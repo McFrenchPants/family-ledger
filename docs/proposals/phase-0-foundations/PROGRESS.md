@@ -19,13 +19,52 @@ Branch: `feature/phase-0-foundations` (off `main`).
 | T2 | Vitest scaffold + currency/dates unit tests | done | Verifier: PASS. 146 tests. Two minor findings fixed by orchestrator (see log). |
 | T3 | Supabase local project + first migration | done | Verifier: PASS on all 6 criteria, verified live against the DB. Two genuine gaps found — see T3a. |
 | T4 | Auth proof of concept | todo | Depends on T1, T3. Auth floor trigger — verifier required. |
-| T5 | Local dev seed data | todo | Depends on T3. |
-| T3a | Close two integrity gaps the T3 verifier found | todo | Membership uniqueness + timezone validation. Security-adjacent — do before Phase 1 policies. |
+| T5 | Local dev seed data | done | Verifier: PASS. Idempotent across resets (identical md5), no auth.users rows. |
+| T3a | Close two integrity gaps the T3 verifier found | done | Verifier: PASS. Validation survived a real search_path hijack attempt. |
 | T6 | Wrangler config + SPA fallback for Cloudflare | todo | Added after T1. See note below — the app cannot deploy correctly without it. |
+| T7 | Database invariant regression tests | todo | **Do before Phase 1 policies.** Nothing in CI currently re-checks the unique index or timezone trigger. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-04 — T3a + T5 verified (pass); T7 opened
+
+Verifier returned **pass** on both. It probed attack paths the brief did not
+name, and two results are worth recording:
+
+- **The timezone validator resists search_path hijacking.** As
+  `authenticated` with `search_path = 'evil, public'` it still rejected bad
+  zones; then, as superuser, the verifier created a real
+  `evil.pg_timezone_names` view returning `'Not/AReal_Zone'` and put `evil`
+  first — still rejected. `pg_catalog` cannot be shadowed at all (the `pg_`
+  prefix is reserved). It also confirmed application roles cannot disable
+  the trigger: they hold no `CREATE` on `public`, and both tables and the
+  function are owned by `postgres`.
+- **The unique index blocks escalation via UPDATE, not just INSERT** —
+  repointing a second existing member row at an already-linked user is
+  rejected. Same user in a *different* household is still allowed, so the
+  index is correctly scoped rather than over-broad.
+
+Timezone edge cases all resolve strictly in the right direction. Notably
+`'localtime'` is rejected — that is the server-local alias the standing rule
+forbids, and the most important of the edge cases. `'EST5EDT'` is accepted,
+which is fine: it is a real legacy IANA zone that does observe DST, so it
+cannot mis-date.
+
+**New task T7, from the verifier's second finding.** Neither invariant has a
+committed regression test — the only thing proving them is ad hoc SQL that
+will not run in CI. `CLAUDE.md`'s Testing section explicitly calls for
+database/security tests with negative cases, and Phase 1 is about to layer
+RLS policies directly on top of these two guarantees. If the unique index or
+the trigger were dropped, nothing would currently catch it. This should land
+**before** Phase 1's policy work, not after.
+
+Also carried forward to Phase 1: `households.timezone` must be a picker
+sourced from `pg_timezone_names`, never a free-text field. Validation is
+deliberately case-sensitive (canonical storage), so plausible input like
+`'america/chicago'` raises a raw `check_violation` — acceptable in the
+database, unacceptable as a user-facing experience.
 
 ### 2026-09-04 — T2 verified (pass), two findings fixed
 
