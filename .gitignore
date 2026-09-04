@@ -11,6 +11,9 @@ dist/
 .env.*
 !.env.example
 
+# Wrangler local state (dev server cache, deploy dry-run output)
+.wrangler/
+
 # Supabase CLI local state
 supabase/.branches/
 supabase/.temp/
