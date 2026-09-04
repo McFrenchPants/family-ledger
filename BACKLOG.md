@@ -29,7 +29,11 @@ The seven phases below are transcribed from `docs/ARCHITECTURE.md` §29 and
 order and its dependencies. They are not invented work. Phases are strictly
 sequential except where noted.
 
-1. **Phase 0 — Technical foundations** — status: `ready` — analysis: analysis/00-phase-0-foundations.md
+1. **Phase 0 — Technical foundations** — status: `in progress` — analysis: analysis/00-phase-0-foundations.md
+   Tracking doc: `docs/proposals/phase-0-foundations/PROGRESS.md` (branch
+   `feature/phase-0-foundations`) — that file is the source of truth for
+   task-level status, not this entry.
+
    Vite + React + TypeScript app skeleton, Tailwind CSS + Radix UI setup
    (ADR-008), local Supabase project via CLI, initial schema and first
    migration, Cloudflare Pages deployment, authentication proof of concept.
@@ -37,19 +41,15 @@ sequential except where noted.
    every later task's verification commands depend on — nothing else can
    be properly verified until this lands.
 
-   Split into two tracks — do the local one first:
-   - **Local track** (startable now): app skeleton, Tailwind/Radix setup,
-     `supabase start` against local Docker, first migration, auth PoC
-     against the local Supabase instance. No external accounts needed
-     beyond what already exists.
-   - **Hosted track** (blocked on one manual step): linking the CLI to the
-     real Supabase project (`fsszkclgeekdyyspgrhg` — see
-     `docs/ARCHITECTURE.md` §21) and connecting Cloudflare Pages to the
-     GitHub repo with preview deployments disabled (§20/ADR-009). The
-     Supabase project and GitHub repo already exist; Cloudflare Pages does
-     not yet have the project connected — that's a one-time dashboard
-     action only a human can complete (OAuth-style repo connection), not
-     something this framework should attempt on its own.
+   Two tracks:
+   - **Local track** (in progress — see the proposal's PROGRESS.md): app
+     skeleton, Tailwind/Radix setup, `supabase start` against local
+     Docker, first migration, auth PoC against the local Supabase
+     instance.
+   - **Hosted track** (done): Cloudflare Pages is connected to the GitHub
+     repo with the production branch set to `production`. Linking the CLI
+     to the real Supabase project (`fsszkclgeekdyyspgrhg`) is deferred
+     until there's a migration worth pushing to it.
 
 2. **Phase 1 — Security and core ledger** — status: `ready` — analysis: not yet written
    Households/members model, RLS policies, Parent/Child role enforcement,
