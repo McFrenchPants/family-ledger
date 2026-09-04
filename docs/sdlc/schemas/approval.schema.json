@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdlc-supervisor.plugin/schemas/approval.schema.json",
+  "title": "sdlc-supervisor approval record",
+  "description": "One recorded human approval for a single production-mutation-or-above action, for projects using 'full' release mode (see project.yaml's release.mode). Lives as one file per approval in .sdlc/approvals/. This is NOT a token system and NOT a new gate in front of the user: the authorization itself is still a direct, live human instruction in the conversation. The record exists so that what was approved -- which operation, against which branch, at which exact commit -- is written down rather than remembered, so a later session or a differently-worded ask cannot silently reuse it. The release operator's read/verify/consume procedure is documented in docs/sdlc/APPROVAL_RECORDS.md.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "operation",
+    "target_branch",
+    "commit_sha",
+    "approved_at",
+    "approved_by",
+    "single_use",
+    "consumed"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Version of THIS schema's shape (semver). Bump when the approval-record structure changes in a way that could break a reader."
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "merge_to_default_branch",
+        "push_to_remote",
+        "deploy_release",
+        "restart_live_service",
+        "remote_host_session",
+        "device_install"
+      ],
+      "description": "The single operation being approved -- an enum rather than free text so a record cannot be stretched to cover an adjacent action by wording. This set is deliberately generic; a project's own agents/supervisor.md should map each enum value onto its real, concrete meaning for that project (e.g. 'restart_live_service' might mean a Kubernetes rollout restart in one project and a Home Assistant add-on restart in another). Deliberately absent: read-only live checks, which need no approval record; and anything in supervisor.md's 'What you never do' list, which no approval record can authorize at all."
+    },
+    "work_item_id": {
+      "type": ["string", "null"],
+      "description": "Work item this approval relates to, matching an id in .sdlc/state.json's work_items[]. null when the action is not tied to a tracked work item."
+    },
+    "task_id": {
+      "type": ["string", "null"],
+      "description": "Task this approval relates to, matching an id in .sdlc/state.json's work_items[].tasks[]. null when the action covers a whole work item or otherwise has no single owning task."
+    },
+    "target_branch": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The branch the operation acts on or from -- for 'merge_to_default_branch' and 'push_to_remote', the source branch being merged/pushed; for deploy/restart/session/install, the branch the artifact being deployed or installed was built from. Part of how the release operator locates the right record for the action in front of it."
+    },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Full 40-character SHA of the exact commit that was approved -- not a short SHA and not a branch name, because the whole point is that it identifies one specific artifact. Before acting, the release operator must confirm that target_branch's current HEAD still equals this SHA; a newer commit on the same branch is a different artifact and needs its own approval record."
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp of when the human gave the instruction this record is capturing."
+    },
+    "approved_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who approved it -- the repo owner's identifier (e.g. their email or handle). Recorded because 'a human said so in conversation' is the actual authorization; this names which human."
+    },
+    "instruction": {
+      "type": "string",
+      "description": "Short verbatim quote or faithful paraphrase of the live instruction that authorized this action, so a later reader can see what was actually asked for rather than only the structured fields. Recommended, not required."
+    },
+    "single_use": {
+      "type": "boolean",
+      "const": true,
+      "description": "Always true. Modelled as an explicit, self-describing field rather than an implicit rule so a record read in isolation states its own reuse policy -- and constrained to true so that no one can mint a standing/reusable approval by writing false ('go ahead' authorizes the specific thing just discussed, not a standing license)."
+    },
+    "consumed": {
+      "type": "boolean",
+      "description": "false when the approval is still open; set to true by the release operator immediately after it performs the approved operation. A record with consumed=true must never authorize a second action."
+    },
+    "consumed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO-8601 timestamp of when the approval was consumed, or null while still open. Kept alongside the boolean rather than replacing it so the record doubles as an audit trail of when the live action actually happened."
+    },
+    "consumed_by": {
+      "type": ["string", "null"],
+      "description": "Identifier of the release-operator run/session that consumed it (e.g. a run_id matching the lease convention in state.schema.json), or null while still open. Lets a later session tell 'this was already used, by some earlier run' apart from 'this is the record I myself just created and acted on'."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-text context: preconditions confirmed before the action, what the operator actually ran, anything a future reader would need. Optional."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "consumed": { "const": true } },
+        "required": ["consumed"]
+      },
+      "then": {
+        "required": ["consumed_at", "consumed_by"],
+        "properties": {
+          "consumed_at": { "type": "string" },
+          "consumed_by": { "type": "string" }
+        },
+        "description": "A consumed record must say when it was consumed and by which run -- 'used up' with no trace of the actual live action would defeat the point of recording it."
+      }
+    }
+  ]
+}

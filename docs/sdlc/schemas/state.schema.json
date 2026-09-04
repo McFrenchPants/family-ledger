@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdlc-supervisor.plugin/schemas/state.schema.json",
+  "title": "sdlc-supervisor state.json",
+  "description": "Machine state for the sdlc-supervisor framework: work items, their task graphs, lifecycle state, and per-task leases. Every write to .sdlc/state.json must validate against this schema, and every lifecycle_state transition must be checked against the state-transition validator (scripts/validate-state.mjs) before being persisted -- this schema only constrains shape, not legal transitions.",
+  "type": "object",
+  "required": ["schema_version", "work_items"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Version of THIS schema's shape (semver). Bump when state.json's structure changes in a way that could break readers/writers."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last write to this file. Optional but recommended -- the orchestrator should set it on every save."
+    },
+    "work_items": {
+      "type": "array",
+      "description": "One entry per tracked work item (a proposal/feature effort). Each work item owns a task graph.",
+      "items": { "$ref": "#/$defs/work_item" }
+    }
+  },
+  "$defs": {
+    "lifecycle_state": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "design_review",
+        "approved",
+        "implementing",
+        "verifying",
+        "ready_to_release",
+        "released"
+      ],
+      "description": "Full lifecycle enum, validated on every transition. An agent cannot write a 'done'/'released'-equivalent status without the evidence its verification_commands require having actually produced."
+    },
+    "task_status": {
+      "type": "string",
+      "enum": ["todo", "in-progress", "blocked", "done"],
+      "description": "Coarse status vocabulary, matching the wording used in a project's own PROGRESS.md-style task table legend. This is the field humans read at a glance; lifecycle_state (below) is the finer-grained, evidence-gated state used once a task has an actual task packet driving it through the formal pipeline. 'blocked' here is informational/manually-set (e.g. waiting on an external decision) and distinct from a task merely having incomplete dependencies, which is derivable from the dependencies array plus the referenced tasks' own status."
+    },
+    "lease": {
+      "type": "object",
+      "description": "Per-task lease: which agent/run currently owns this task, and how many attempts it has used. attempt_count feeds project.yaml's budgets.max_attempts_per_task -- once it reaches that limit, the task escalates to the orchestrator instead of being retried automatically.",
+      "required": ["assigned_agent", "run_id", "attempt_count"],
+      "additionalProperties": false,
+      "properties": {
+        "assigned_agent": {
+          "type": ["string", "null"],
+          "description": "Role/name of the agent currently assigned (e.g. 'implementer', 'verifier'). null when the task is unassigned/unleased."
+        },
+        "run_id": {
+          "type": ["string", "null"],
+          "description": "Identifier of the run/session that holds this lease. null when unassigned."
+        },
+        "attempt_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of attempts made on this task so far under the current (or most recent) lease. Reset only per the orchestrator's own policy, not by this schema."
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": ["id", "title", "status", "dependencies", "lease"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Task identifier, e.g. 'SS0.1'. Referenced by other tasks' dependencies arrays."
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/task_status"
+        },
+        "lifecycle_state": {
+          "oneOf": [{ "$ref": "#/$defs/lifecycle_state" }, { "type": "null" }],
+          "description": "null until this task has an actual task packet generated for it and enters the formal draft->...->released pipeline. Once non-null, transitions must go through the state-transition validator."
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Task IDs that must reach status 'done' (and, once tracked, lifecycle_state 'released') before this task can be leased to an implementer."
+        },
+        "lease": {
+          "$ref": "#/$defs/lease"
+        },
+        "task_packet_path": {
+          "type": ["string", "null"],
+          "description": "Path to this task's generated task packet under .sdlc/task-packets/, once one exists. The packet itself is NOT embedded here -- state.json holds only the reference."
+        },
+        "report_path": {
+          "type": ["string", "null"],
+          "description": "Path to this task's completion report under .sdlc/task-packets/ (or .sdlc/evidence/), once the implementer has returned one. Referenced only, not embedded."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free-text notes, mirroring the Notes column convention used in a project's own PROGRESS.md-style task table (e.g. dependency call-outs, spike findings)."
+        }
+      }
+    },
+    "work_item": {
+      "type": "object",
+      "required": ["id", "title", "lifecycle_state", "tasks"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "lifecycle_state": {
+          "$ref": "#/$defs/lifecycle_state",
+          "description": "Overall lifecycle state of the work item as a whole, distinct from any individual task's lifecycle_state."
+        },
+        "tasks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/task" },
+          "description": "This work item's task dependency graph -- a flat list of tasks, each carrying its own dependencies array (task IDs), so the graph is reconstructable without a separate edge list."
+        }
+      }
+    }
+  }
+}

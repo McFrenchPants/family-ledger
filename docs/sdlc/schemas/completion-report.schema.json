@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdlc-supervisor.plugin/schemas/completion-report.schema.json",
+  "title": "sdlc-supervisor completion report",
+  "description": "Structured report an implementer returns for a task packet, replacing free-text 'here's what I did' summaries. If an implementer finds it needs to touch something outside its packet's read_paths/write_paths, it reports status 'scope_change_requested' rather than doing the out-of-scope work and mentioning it in a decisions note.",
+  "type": "object",
+  "required": [
+    "status",
+    "files_changed",
+    "acceptance_results",
+    "commands_run",
+    "test_results",
+    "decisions",
+    "scope_deviations",
+    "unresolved_risks",
+    "commit"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "scope_change_requested", "blocked", "failed"],
+      "description": "Outcome of this attempt. 'done': acceptance criteria met and (if the workflow calls for it) committed. 'scope_change_requested': the implementer determined it needs to read/write outside the packet's declared paths and stopped to ask rather than doing it -- a hard requirement of this framework's scope-contract model, not an implementer's judgment call to skip. 'blocked': cannot proceed for a reason outside the implementer's control (e.g. an unmet dependency, a missing credential/environment it isn't allowed to provision itself). 'failed': attempted the task and did not reach a done state (e.g. verification commands failed and further local attempts wouldn't help)."
+    },
+    "files_changed": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Repo-relative paths actually created or modified this attempt. Should be a subset of the packet's write_paths; anything outside it is exactly what 'scope_change_requested' exists to flag instead of silently including here."
+    },
+    "acceptance_results": {
+      "type": "array",
+      "description": "One entry per criterion in the source packet's acceptance_criteria, in the same order, so a reader can line them up directly.",
+      "items": {
+        "type": "object",
+        "required": ["criterion", "met", "notes"],
+        "additionalProperties": false,
+        "properties": {
+          "criterion": { "type": "string", "minLength": 1, "description": "Copied verbatim from the packet's acceptance_criteria." },
+          "met": { "type": "boolean" },
+          "notes": { "type": "string", "description": "Evidence or explanation; may be an empty string if met is true and self-evident, but should not be empty when met is false." }
+        }
+      }
+    },
+    "commands_run": {
+      "type": "array",
+      "description": "One entry per verification (or other relevant) command actually executed.",
+      "items": {
+        "type": "object",
+        "required": ["command", "exit_code", "summary"],
+        "additionalProperties": false,
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "exit_code": { "type": "integer" },
+          "summary": { "type": "string", "description": "Short human-readable summary of the output (e.g. '387 tests, 0 failed'), not the raw log." }
+        }
+      }
+    },
+    "test_results": {
+      "description": "Free-form by design -- a project's test/verification shape varies enough by task (unit suite counts, manual throwaway-script verification with no runner, a live check under a supervisor role, etc.) that a single fixed structure would just get stringified into anyway. Typically a string summary, but any JSON value is accepted; the generator/consumers should not assume a specific shape here beyond 'present'.",
+      "not": { "type": "null" }
+    },
+    "decisions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Notable judgment calls made during the attempt, in scope, that a reviewer should know about."
+    },
+    "scope_deviations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Anything that ended up differing from the packet's stated scope, even if minor and not rising to a full 'scope_change_requested' status (e.g. a read outside read_paths that turned out to be unavoidable and harmless). Distinct from status: scope_change_requested, which is for write-scope changes serious enough to halt and ask before proceeding."
+    },
+    "unresolved_risks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Known gaps, caveats, or follow-ups the implementer is flagging rather than silently leaving implicit."
+    },
+    "commit": {
+      "type": ["string", "null"],
+      "description": "Commit SHA once the work is committed on a feature branch, else null (e.g. status is blocked/failed/scope_change_requested, or the workflow leaves committing to the orchestrator)."
+    }
+  }
+}

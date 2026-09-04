@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+
+# Secrets — see CLAUDE.md: service_role and VAPID private keys must never
+# reach source control or a browser bundle.
+.env
+.env.*
+!.env.example
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.log
+
+# sdlc-supervisor transient state (task packets and the active-packet
+# pointer are per-run scratch, not history)
+.sdlc/task-packets/
+.sdlc/active-packet

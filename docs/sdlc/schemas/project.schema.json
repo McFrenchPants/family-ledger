@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdlc-supervisor.plugin/schemas/project.schema.json",
+  "title": "sdlc-supervisor project.yaml",
+  "description": "Per-project policy for the sdlc-supervisor framework: framework/schema version, run budgets, verification-profile floor, release-tier config, and the bootstrap owned-files list. Authored as YAML on disk (.sdlc/project.yaml); this schema describes its parsed (JSON-equivalent) shape. Written once by the plugin's init flow (see commands/continue-development.md) and hand-edited afterward as the project's needs change.",
+  "type": "object",
+  "required": ["framework_version", "schema_version", "path_enforcement", "budgets", "verification_profile", "owned_files"],
+  "additionalProperties": false,
+  "properties": {
+    "framework_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Version of the sdlc-supervisor framework itself (the orchestrator/agent/hook machinery), independent of any one schema's shape. Should match the installed plugin's version at the time this file was scaffolded or last reviewed."
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Version of THIS schema's shape (semver) -- should track schemas/project.schema.json, and does not need to move in lockstep with state.schema.json's schema_version."
+    },
+    "path_enforcement": {
+      "type": "object",
+      "description": "Kill switch for the PreToolUse path-enforcement hook (hooks/sdlc-path-check.mjs), which denies an implementer's Edit/Write outside its active task packet's write_paths. The toggle lives in this file -- read by the hook script at runtime -- specifically so that disabling enforcement never routes through the Edit/Write tools the hook itself gates (a hook that can block its own author's attempt to turn it off is a real, previously-hit self-lock). Flip it with Bash (sed/python), never with Edit/Write.",
+      "required": ["enforce"],
+      "additionalProperties": false,
+      "properties": {
+        "enforce": {
+          "type": "boolean",
+          "description": "true = the hook denies out-of-scope writes by implementer agents; false = the hook exits without an opinion on every call. Default when this file or this key is missing is `true` -- enforcement can only be switched off explicitly, never by an absent/typo'd key. Note the hook is scoped to callers whose PreToolUse input reports agent_type 'implementer', so `true` does not restrict ordinary interactive sessions in this repo."
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "description": "Run budgets governing how far the orchestrator (the /continue-development command) drives a run before stopping. All but token_or_time_budget are hard caps; token_or_time_budget is explicitly soft (logged and flagged, not a hard kill).",
+      "required": [
+        "max_tasks_per_run",
+        "max_concurrent_implementers",
+        "max_attempts_per_task",
+        "max_verifier_retries",
+        "token_or_time_budget"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_tasks_per_run": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of tasks the orchestrator will drive to completion in a single run before stopping."
+        },
+        "max_concurrent_implementers": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of implementer agents the orchestrator may have leased/running at once. Keep at 1 unless task packets are worktree-isolated (see design notes in agents/implementer.md) -- concurrent implementers sharing one working tree is unsafe."
+        },
+        "max_attempts_per_task": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum attempts an implementer may make on one task (tracked via that task's lease.attempt_count in state.json) before the task escalates to the orchestrator instead of being retried automatically."
+        },
+        "max_verifier_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum times a Verifier subagent may be re-run on the same task/report before escalating."
+        },
+        "token_or_time_budget": {
+          "type": "object",
+          "description": "Soft, per-run budget -- logged and flagged when exceeded, never used to hard-kill a run. Either field (or both) may be null to mean 'not tracked'.",
+          "additionalProperties": false,
+          "required": ["tokens", "minutes"],
+          "properties": {
+            "tokens": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Rough token budget for a run. null = not tracked."
+            },
+            "minutes": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Rough wall-clock time budget for a run, in minutes. null = not tracked."
+            }
+          }
+        }
+      }
+    },
+    "verification_profile": {
+      "type": "object",
+      "description": "Strong verification (a separate read-only Verifier subagent) is required, not optional, for any task packet touching floor_triggers. A project may widen that list; it cannot narrow it.",
+      "required": ["floor_triggers", "widen"],
+      "additionalProperties": false,
+      "properties": {
+        "floor_triggers": {
+          "type": "array",
+          "description": "Fixed floor. This exact set is immutable framework policy -- a conforming project.yaml MUST reproduce it verbatim here (do not edit; widen coverage via the `widen` array instead).",
+          "const": [
+            "authentication_authorization",
+            "data_persistence_migrations",
+            "deployment_release_tooling",
+            "production_mutation_tier_or_above"
+          ]
+        },
+        "widen": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Project-specific additional triggers (free-form strings or path/description patterns) that also require strong verification for this project, on top of the immutable floor. May be empty. Fill this in with whatever this project's own real risk areas are (e.g. 'payment_handling', 'third_party_credential_or_token_handling', 'access_to_shared_external_service')."
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "description": "Optional. Present only for projects that use the two-tier release model (a routine integration branch plus a gated production branch/live-system tier driving a real supervisor role). Absent (or 'mode': 'lite') means this project has no supervisor tier at all -- continue-development stops at 'implemented, tested, committed on a feature branch' and the user merges/releases by hand.",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["lite", "full"],
+          "description": "'lite': no supervisor agent, no approval records -- continue-development implements and commits to a feature branch and stops there. 'full': the supervisor agent, approval-record gate, and integration/production branch tiers below are active."
+        },
+        "integration_branch": {
+          "type": "string",
+          "description": "The default branch feature branches fork from and merge back into as a routine, standing-authorized step (this project's equivalent of 'develop'). Only meaningful when mode is 'full'."
+        },
+        "production_branch": {
+          "type": "string",
+          "description": "The branch that actually ships/deploys, promoted from integration_branch only on a live, explicit instruction plus an approval record (this project's equivalent of 'master'). Only meaningful when mode is 'full'."
+        },
+        "live_systems": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Short names of external live systems the supervisor role is allowed to reach (read-only checks and the specific state-changing actions named in agents/supervisor.md) once mode is 'full' -- e.g. 'production-database', 'kubernetes-cluster', 'ios-testflight'. Empty is valid: some 'full'-mode projects gate merges to production without the supervisor ever reaching an external system."
+        }
+      }
+    },
+    "always_forbidden_paths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Paths the implementer role may never write to, regardless of what any task packet's write_paths says -- enforced directly by hooks/sdlc-path-check.mjs's ALWAYS_FORBIDDEN_PATHS-equivalent check. Typically the orchestrator's own tracking docs (a backlog file, a root progress file) that the implementer should never be the one updating. Defaults to an empty list if omitted -- fill this in during init."
+    },
+    "owned_files": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Path globs this project's sdlc tooling considers itself the owner/bootstrapper of -- used by tooling (e.g. the sdlc-doctor command) to know what it's safe to scaffold, check, or regenerate without being told file-by-file."
+    }
+  }
+}
