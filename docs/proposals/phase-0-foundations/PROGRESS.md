@@ -17,14 +17,48 @@ Branch: `feature/phase-0-foundations` (off `main`).
 | --- | --- | --- | --- |
 | T1 | App skeleton (Vite/React/TS/Tailwind/Radix/Router/tooling) | done | Verified independently: typecheck/lint/build all pass. Orchestrator added a `no-restricted-properties` guard so `Number.parseFloat` can't bypass the existing `parseFloat` one. |
 | T2 | Vitest scaffold + currency/dates unit tests | todo | Depends on T1. |
-| T3 | Supabase local project + first migration | in-progress | Runs parallel to T1 (touches only supabase/). RLS floor trigger — verifier required. |
+| T3 | Supabase local project + first migration | done | Verifier: PASS on all 6 criteria, verified live against the DB. Two genuine gaps found — see T3a. |
 | T4 | Auth proof of concept | todo | Depends on T1, T3. Auth floor trigger — verifier required. |
 | T5 | Local dev seed data | todo | Depends on T3. |
+| T3a | Close two integrity gaps the T3 verifier found | todo | Membership uniqueness + timezone validation. Security-adjacent — do before Phase 1 policies. |
 | T6 | Wrangler config + SPA fallback for Cloudflare | todo | Added after T1. See note below — the app cannot deploy correctly without it. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-04 — T3 verified (pass), T3a opened
+
+Verifier returned **pass** on all six acceptance criteria, checked live
+against the running database rather than read off the SQL. Notably it
+confirmed the attribution invariant empirically: it created an `auth.users`
+row, linked a member, deleted the user, and confirmed the member row
+survived with name and role intact and only `user_id` nulled. It also
+confirmed default-deny is real, not nominal — as both `anon` and
+`authenticated`, selects returned 0 rows and writes were refused.
+
+One thing it checked that is worth recording so nobody re-investigates it:
+`anon`/`authenticated` DO hold DML grants on these tables, but those come
+from Supabase's stock `pg_default_acl` defaults, not from this migration.
+Default-deny therefore rests entirely on RLS — which is the normal Supabase
+posture, and it is working. Related: RLS is enabled but not `FORCE`d, so the
+table owner bypasses it. That matters later — security-definer functions run
+as owner and will bypass RLS by design.
+
+**Two genuine gaps found, now T3a.** Both were demonstrated with real
+inserts, not inferred:
+1. The same `auth.users` id can be inserted twice into one household as two
+   members with *conflicting roles* (one `parent`, one `child`). Phase 1's
+   policies will resolve a caller's role by membership lookup, so this is a
+   privilege-escalation ambiguity waiting to happen. Most consequential of
+   the findings; fix before policies are written on top of it.
+2. `households.timezone` accepts any string — `'Not/AReal_Zone'` inserts
+   fine. Since the household zone drives every today/due/overdue
+   computation, a bad value doesn't fail at write time, it silently
+   mis-dates financial obligations later.
+
+Deferred as reasonable: `status='archived'` with null `archived_at`, and
+empty-string `name`. Both recoverable and genuinely later-phase concerns.
 
 ### 2026-09-04 — T1 done; T6 added
 
