@@ -21,12 +21,47 @@ Branch: `feature/phase-0-foundations` (off `main`).
 | T4 | Auth proof of concept | todo | Depends on T1, T3. Auth floor trigger — verifier required. |
 | T5 | Local dev seed data | done | Verifier: PASS. Idempotent across resets (identical md5), no auth.users rows. |
 | T3a | Close two integrity gaps the T3 verifier found | done | Verifier: PASS. Validation survived a real search_path hijack attempt. |
-| T6 | Wrangler config + SPA fallback for Cloudflare | todo | Added after T1. See note below — the app cannot deploy correctly without it. |
+| T6 | Wrangler config + SPA fallback for Cloudflare | done | Verifier: PASS. Two dashboard-side items need the user — see log. |
 | T7 | Database invariant regression tests | todo | **Do before Phase 1 policies.** Nothing in CI currently re-checks the unique index or timezone trigger. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-04 — T6 verified (pass); Phase 0 local track complete
+
+Verifier returned **pass**. It validated the config against wrangler
+4.129.0's own bundled JSON schema rather than against documentation or
+memory — `assets.not_found_handling` is an enum of
+`single-page-application | 404-page | none`, so the value used is the
+current Workers-with-assets spelling, not the legacy `[site]` / `_redirects`
+/ Pages-era shape. Its negative control was cleaner than the implementer's:
+it pointed an **out-of-repo** config at the same `dist/` with
+`not_found_handling` omitted, so `wrangler.jsonc` was never edited and
+restoration was exact by construction. Without the key, `/parent`, `/child`
+and a deep path all return 404 with 0-byte bodies; with it, all return 200
+with real HTML, while `/assets/*.js` still serves the real asset rather than
+being swallowed by the fallback.
+
+Orchestrator added `"preview_urls": false` explicitly after verification.
+It is already wrangler's default, but ADR-009 is a deliberate privacy
+decision and should not rest on a default that could change. Note these are
+**two independent controls** — the wrangler-side `preview_urls` and the
+Cloudflare dashboard's own preview-deployment setting — and both must stay
+off. Re-confirmed `deploy --dry-run` after the change.
+
+**Two dashboard-side items the user must confirm before promoting to
+`production`.** Neither is fixable in the repo and neither is checkable from
+this machine:
+
+1. **The Workers Builds project's build command must be `npm run build`.**
+   `dist/` is gitignored, and `wrangler.jsonc` declares no `build.command`,
+   so a fresh CI checkout has nothing to upload unless the dashboard builds
+   it. This is the single most likely cause of a failed first deploy.
+2. **`"name": "family-ledger"` must match the connected Worker's name.** If
+   it does not, `wrangler deploy` creates and deploys a *different* Worker —
+   the command reports success while nothing changes at the expected URL.
+   A quietly wrong deploy is worse than a failed one.
 
 ### 2026-09-04 — T3a + T5 verified (pass); T7 opened
 
