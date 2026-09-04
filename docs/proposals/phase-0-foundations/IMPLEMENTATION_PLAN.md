@@ -160,3 +160,35 @@ the real `npm run <script>` names T1/T2 established, and records the local
 Supabase workflow. This is deliberately not delegated — `CLAUDE.md` isn't
 in `always_forbidden_paths` but is treated as orchestrator-owned tracking
 content for this project, same as `BACKLOG.md`/`PROGRESS.md`.
+
+### T6 — Wrangler config + SPA fallback for Cloudflare (added after T1 review)
+
+**Scope:** A `wrangler` config file (`wrangler.jsonc` or `wrangler.toml`) at
+the repo root declaring the static-assets directory (`dist`), plus SPA
+fallback so unmatched paths serve `index.html` rather than 404ing.
+
+**Why this exists:** T1's router uses `createBrowserRouter`, so a direct
+navigation to `/parent` or `/child` is a real HTTP request for that path.
+Vite's `preview` server applies an SPA fallback automatically — which is why
+T1's route verification passed locally — but a static host does not, unless
+told to. Separately, Cloudflare's current Git integration deploys with
+`npx wrangler deploy` and reads the assets directory from a repo-side
+wrangler config; without one, the connected Pages/Workers project has
+nothing to deploy.
+
+**Acceptance criteria:**
+- A wrangler config exists declaring `dist` as the assets directory, with
+  SPA/not-found handling set so unmatched routes serve `index.html` with a
+  200, not a 404.
+- Verified locally against a real build: `npm run build`, then serve via
+  `npx wrangler dev` (or equivalent) and confirm a **direct** request to
+  `/parent` and `/child` returns the app rather than a 404. Do not verify
+  this with `npm run preview` — Vite's fallback masks exactly the bug this
+  task exists to prevent.
+- No secrets in the config file. `VITE_*` values are set in the Cloudflare
+  dashboard, not committed here.
+
+**Depends on:** T1.
+
+**Note:** this task only makes deployment *correct*; actually deploying is
+the supervisor role's job and is out of scope here.
