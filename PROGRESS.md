@@ -26,6 +26,32 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 _Newest entries on top._
 
+### 2026-09-04 — Phase 0 complete (T4 auth PoC verified)
+
+T4, the last remaining Phase 0 task, is done and verifier-passed. The local
+track's eight tasks (T1–T7 plus T3a) are all complete; the hosted track was
+already done. Detail lives in
+`docs/proposals/phase-0-foundations/PROGRESS.md` — this entry is the summary.
+
+Supabase Auth email/password sign-in works end to end against the local stack
+and the session survives a reload, proven two independent ways (a real browser
+driven through the DOM, and a headless reconstruction of the client that showed
+a fresh client recovering the persisted session). Nothing has been confirmed by
+human eyes in a rendered browser yet — worth one manual pass before Phase 1.
+
+Deliberately not built: any route guard. Session state is display state; the
+authorization boundary is Phase 1's RLS, per the standing rule that the browser
+is untrusted.
+
+Two new backlog items came out of this, both `idea`, neither blocking Phase 1:
+**8** (split the 451 kB single-chunk bundle that `@supabase/supabase-js`
+created) and **9** (component-test tooling — the auth code has no regression
+net, since `npm run test` still covers only the pure currency/dates modules).
+
+`production` is still at the framework-init commit and far behind `main`.
+Promoting it needs an explicit go-ahead and an approval record; nothing here
+authorizes that.
+
 ### 2026-09-04 — Strategy clarified; infrastructure provisioned; Phase 0 analysis finalized
 
 User provisioned real infrastructure outside this session: a GitHub repo

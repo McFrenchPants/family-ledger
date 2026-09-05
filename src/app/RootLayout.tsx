@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 
+import { SessionStatus } from "../features/auth/SessionStatus";
+
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
     "inline-flex min-h-touch items-center rounded-card px-3 text-label font-medium",
@@ -20,7 +22,14 @@ export function RootLayout() {
           <NavLink to="/child" className={navLinkClass}>
             Child
           </NavLink>
+          <NavLink to="/sign-in" className={navLinkClass}>
+            Sign in
+          </NavLink>
         </nav>
+
+        <div className="mt-2">
+          <SessionStatus />
+        </div>
       </header>
 
       <main className="flex-1 px-gutter py-4">

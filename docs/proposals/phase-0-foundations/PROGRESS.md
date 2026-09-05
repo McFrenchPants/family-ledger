@@ -18,7 +18,7 @@ Branch: `feature/phase-0-foundations` (off `main`).
 | T1 | App skeleton (Vite/React/TS/Tailwind/Radix/Router/tooling) | done | Verified independently: typecheck/lint/build all pass. Orchestrator added a `no-restricted-properties` guard so `Number.parseFloat` can't bypass the existing `parseFloat` one. |
 | T2 | Vitest scaffold + currency/dates unit tests | done | Verifier: PASS. 146 tests. Two minor findings fixed by orchestrator (see log). |
 | T3 | Supabase local project + first migration | done | Verifier: PASS on all 6 criteria, verified live against the DB. Two genuine gaps found — see T3a. |
-| T4 | Auth proof of concept | todo | Depends on T1, T3. Auth floor trigger — verifier required. |
+| T4 | Auth proof of concept | done | Verifier: PASS on all 3 criteria. Session persistence proven two independent ways. Orchestrator fixed the unhandled sign-out path. |
 | T5 | Local dev seed data | done | Verifier: PASS. Idempotent across resets (identical md5), no auth.users rows. |
 | T3a | Close two integrity gaps the T3 verifier found | done | Verifier: PASS. Validation survived a real search_path hijack attempt. |
 | T6 | Wrangler config + SPA fallback for Cloudflare | done | Verifier: PASS. Two dashboard-side items need the user — see log. |
@@ -27,6 +27,78 @@ Branch: `feature/phase-0-foundations` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-04 — T4 verified (pass); Phase 0 local track complete
+
+Verifier returned **pass** on all three acceptance criteria. Phase 0 has no
+`todo` tasks left.
+
+**What landed.** `src/lib/supabase.ts` (the single browser client, built only
+from `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`), a `SessionProvider` hung on
+T1's deliberately-empty `AppProviders` placeholder, `SignInForm`,
+`SessionStatus`, and a `/sign-in` route. One new dependency,
+`@supabase/supabase-js`.
+
+**No route guard, deliberately.** Nothing in this change gates access — the
+sign-in nav link is unconditional and no route is wrapped in a session
+conditional. Session state is display state only. A future session should not
+"finish" this by adding a React guard and treating it as a control; the real
+boundary is Phase 1's RLS.
+
+**Session-survives-reload was proven twice, by different methods, and neither
+was a screenshot.** The implementer drove a real browser (the Browser pane was
+hidden, so via DOM/`javascript_tool` and accessibility-tree inspection, not
+pointer clicks): after a forced `location.reload()` — confirmed by
+`performance.getEntriesByType('navigation')[0].type === "reload"` — the status
+still read the signed-in email and the password form was absent from the tree.
+The verifier, which had no browser tool at all, instead reconstructed the client
+headlessly with the exact options from `supabase.ts`, signed in, and showed a
+**freshly constructed client** recovering the session from the same storage key
+— which is precisely what `SessionProvider`'s mount-time `getSession()` does.
+It also confirmed the provider really is mounted above the router.
+
+**The residual gap, stated plainly:** nobody has looked at this with human eyes
+in a rendered browser. Both methods establish that the session persists and that
+the components read it correctly; neither establishes that the page *looks*
+right. That is a cheap thing for the user to confirm manually and worth doing
+once before Phase 1 builds on it.
+
+**Key hygiene was checked past the grep.** `grep -ri "service_role" src/`
+returning nothing is weak evidence on its own, so the verifier rebuilt `dist/`
+and decoded every JWT in the bundle: exactly one, with payload
+`{"iss":"supabase-demo","role":"anon"}`. No VAPID private key either. Note the
+implementer had to rephrase two *warning comments* that mentioned the forbidden
+key by name — they made the acceptance grep return hits. Comments now point at
+`CLAUDE.md` instead, which keeps the check unambiguous.
+
+**Orchestrator fixed one finding after verification.** `handleSignOut` awaited
+`supabase.auth.signOut()` with no `try/catch`: a network fault would land as an
+unhandled rejection and leave `signingOut` stuck `true`, disabling the button
+permanently with nothing on screen to explain it — the same silent-failure shape
+criterion 3 explicitly forbade on the sign-in path. Now handles both the
+returned-error and thrown cases and renders a `role="alert"`. Typecheck, lint
+and build re-run green after the change.
+
+**Carried forward to Phase 1:**
+
+- **No automated test covers any of the auth code.** The 146 passing tests are
+  all pre-existing `currency`/`dates` unit tests. There is no jsdom or
+  testing-library in `devDependencies`, so a component test is not currently
+  possible without adding tooling. Criterion 1 has no regression guard behind
+  it — if session persistence breaks, nothing in CI will say so.
+- **Bundle jumped ~60 kB → 451 kB (132 kB gzip)**, all `@supabase/supabase-js`
+  in a single chunk. Fine now; this is a phone-first PWA, so route-level
+  code-splitting or a `manualChunks` decision is owed before it ships. Filed as
+  backlog item 8.
+- `readRequiredEnv` throws at module load, so a boot with missing env is a blank
+  page plus a console error. Deliberate fail-loud choice, but it needs an error
+  boundary before anything user-facing.
+- `SessionStatus`/`SignInPage` carry `data-testid` attributes added purely to
+  make this verification assertable. Keep them only if real tests use them.
+- The local stack now emits a `PUBLISHABLE_KEY` (`sb_publishable_…`) alongside
+  the legacy `ANON_KEY`. The legacy key was used, matching `.env.example` and
+  the hosted project. Migrating to publishable keys is a separate, deliberate
+  decision — not something to drift into.
 
 ### 2026-09-04 — T7 verified (pass); the DB test harness gap is closed
 

@@ -29,7 +29,7 @@ The seven phases below are transcribed from `docs/ARCHITECTURE.md` §29 and
 order and its dependencies. They are not invented work. Phases are strictly
 sequential except where noted.
 
-1. **Phase 0 — Technical foundations** — status: `in progress` — analysis: analysis/00-phase-0-foundations.md
+1. **Phase 0 — Technical foundations** — status: `done` — analysis: analysis/00-phase-0-foundations.md
    Tracking doc: `docs/proposals/phase-0-foundations/PROGRESS.md` (branch
    `feature/phase-0-foundations`) — that file is the source of truth for
    task-level status, not this entry.
@@ -42,10 +42,10 @@ sequential except where noted.
    be properly verified until this lands.
 
    Two tracks:
-   - **Local track** (in progress — see the proposal's PROGRESS.md): app
+   - **Local track** (done — see the proposal's PROGRESS.md): app
      skeleton, Tailwind/Radix setup, `supabase start` against local
      Docker, first migration, auth PoC against the local Supabase
-     instance.
+     instance. All eight tasks (T1–T7 plus T3a) are done and verified.
    - **Hosted track** (done): Cloudflare Pages is connected to the GitHub
      repo with the production branch set to `production`. Linking the CLI
      to the real Supabase project (`fsszkclgeekdyyspgrhg`) is deferred
@@ -92,3 +92,24 @@ sequential except where noted.
    accessibility/performance review against `PROJECT_REQUIREMENTS.md` §17.
    Several of these are independently shippable and need not wait for each
    other. Depends on Phase 1 at minimum.
+
+8. **Split the Supabase client out of the main bundle** — status: `idea` — analysis: not yet written
+   Adding `@supabase/supabase-js` in Phase 0 T4 took the built bundle from
+   ~60 kB to 451 kB (132 kB gzip), all in a single chunk. This is a
+   phone-first PWA on possibly-poor connections, and
+   `PROJECT_REQUIREMENTS.md` §17 sets performance expectations, so a
+   route-level code-split or a Vite `manualChunks` decision is owed before
+   anything ships. Not urgent — it is a build-config change, not a
+   rewrite — but it gets worse to retrofit the more feature code piles on
+   top. Independent of the phase sequence; can be done any time after
+   Phase 1 lands enough routes to make the split meaningful.
+
+9. **Component-test tooling for the auth and UI layer** — status: `idea` — analysis: not yet written
+   `npm run test` covers only the pure `currency`/`dates` modules; there is
+   no jsdom or testing-library in `devDependencies`, so nothing guards the
+   sign-in flow or session persistence that Phase 0 T4 built — both were
+   verified once, by hand, and have no regression net. `ARCHITECTURE.md`
+   §24 puts database/security tests first and that ordering is right, so
+   this is deliberately *not* a blocker for Phase 1. Revisit once Phase 1's
+   RLS suite is in place and there is real UI worth pinning down. Keep
+   `npm run test` Docker-free.
