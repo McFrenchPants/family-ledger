@@ -18,7 +18,7 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 | P2.1 | Schema: `payment_plans` and `payment_periods` | done | Verifier: PASS on all 7 criteria, independently re-derived. |
 | P2.2 | RLS policies for read access | done | Verifier: PASS on all 5 criteria, independently re-derived. |
 | P2.3 | Security-definer functions: create/deactivate plan, ensure-current-period, waive | done | Verifier: FAIL on first pass (month-walk compounding drift for starts_on on day 29-31), fixed by orchestrator, re-verified independently PASS on all criteria. |
-| P2.4 | Period status derivation (allocation rule) | todo | Depends on P2.1–P2.3. |
+| P2.4 | Period status derivation (allocation rule) | done | Verifier: PASS on all 10 criteria, independently re-derived. |
 | P2.5 | pgTAP privilege-escalation and status regression suite | todo | Depends on P2.1–P2.4. Gates Stage 2. |
 | S3.1 | Parent payment-plan management screen | todo | Depends on Stage 1 complete. |
 | S3.2 | Child progress UI | todo | Depends on Stage 1 complete. |
@@ -28,6 +28,41 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — P2.4 verified (pass)
+
+Verifier returned **pass** on all ten acceptance criteria, all
+independently re-derived with real fixtures built exclusively through the
+established RPCs (`create_payment_plan`, `ensure_current_payment_period`,
+`record_payment`/`record_expense`/`record_adjustment`,
+`void_ledger_transaction`, `waive_payment_period`) — never raw inserts.
+Given P2.3 had a verifier-caught date bug, the verifier specifically
+stress-tested this task's boundaries too; all held.
+
+**What landed.** One migration,
+`supabase/migrations/20260905060000_payment_period_status.sql`:
+`public.payment_period_status(p_period_id)`, a `SECURITY INVOKER` (not
+DEFINER) table-valued function returning status plus paid/remaining
+cents — deliberately invoker-rights since it discloses nothing beyond
+what the caller's existing RLS SELECT policies already allow, unlike
+P2.3's write functions which needed DEFINER to check a caller's role
+against a target row before revealing anything. The allocation rule
+(`type='payment'`, not voided, `occurred_on > period_start and <=
+due_date`) is implemented exactly once. Status precedence: waived beats
+satisfied beats overdue beats partially_paid beats due beats upcoming —
+verifier specifically confirmed the two trickiest interactions
+(fully-paid-after-due-date still reads `satisfied`, not `overdue`; a
+payment dated exactly `period_start` is excluded while one dated exactly
+`due_date` is included) are correct by design, not by accident of test
+data. Time zone resolved the same way P2.3's fix does
+(`(now() at time zone h.timezone)::date`).
+
+Bonus check beyond the plan's criteria: confirmed `expense`/`adjustment`
+transactions never count toward a period's paid amount, only `payment`.
+
+**Stage 1 (P2.1–P2.4) is done.** P2.5 (the pgTAP regression suite) is the
+last Stage 1 task and gates Stage 2 (UI) — this run's `max_tasks_per_run`
+budget of 5 will be fully used once P2.5 completes.
 
 ### 2026-09-05 — P2.3 verifier FAIL, fixed by orchestrator, re-verified
 
