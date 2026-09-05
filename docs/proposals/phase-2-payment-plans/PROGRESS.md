@@ -19,7 +19,7 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 | P2.2 | RLS policies for read access | done | Verifier: PASS on all 5 criteria, independently re-derived. |
 | P2.3 | Security-definer functions: create/deactivate plan, ensure-current-period, waive | done | Verifier: FAIL on first pass (month-walk compounding drift for starts_on on day 29-31), fixed by orchestrator, re-verified independently PASS on all criteria. |
 | P2.4 | Period status derivation (allocation rule) | done | Verifier: PASS on all 10 criteria, independently re-derived. |
-| P2.5 | pgTAP privilege-escalation and status regression suite | todo | Depends on P2.1–P2.4. Gates Stage 2. |
+| P2.5 | pgTAP privilege-escalation and status regression suite | done | Verifier: PASS on all criteria, all 3 mutation-proofing claims independently re-derived. **Stage 1 is gated-green.** |
 | S3.1 | Parent payment-plan management screen | todo | Depends on Stage 1 complete. |
 | S3.2 | Child progress UI | todo | Depends on Stage 1 complete. |
 | S3.3 | Parent dashboard plan-status card | todo | Depends on Stage 1 complete. |
@@ -28,6 +28,44 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — P2.5 verified (pass); Stage 1 complete and gated-green
+
+Verifier returned **pass**, and — since this task gates the entire next
+stage — was explicitly asked to independently re-derive all three
+mutation-proofing claims rather than trust the implementer's reported
+numbers. It did: dropping `payment_plans_member_id_active_key` flipped
+test 27 red (then cascaded, since `create_payment_plan` itself depends on
+the invariant); neutering the Parent-only check in `waive_payment_period`
+flipped exactly tests 6, 7, 10 (Child and cross-household rejection);
+removing the allocation-window/voided filters from `payment_period_status`
+flipped exactly tests 47-49, 52-53 (the boundary/voided-payment
+assertions). All three restored, full 126-assertion suite re-confirmed
+green afterward.
+
+**What landed.** One new file,
+`supabase/tests/005_payment_plans_privilege_escalation.sql` — 53 pgTAP
+assertions covering every negative case from the design spec (Child
+attempting create/deactivate/waive, cross-household rejection on all three
+write RPCs, Child SELECT scoping, raw-table-bypass rejection, anon
+execute-denial on all five functions) plus every integrity case (active-
+plan uniqueness both at the schema and RPC-supersede level, waive
+all-or-nothing CHECK, reason validation, idempotent period generation,
+voided-payment exclusion, the asymmetric allocation-window boundary) and
+every status-derivation case (all six statuses, including the two
+trickiest interactions: satisfied beating overdue both before and after
+due_date, and waived beating both). `npm run test:db` now runs 126
+assertions total across all five files (73 from Phase 0/1, unmodified; 53
+new), all green from a clean `npx supabase db reset`.
+
+**Stage 1 (the DB/authorization layer) is done.** Every one of P2.1–P2.5
+is verifier-passed, and the Child privilege-escalation suite — the gate
+this project's standing rules require before proceeding to UI — is
+genuinely green, independently confirmed twice (implementer's report, then
+the verifier's own re-derivation of every mutation-proofing claim).
+
+**This closes out this run's `max_tasks_per_run` budget of 5
+(P2.1–P2.5).** Stage 2 (S3.1–S3.4, the UI layer) carries to a future run.
 
 ### 2026-09-05 — P2.4 verified (pass)
 
