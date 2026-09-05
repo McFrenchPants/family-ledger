@@ -19,5 +19,10 @@ export default defineConfig({
     // Explicit imports from "vitest" rather than ambient globals, so the test
     // files typecheck under the app tsconfig with no extra `types` entry.
     globals: false,
+    // Registers @testing-library/jest-dom's matchers against vitest's
+    // `expect` and resets jsdom between tests. Runs for every test file
+    // (jsdom-environment ones as well as the pure-logic "node" ones) but is a
+    // no-op for the latter since they never render anything.
+    setupFiles: ["src/test/setup.ts"],
   },
 });
