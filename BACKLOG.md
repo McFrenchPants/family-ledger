@@ -61,12 +61,14 @@ sequential except where noted.
    History). Gate satisfied: every Child privilege-escalation negative test
    passed (`ARCHITECTURE.md` §24, §29). Depends on Phase 0.
 
-3. **Phase 2 — Payment plans** — status: `ready` — analysis: not yet written
+3. **Phase 2 — Payment plans** — status: `in progress` — analysis: analysis/02-phase-2-payment-plans.md
    Monthly payment-plan model, payment periods, upcoming/due/partial/
    satisfied/overdue status calculations, Parent management UI, Child
    progress UI. The payment-to-period allocation rule must be documented in
    code and covered by tests (`PROJECT_REQUIREMENTS.md` §7.3). Depends on
-   Phase 1.
+   Phase 1 (satisfied). One active plan per child, decoupled from
+   individual expenses; lazy period generation (no scheduler); waived
+   periods require a reason — see the analysis file.
 
 4. **Phase 3 — PWA** — status: `ready` — analysis: not yet written
    Web app manifest with a stable `id`, icons and Apple touch icon,
@@ -107,9 +109,9 @@ sequential except where noted.
    top. Independent of the phase sequence; can be done any time after
    Phase 1 lands enough routes to make the split meaningful.
 
-9. **Component-test tooling for the auth and UI layer** — status: `in progress` — analysis: analysis/09-component-test-tooling.md
+9. **Component-test tooling for the auth and UI layer** — status: `done` — analysis: analysis/09-component-test-tooling.md
    Tracking: root `PROGRESS.md` Post-Launch table (branch
-   `feature/component-test-tooling`). Scoped narrowly to the auth/session
+   `feature/component-test-tooling`, merged into `main`). Scoped narrowly to the auth/session
    layer (`SessionProvider`, `MembershipProvider`, `RequireRole`,
    `SignInForm`) after a user check-in — see the analysis file for why page
    components are explicitly out of scope.
