@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    Family Ledger placeholder monogram icon — maskable source SVG.
+    Background: accent.DEFAULT (#2f5d8a), full-bleed edge-to-edge (Android OS
+    masks may crop to a circle/squircle/rounded-square, so the background
+    must not stop short of the canvas edge).
+    Monogram: "FL" in white, sized and centered so it sits well within the
+    ~80%-diameter safe-zone circle (radius ~204.8 of the 512 canvas) that
+    maskable icons guarantee stays visible after masking.
+  -->
+  <rect width="512" height="512" fill="#2f5d8a"/>
+  <text
+    x="256"
+    y="256"
+    font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"
+    font-size="220"
+    font-weight="700"
+    fill="#ffffff"
+    text-anchor="middle"
+    dominant-baseline="central"
+  >FL</text>
+</svg>

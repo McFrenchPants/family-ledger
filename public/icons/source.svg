@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    Family Ledger placeholder monogram icon — source SVG.
+    Background: accent.DEFAULT (#2f5d8a) from tailwind.config.js.
+    Monogram: "FL" in white, bold, centered.
+    Full-bleed design (used for icon-192.png / icon-512.png / apple-touch-icon.png).
+    For the maskable variant see source-maskable.svg, which keeps the monogram
+    within the ~80% safe-zone circle required by the maskable icon spec.
+  -->
+  <rect width="512" height="512" fill="#2f5d8a"/>
+  <text
+    x="256"
+    y="256"
+    font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"
+    font-size="300"
+    font-weight="700"
+    fill="#ffffff"
+    text-anchor="middle"
+    dominant-baseline="central"
+  >FL</text>
+</svg>
