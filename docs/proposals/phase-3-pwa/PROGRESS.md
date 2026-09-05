@@ -17,13 +17,49 @@ Branch: `feature/phase-3-pwa` (off `main`).
 | --- | --- | --- | --- |
 | S4.1 | Vite PWA tooling and manifest | done | AC1/2/4 fully verified; AC3 (HTTPS/LAN dev server) blocked on a one-time interactive Windows cert-trust dialog this sandbox can't click through — see session log. |
 | S4.2 | Placeholder app icon set | done | All 4 files + safe-zone check verified. |
-| S4.3 | Service worker: app-shell precaching, no ledger-API caching | todo | Depends on S4.1 (plugin config). |
+| S4.3 | Service worker: app-shell precaching, no ledger-API caching | done | AC1/2/3 verified by static analysis + build inspection; live registration blocked by a sandbox limitation, independently reproduced. AC4 fully verified. |
 | S4.4 | Mobile install onboarding | todo | Depends on S4.1 (manifest must exist for `beforeinstallprompt` to fire in a real browser), but its platform-detection logic can be built/unit-tested independently. |
 | S4.5 | Real-device confirmation | blocked | User-performed, not delegated — requires a physical Android phone and iPhone. Blocked until S4.1–S4.4 are done. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S4.3 done: service worker precaching and registration
+
+Default verification tier. Spot-checked the diff, independently re-ran
+`npm run typecheck`/`lint`/`test`/`build` (all clean; 222/222; `dist/index.html`
+confirmed to have no injected registration script, proving the
+import-based `virtual:pwa-register` path took effect rather than the
+plugin's auto-inject fallback).
+
+**What landed.** `src/sw.ts` keeps `precacheAndRoute(self.__WB_MANIFEST)` as
+its entire caching surface, with an explicit comment that the absence of
+any Supabase-matching route is deliberate (ADR-007), not an oversight.
+`src/registerServiceWorker.ts` (new) imports `registerSW` from
+`virtual:pwa-register` and calls it from `src/main.tsx`; `autoUpdate` means
+no custom update-prompt UI was needed. `src/vite-env.d.ts` gained a
+`vite-plugin-pwa/client` type reference.
+
+**Live verification of actual SW activation was blocked by a sandbox
+limitation, independently reproduced.** Both the implementer and I
+(separately: `npm run build`, served `dist/` with `http-server`, then
+`navigator.serviceWorker.register('/sw.js')` via this session's own Browser
+pane) got the identical `TypeError: ... An unknown error occurred when
+fetching the script.` A trivial one-line placeholder service worker failed
+registration the same way, confirming this is an environment restriction
+on registering *any* service worker in this sandboxed browser, not
+something wrong with this task's code. Criteria 1–3 (SW activates,
+precached assets served from cache, Supabase requests pass through
+unintercepted) are satisfied by static analysis instead: `precacheAndRoute`
+only registers routes for the build's own manifest entries (confirmed by
+reading `workbox-precaching`'s behavior and the generated `dist/sw.js`),
+and `src/sw.ts` has no other route or fetch listener that could intercept
+anything else. A real desktop-Chrome devtools session (outside this
+sandbox) would be needed to confirm actual runtime activation, but nothing
+here suggests the implementation itself is wrong.
+
+Starting S4.4 (mobile install onboarding) next.
 
 ### 2026-09-05 — S4.1 + S4.2 done: Vite PWA tooling, manifest, and icon set
 
