@@ -18,12 +18,48 @@ Branch: `feature/phase-3-pwa` (off `main`).
 | S4.1 | Vite PWA tooling and manifest | done | AC1/2/4 fully verified; AC3 (HTTPS/LAN dev server) blocked on a one-time interactive Windows cert-trust dialog this sandbox can't click through — see session log. |
 | S4.2 | Placeholder app icon set | done | All 4 files + safe-zone check verified. |
 | S4.3 | Service worker: app-shell precaching, no ledger-API caching | done | AC1/2/3 verified by static analysis + build inspection; live registration blocked by a sandbox limitation, independently reproduced. AC4 fully verified. |
-| S4.4 | Mobile install onboarding | todo | Depends on S4.1 (manifest must exist for `beforeinstallprompt` to fire in a real browser), but its platform-detection logic can be built/unit-tested independently. |
+| S4.4 | Mobile install onboarding | done | All 5 criteria verified (synthetic-event + spoofed-UA testing, since no real device is available here). |
 | S4.5 | Real-device confirmation | blocked | User-performed, not delegated — requires a physical Android phone and iPhone. Blocked until S4.1–S4.4 are done. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S4.4 done: mobile install onboarding. Only S4.5 (user-performed) remains.
+
+Default verification tier. Spot-checked the diff against all 5 acceptance
+criteria, independently re-ran `npm run typecheck`/`lint`/`test` (clean;
+226/226, up from 222 — 4 new tests for the decision function).
+
+**What landed.** `src/features/pwa/install-prompt.ts`: pure types +
+`isStandalone()` (checks both `matchMedia("(display-mode: standalone)")`
+and iOS's non-standard `navigator.standalone`), `isIOS()` (UA sniff plus
+the iPadOS-13+ "Mac-that-supports-touch" quirk, documented as the one
+justified use of UA sniffing in this app), and `decideInstallBannerState()`
+— a pure function so the branching logic (standalone always wins; iOS
+always gets manual instructions regardless of any captured event; the
+Chromium install button only when an event is actually captured; otherwise
+hidden, never a dead button) has a real unit test independent of DOM
+wiring. `InstallBanner.tsx` wires this to a `beforeinstallprompt` listener
+and a try/catch-wrapped `localStorage` dismissal flag (fails safe to "not
+dismissed" if storage is unavailable). Rendered once from
+`RootLayout.tsx`, covering every route including sign-in, rather than
+duplicated per dashboard.
+
+**Live-verified via synthetic events / spoofed UA** (no real device
+available in this environment, same limitation noted for S4.1/S4.3):
+dispatched a synthetic `beforeinstallprompt`-shaped event → Install button
+appeared and correctly invoked the handler, clearing the event after use;
+spoofed an iPhone UA before mount → manual "Add to Home Screen"
+instructions rendered, no button; confirmed dismiss-then-reload
+persistence; confirmed a captured install event is still suppressed when
+`matchMedia("(display-mode: standalone)")` reports true, proving standalone
+wins over everything per `decideInstallBannerState`.
+
+**Only S4.5 (real-device confirmation) remains in Phase 3** — explicitly
+not delegable, requires the user's own Android phone and iPhone per the
+implementation plan. S4.1–S4.4 are all done; this run used 4 delegable
+tasks, matching the plan's full non-S4.5 scope.
 
 ### 2026-09-05 — S4.3 done: service worker precaching and registration
 
