@@ -14,6 +14,7 @@ import { supabase } from "../lib/supabase";
 import { todayInZone } from "../lib/dates";
 import { formatCents } from "../lib/currency";
 import type { Cents } from "../lib/currency";
+import type { PaymentPeriodStatus } from "../features/payment-plans/useChildPaymentProgress";
 
 /**
  * `/record-payment` (S2.6). Parent-only, end to end -- unlike `/add-expense`
@@ -80,11 +81,59 @@ export function RecordPaymentPage() {
   }
 }
 
+type PeriodEffect = {
+  status: PaymentPeriodStatus;
+  minimumCents: Cents;
+  paidCents: Cents;
+  remainingCents: Cents;
+};
+
 type SubmitState =
   | { status: "idle" }
   | { status: "submitting" }
   | { status: "error"; message: string }
-  | { status: "done"; type: RecordTransactionType; amountCents: Cents; balanceCents: Cents | null };
+  | {
+      status: "done";
+      type: RecordTransactionType;
+      amountCents: Cents;
+      balanceCents: Cents | null;
+      /**
+       * Only ever populated for a `payment` (never an `adjustment` -- see
+       * module comment on S3.4). `null` covers every "nothing to show" case
+       * uniformly: no active plan for this child, the type was `adjustment`,
+       * or the best-effort secondary fetch failed. The confirmation panel
+       * treats all three identically -- just render the plain balance
+       * confirmation, unchanged from Phase 1.
+       */
+      periodEffect: PeriodEffect | null;
+    };
+
+const PERIOD_STATUS_LABELS: Record<PaymentPeriodStatus, string> = {
+  upcoming: "Upcoming",
+  due: "Due",
+  partially_paid: "Partially Paid",
+  satisfied: "Satisfied",
+  overdue: "Overdue",
+  waived: "Waived",
+};
+
+/** Mirrors `ChildDashboardPage.tsx`'s `remainingDueCopy` phrasing per status. */
+function periodEffectCopy(effect: PeriodEffect): string {
+  switch (effect.status) {
+    case "satisfied":
+      return "Fully paid for this period.";
+    case "waived":
+      return "Waived for this period -- nothing due.";
+    case "upcoming":
+      return `${formatCents(effect.remainingCents)} will be due.`;
+    case "overdue":
+      return `${formatCents(effect.remainingCents)} overdue.`;
+    case "due":
+    case "partially_paid":
+    default:
+      return `${formatCents(effect.remainingCents)} remaining due.`;
+  }
+}
 
 const TYPE_COPY: Record<
   RecordTransactionType,
@@ -204,6 +253,21 @@ function RecordForm({ membership }: { membership: Membership }) {
           New balance:{" "}
           {submitState.balanceCents === null ? "unavailable" : formatCents(submitState.balanceCents)}
         </p>
+        {submitState.periodEffect && (
+          <div className="flex flex-col gap-1 rounded-card border border-surface-border px-3 py-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-label font-medium text-ink-muted">Payment Period</h3>
+              <span className="rounded-card bg-surface-sunken px-2 py-0.5 text-label font-medium text-ink-muted">
+                {PERIOD_STATUS_LABELS[submitState.periodEffect.status]}
+              </span>
+            </div>
+            <p className="text-body text-ink">{periodEffectCopy(submitState.periodEffect)}</p>
+            <p className="text-label text-ink-subtle">
+              {formatCents(submitState.periodEffect.paidCents)} of{" "}
+              {formatCents(submitState.periodEffect.minimumCents)} paid
+            </p>
+          </div>
+        )}
         <button
           type="button"
           onClick={() => navigate("/parent")}
@@ -257,11 +321,72 @@ function RecordForm({ membership }: { membership: Membership }) {
         (row) => row.member_id === memberId,
       );
 
+      // Period effect (S3.4) is a payment-only concern -- an adjustment never
+      // counts toward a period's paid amount (the allocation rule excludes
+      // adjustments entirely), so showing period-shaped UI for one would be
+      // misleading rather than helpful. `periodEffect` stays `null` for any
+      // adjustment, with no RPC calls made at all.
+      let periodEffect: PeriodEffect | null = null;
+
+      if (type === "payment") {
+        try {
+          const { data: planData } = await supabase
+            .from("payment_plans")
+            .select("id")
+            .eq("member_id", memberId)
+            .eq("active", true)
+            .maybeSingle<{ id: string }>();
+
+          if (planData) {
+            const { data: periodRaw, error: periodError } = await supabase.rpc(
+              "ensure_current_payment_period",
+              { p_plan_id: planData.id },
+            );
+
+            const periodData = periodRaw as { id: string } | null;
+
+            if (!periodError && periodData) {
+              const { data: statusData, error: statusError } = await supabase.rpc(
+                "payment_period_status",
+                { p_period_id: periodData.id },
+              );
+
+              const statusRow = (
+                (statusData ?? []) as {
+                  period_id: string;
+                  status: PaymentPeriodStatus;
+                  minimum_cents: number;
+                  paid_cents: number;
+                  remaining_cents: number;
+                }[]
+              )[0];
+
+              if (!statusError && statusRow) {
+                periodEffect = {
+                  status: statusRow.status,
+                  minimumCents: statusRow.minimum_cents,
+                  paidCents: statusRow.paid_cents,
+                  remainingCents: Math.max(0, statusRow.remaining_cents),
+                };
+              }
+            }
+          }
+        } catch {
+          // Best-effort secondary read: the payment RPC above already
+          // succeeded and the write is final, so a failure here must not
+          // surface as a second error state (that would read as the payment
+          // itself having failed). Fall back to no period-effect display --
+          // the existing plain balance confirmation still stands on its own.
+          periodEffect = null;
+        }
+      }
+
       setSubmitState({
         status: "done",
         type,
         amountCents: result.amountCents,
         balanceCents: balanceRow?.balance_cents ?? null,
+        periodEffect,
       });
     } catch (caught) {
       setSubmitState({
