@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 
 import { SessionStatus } from "../features/auth/SessionStatus";
+import { InstallBanner } from "../features/pwa/InstallBanner";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -33,6 +34,7 @@ export function RootLayout() {
       </header>
 
       <main className="flex-1 px-gutter py-4">
+        <InstallBanner />
         <Outlet />
       </main>
     </div>
