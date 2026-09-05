@@ -20,14 +20,69 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | P1.3 | Security-definer functions: insert expense/payment/adjustment, void | done | Verifier: FAIL on first pass (anon could still execute all four functions — default-privileges grant, not covered by `revoke ... from public`), fixed by orchestrator; re-verified independently. |
 | P1.4 | Balance derivation | done | Verifier: PASS on all 11 criteria. |
 | P1.5 | pgTAP privilege-escalation and integrity regression suite | done | Verifier: PASS on all 12 cases, all 3 mutation-proofing claims independently re-derived. **Stage 1 is gated-green.** |
-
-Stage 2 (Parent/Child dashboards, Add Expense, Record Payment, History) is
-not yet broken into tasks — it will be appended to `IMPLEMENTATION_PLAN.md`
-once P1.5 is done and verified, per the design spec's gate.
+| S2.1 | Household membership read access (RLS/RPC) | done | Verifier: PASS on all 5 criteria, independently re-derived. |
+| S2.2 | Session/role context, membership hook, and route guarding | todo | Default tier. Depends on S2.1. |
+| S2.3 | Parent dashboard: household overview | todo | Default tier. Depends on S2.1, S2.2. |
+| S2.4 | Child dashboard: own balance and recent activity | todo | Default tier. Depends on S2.1, S2.2. |
+| S2.5 | Add Expense flow | todo | Default tier. Depends on S2.1–S2.4. |
+| S2.6 | Record Payment/Adjustment and Void flow | todo | Default tier. Depends on S2.1, S2.2, S2.3, S2.7. |
+| S2.7 | History view | todo | Default tier. Depends on S2.1, S2.2. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S2.1 verified (pass)
+
+Verifier returned **pass** on all five acceptance criteria, all
+independently re-derived against the live local database (role-switched
+fixtures, not taken on the implementer's report), plus a clean forbidden-
+path check and a pass on every relevant architectural invariant.
+
+**What landed.** One migration,
+`supabase/migrations/20260905013000_household_members_read_access.sql`,
+adding two SELECT policies on `household_members` (RLS policies chosen over
+a new `SECURITY DEFINER` function — reasoned in-file: unlike
+`household_member_balances`, this is a plain row filter, not a
+"manufacture a 0-row for a member with no matches" case): `..._select_self`
+(own row, unconditional on status, `to authenticated`) and
+`..._select_parent_active_members` (every `active` member of a household
+the caller parents, reusing P1.2's `internal.is_household_parent` helper).
+`invited`/`archived` siblings are excluded from a Parent's listing by
+design, matching `household_member_balances`'s own filter. No new grants —
+`anon` is blocked by both policies being scoped `to authenticated` plus
+RLS default-deny, independently confirmed operationally (not just by
+reading the policy).
+
+Verifier's one non-blocking observation: table-level grants for
+`anon`/`authenticated` are left at Supabase's broad defaults here (same
+precedent as `categories`/`ledger_transactions` in P1.2), rather than the
+stricter belt-and-suspenders revoke `audit_log` got — worth considering if
+a future task wants to standardize the stricter pattern everywhere, not a
+defect in this task.
+
+Starting S2.2 (session/role context and route guarding) next.
+
+### 2026-09-05 — Stage 2 planned
+
+Confirmed Stage 1 is genuinely gated-green (all five tasks verifier-passed,
+P1.5's 35-assertion privilege-escalation suite green and mutation-proofed)
+before writing anything further, per the design spec's gate.
+
+Broke Stage 2 into seven tasks (S2.1–S2.7), appended to
+`IMPLEMENTATION_PLAN.md`. The one thing worth flagging: `household_members`
+itself still has zero RLS policies (a Phase 0 default-deny carried through
+all of Stage 1, each task routing around it narrowly for its own purpose —
+P1.2's three `internal.*` helpers, P1.4's `household_member_balances`).
+None of those expose what the UI now actually needs — the current user's
+own membership row, and a Parent's list of child names — so S2.1 closes
+that gap first; every other Stage 2 task depends on it. S2.1 is the only
+Stage 2 task in the verifier-routed tier (RLS/data-persistence); S2.2–S2.7
+call only existing, already-verified RPCs and are spot-checked normally,
+per the design spec's explicit carve-out.
+
+This run's `max_tasks_per_run` budget (5) will cover S2.1–S2.5; S2.6/S2.7
+carry to a future run. Starting S2.1 next.
 
 ### 2026-09-05 — P1.5 verified (pass); Stage 1 complete and gated-green
 
