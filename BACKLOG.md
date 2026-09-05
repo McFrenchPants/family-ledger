@@ -61,14 +61,15 @@ sequential except where noted.
    History). Gate satisfied: every Child privilege-escalation negative test
    passed (`ARCHITECTURE.md` §24, §29). Depends on Phase 0.
 
-3. **Phase 2 — Payment plans** — status: `in progress` — analysis: analysis/02-phase-2-payment-plans.md
-   Monthly payment-plan model, payment periods, upcoming/due/partial/
-   satisfied/overdue status calculations, Parent management UI, Child
-   progress UI. The payment-to-period allocation rule must be documented in
-   code and covered by tests (`PROJECT_REQUIREMENTS.md` §7.3). Depends on
-   Phase 1 (satisfied). One active plan per child, decoupled from
-   individual expenses; lazy period generation (no scheduler); waived
-   periods require a reason — see the analysis file.
+3. **Phase 2 — Payment plans** — status: `done` — analysis: analysis/02-phase-2-payment-plans.md
+   Tracking doc: `docs/proposals/phase-2-payment-plans/PROGRESS.md` (branch
+   `feature/phase-2-payment-plans`, merged into `main` at `03afa6f` on
+   2026-09-05). Monthly payment-plan model, payment periods, upcoming/due/
+   partial/satisfied/overdue status calculations, Parent management UI,
+   Child progress UI. The payment-to-period allocation rule is documented in
+   code (`payment_period_status`) and covered by a mutation-proofed pgTAP
+   suite. Gate satisfied: every Child privilege-escalation negative test
+   passed. Depends on Phase 1 (satisfied).
 
 4. **Phase 3 — PWA** — status: `ready` — analysis: not yet written
    Web app manifest with a stable `id`, icons and Apple touch icon,
