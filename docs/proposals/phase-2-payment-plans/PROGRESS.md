@@ -15,7 +15,7 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| P2.1 | Schema: `payment_plans` and `payment_periods` | todo | |
+| P2.1 | Schema: `payment_plans` and `payment_periods` | done | Verifier: PASS on all 7 criteria, independently re-derived. |
 | P2.2 | RLS policies for read access | todo | Depends on P2.1. |
 | P2.3 | Security-definer functions: create/deactivate plan, ensure-current-period, waive | todo | Depends on P2.1, P2.2. |
 | P2.4 | Period status derivation (allocation rule) | todo | Depends on P2.1–P2.3. |
@@ -28,6 +28,35 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — P2.1 verified (pass)
+
+Verifier returned **pass** on all seven acceptance criteria, all
+independently re-derived against the live local database (savepoint-per-
+test, rolled back), not taken on the implementer's report.
+
+**What landed.** One migration,
+`supabase/migrations/20260905030000_payment_plans_schema.sql`:
+`payment_plans` (minimum_cents/frequency/due_day/starts_on/ends_on/active,
+at most one active plan per member via a partial unique index on
+`(member_id) where active`, mirroring `household_members`' existing
+partial-unique pattern) and `payment_periods` (period_start/due_date/
+minimum_cents fixed at creation, an all-or-nothing waive-state CHECK
+mirroring `ledger_transactions`' void CHECK, and a unique
+`(payment_plan_id, period_start)` constraint to prevent duplicate periods
+under future concurrent lazy-generation calls). `due_day` is deliberately
+capped at 1–28, sidestepping end-of-month clamping ambiguity entirely
+rather than resolving it per-call. Both tables denormalize `household_id`/
+`member_id` from the plan onto periods, matching `ledger_transactions`'
+own precedent, specifically so P2.2's RLS policies won't need to join
+through `payment_plans`. RLS enabled with zero policies on both tables —
+deliberate default-deny, real policies are P2.2.
+
+Verifier's only non-blocking note: no pgTAP tests exist yet for these new
+constraints (expected — that's P2.5's job, not this task's), so a future
+regression against them wouldn't be caught until P2.5 lands.
+
+Starting P2.2 (RLS policies) next.
 
 ### 2026-09-05 — Plan created; Stage 1 scaffolded
 
