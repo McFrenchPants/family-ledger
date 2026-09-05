@@ -21,7 +21,7 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | P1.4 | Balance derivation | done | Verifier: PASS on all 11 criteria. |
 | P1.5 | pgTAP privilege-escalation and integrity regression suite | done | Verifier: PASS on all 12 cases, all 3 mutation-proofing claims independently re-derived. **Stage 1 is gated-green.** |
 | S2.1 | Household membership read access (RLS/RPC) | done | Verifier: PASS on all 5 criteria, independently re-derived. |
-| S2.2 | Session/role context, membership hook, and route guarding | todo | Default tier. Depends on S2.1. |
+| S2.2 | Session/role context, membership hook, and route guarding | done | Spot-checked: typecheck/lint/test clean, redirect behavior verified live in-browser. |
 | S2.3 | Parent dashboard: household overview | todo | Default tier. Depends on S2.1, S2.2. |
 | S2.4 | Child dashboard: own balance and recent activity | todo | Default tier. Depends on S2.1, S2.2. |
 | S2.5 | Add Expense flow | todo | Default tier. Depends on S2.1–S2.4. |
@@ -31,6 +31,33 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S2.2 spot-checked (pass)
+
+Default verification tier — no new RLS/RPC. Spot-checked the diff directly
+and re-ran `npm run typecheck`/`npm run lint`/`npm run test` myself
+(146/146, clean) rather than taking the implementer's report on faith.
+
+**What landed.** `src/features/auth/membership-context.ts` (a
+`MembershipState` discriminated union: `signed-out` / `loading` /
+`no-membership` / `error` / `loaded`, plus `useMembership()`),
+`MembershipProvider.tsx` (queries the caller's own `household_members` row
+via S2.1's RLS policy, explicitly filtered to `user_id = auth.uid()` — the
+implementer caught and fixed a real bug here: an *unfiltered* select for a
+Parent returns multiple rows under S2.1's second policy, which the task
+prompt's suggested `select('*')` shortcut would have broken on), and
+`RequireRole.tsx` (route guard consuming it). Wired into
+`app/providers.tsx` and `app/router.tsx`.
+
+Verified live in a real browser against the local Supabase stack with real
+seeded Parent/Child test users: Parent visiting `/child` redirects to
+`/parent` and vice versa, neither role loops on its own route, signed-out
+redirects to `/sign-in`, and a simulated fetch failure (temporarily querying
+a nonexistent table) rendered a visible retry/error state that recovered
+once reverted. Every redirect-as-UX-not-security-control point from the
+task prompt is stated explicitly in the new code's comments.
+
+Starting S2.3 (Parent dashboard: household overview) next.
 
 ### 2026-09-05 — S2.1 verified (pass)
 
