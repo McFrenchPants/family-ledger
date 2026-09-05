@@ -22,12 +22,44 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 | P2.5 | pgTAP privilege-escalation and status regression suite | done | Verifier: PASS on all criteria, all 3 mutation-proofing claims independently re-derived. **Stage 1 is gated-green.** |
 | S3.1 | Parent payment-plan management screen | done | Spot-checked (default tier, no RLS/security-definer changes). |
 | S3.2 | Child progress UI | done | Spot-checked (default tier); live-verified against local Supabase (Due/Partially Paid/Satisfied/no-plan). |
-| S3.3 | Parent dashboard plan-status card | todo | Depends on Stage 1 complete. |
+| S3.3 | Parent dashboard plan-status card | done | Spot-checked (default tier); live-verified against local Supabase (Due/Overdue/Satisfied/no-plan, four children). |
 | S3.4 | Record Payment: period effect on confirmation | todo | Depends on Stage 1 complete; benefits from S3.1 existing (a plan to test against). |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S3.3 done: Parent dashboard plan-status card
+
+Default verification tier (only read-path RPCs, already verified in Stage 1
+and reused unchanged from S3.2). Spot-checked the diff against all 3
+acceptance criteria, independently re-ran `npm run typecheck`/`lint`/`test`
+(clean; 222/222), and independently confirmed via `docker exec` against the
+local Postgres container that `payment_plans`/`payment_periods`/
+`ledger_transactions` are empty and `household_members` shows no residual
+scratch rows, rather than taking the implementer's cleanup claim on faith.
+
+**What landed.** `src/features/payment-plans/useHouseholdPaymentProgress.ts`
+(new hook): one batched `payment_plans` query across the whole roster, then
+`ensure_current_payment_period`→`payment_period_status` via `Promise.all`
+only for children that actually have an active plan — reuses
+`useChildPaymentProgress`'s types/row-shapes/clamping verbatim so a Parent
+and a Child derive identical status. Extended
+`src/pages/ParentDashboardPage.tsx`: each child's existing balance row
+(still a single clickable `Link` to history) gains a status chip + due date,
+a distinct neutral "No active plan" chip (visually and textually separate
+from "Satisfied" — AC2), a per-row "Loading plan status…" placeholder
+independent of the balances' own loading state, and a scoped error+Retry
+that doesn't blank the whole page if only plan-status fails.
+
+**Live-verified against the local Supabase stack** across all four required
+states in one household: Due, Overdue, Satisfied (via a real payment
+transaction), and no-active-plan — confirmed via `read_page` and a
+screenshot. All scratch fixtures were deleted afterward; independently
+re-confirmed clean (see above).
+
+**Stage 2 now has one task remaining: S3.4** (Record Payment: period effect
+on confirmation). Starting it next.
 
 ### 2026-09-05 — S3.2 done: Child progress UI
 
