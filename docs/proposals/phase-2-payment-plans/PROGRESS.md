@@ -21,13 +21,45 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 | P2.4 | Period status derivation (allocation rule) | done | Verifier: PASS on all 10 criteria, independently re-derived. |
 | P2.5 | pgTAP privilege-escalation and status regression suite | done | Verifier: PASS on all criteria, all 3 mutation-proofing claims independently re-derived. **Stage 1 is gated-green.** |
 | S3.1 | Parent payment-plan management screen | done | Spot-checked (default tier, no RLS/security-definer changes). |
-| S3.2 | Child progress UI | todo | Depends on Stage 1 complete. |
+| S3.2 | Child progress UI | done | Spot-checked (default tier); live-verified against local Supabase (Due/Partially Paid/Satisfied/no-plan). |
 | S3.3 | Parent dashboard plan-status card | todo | Depends on Stage 1 complete. |
 | S3.4 | Record Payment: period effect on confirmation | todo | Depends on Stage 1 complete; benefits from S3.1 existing (a plan to test against). |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S3.2 done: Child progress UI
+
+Default verification tier (only read-path RPCs: `ensure_current_payment_period`
+and `payment_period_status`, both already verified in Stage 1). Spot-checked
+the diff against all 4 acceptance criteria, then independently re-ran
+`npm run typecheck`/`lint`/`test` (clean; 222/222) rather than taking the
+implementer's report on faith.
+
+**What landed.** `src/features/payment-plans/useChildPaymentProgress.ts`
+(new hook mirroring `useOwnBalance`'s retry-token pattern): resolves the
+child's own active plan, lazily materializes its current period via
+`ensure_current_payment_period`, then reads status/amounts via
+`payment_period_status`; `progress: null` (no active plan) is a normal
+`loaded` outcome, not an error, matching `usePaymentPlan`'s convention.
+Extended `src/pages/ChildDashboardPage.tsx` with a `PaymentProgressCard`
+between "You Owe" and "+ Add Expense" (§11.2 ordering) — all six statuses
+(Upcoming/Due/Partially Paid/Satisfied/Overdue/Waived) get a colored chip
+**with a text label** (never color alone, AC3) plus status-specific copy
+(never a generic "$0.00 remaining" template for Satisfied/Waived, AC1). No
+active plan renders nothing at all for this section — no heading, no
+placeholder (AC2).
+
+**Live-verified against the local Supabase stack**, not just component-mount
+inspection: a scratch auth user linked to the seeded "Child One" member,
+driven through the real dev server + browser across four states (Due →
+Partially Paid → Satisfied → plan deactivated/no active plan, confirming the
+section is fully absent from the DOM in that last case). All scratch
+fixtures (plan, transactions, member linkage, auth user) were deleted
+afterward; `supabase/` shows no diff.
+
+Starting S3.3 (Parent dashboard plan-status card) next.
 
 ### 2026-09-05 — S3.1 done: Parent payment-plan management screen
 
