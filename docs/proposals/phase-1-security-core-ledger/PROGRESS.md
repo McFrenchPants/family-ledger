@@ -18,7 +18,7 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | P1.1 | Ledger schema: transactions, categories, audit log, household policy | done | Verifier: PASS on all 6 criteria. |
 | P1.2 | RLS policies for read access and audit-log protection | done | Verifier: PASS on all 7 criteria. |
 | P1.3 | Security-definer functions: insert expense/payment/adjustment, void | done | Verifier: FAIL on first pass (anon could still execute all four functions — default-privileges grant, not covered by `revoke ... from public`), fixed by orchestrator; re-verified independently. |
-| P1.4 | Balance derivation | todo | Depends on P1.1–P1.3. |
+| P1.4 | Balance derivation | done | Verifier: PASS on all 11 criteria. |
 | P1.5 | pgTAP privilege-escalation and integrity regression suite | todo | Depends on P1.1–P1.4. Gates Stage 2 — must be green before any UI task starts. |
 
 Stage 2 (Parent/Child dashboards, Add Expense, Record Payment, History) is
@@ -28,6 +28,39 @@ once P1.5 is done and verified, per the design spec's gate.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — P1.4 verified (pass)
+
+Verifier returned **pass** on all eleven acceptance criteria, all
+independently re-derived with real fixtures and the actual `record_expense`/
+`record_payment`/`record_adjustment`/`void_ledger_transaction` RPCs (not raw
+inserts) generating the ledger activity.
+
+**What landed.** One migration,
+`supabase/migrations/20260905010000_ledger_member_balances.sql`:
+`public.household_member_balances(p_household_id uuid)`, a `SECURITY
+DEFINER` SQL function returning `(member_id, balance_cents)` — live
+`SUM(amount_cents) WHERE voided_at IS NULL`, coalesced to `0` for a member
+with no transactions. Chosen over a `security_invoker` view specifically
+because `household_members` still has zero RLS policies of its own (a
+Phase 0 default-deny state carried through P1.1–P1.3): a security_invoker
+view's `FROM household_members` would see nothing for anyone and silently
+break the "0 balance" guarantee for every caller. The function reuses
+P1.2's exact access-boundary helpers
+(`internal.is_household_parent`/`internal.current_household_member_id`)
+rather than reimplementing them — a Parent sees every active member's
+balance in their household, a Child sees only their own row, and a
+household_id the caller doesn't belong to yields zero rows, never another
+household's data. Correctly applied the explicit `revoke ... from public,
+anon` pattern P1.3's verifier forced onto this project — confirmed `anon`
+genuinely cannot call it.
+
+Verifier specifically pushed on the cross-household edge cases (Child
+against household B, Parent of A against B, a nonexistent household_id) —
+all three yielded zero rows, no error, no data disclosure.
+
+Starting P1.5 (pgTAP privilege-escalation suite) next — this is the last
+Stage 1 task and the gate for Stage 2 (UI).
 
 ### 2026-09-05 — P1.3 verifier FAIL, fixed by orchestrator, re-verified
 
