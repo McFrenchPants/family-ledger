@@ -48,9 +48,15 @@ Two new backlog items came out of this, both `idea`, neither blocking Phase 1:
 created) and **9** (component-test tooling — the auth code has no regression
 net, since `npm run test` still covers only the pure currency/dates modules).
 
-`production` is still at the framework-init commit and far behind `main`.
-Promoting it needs an explicit go-ahead and an approval record; nothing here
-authorizes that.
+**Merged.** `feature/phase-0-foundations` fast-forwarded into `main` at
+`ae5d2fe` and pushed to `origin` (`git merge --ff-only` + `git push origin
+main`). The feature branch still exists at the same SHA; it was not deleted.
+HEAD is now on `main`. Phase 1 should branch fresh off `main`.
+
+`production` is still at the framework-init commit `5ce9c38` and far behind
+`main`. Cloudflare's production branch is `production`, so this push did not
+trigger a deploy — nothing has ever been deployed. Promoting it needs an
+explicit go-ahead and an approval record; nothing here authorizes that.
 
 ### 2026-09-04 — Strategy clarified; infrastructure provisioned; Phase 0 analysis finalized
 
