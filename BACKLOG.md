@@ -51,7 +51,7 @@ sequential except where noted.
      to the real Supabase project (`fsszkclgeekdyyspgrhg`) is deferred
      until there's a migration worth pushing to it.
 
-2. **Phase 1 — Security and core ledger** — status: `ready` — analysis: not yet written
+2. **Phase 1 — Security and core ledger** — status: `ready` — analysis: analysis/01-phase-1-security-core-ledger.md
    Households/members model, RLS policies, Parent/Child role enforcement,
    add expense, record payment, derived balances, transaction history,
    audit trail. Gate: **do not proceed past this phase until every Child
