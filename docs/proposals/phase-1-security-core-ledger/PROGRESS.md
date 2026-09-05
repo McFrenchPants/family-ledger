@@ -19,7 +19,7 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | P1.2 | RLS policies for read access and audit-log protection | done | Verifier: PASS on all 7 criteria. |
 | P1.3 | Security-definer functions: insert expense/payment/adjustment, void | done | Verifier: FAIL on first pass (anon could still execute all four functions — default-privileges grant, not covered by `revoke ... from public`), fixed by orchestrator; re-verified independently. |
 | P1.4 | Balance derivation | done | Verifier: PASS on all 11 criteria. |
-| P1.5 | pgTAP privilege-escalation and integrity regression suite | todo | Depends on P1.1–P1.4. Gates Stage 2 — must be green before any UI task starts. |
+| P1.5 | pgTAP privilege-escalation and integrity regression suite | done | Verifier: PASS on all 12 cases, all 3 mutation-proofing claims independently re-derived. **Stage 1 is gated-green.** |
 
 Stage 2 (Parent/Child dashboards, Add Expense, Record Payment, History) is
 not yet broken into tasks — it will be appended to `IMPLEMENTATION_PLAN.md`
@@ -28,6 +28,42 @@ once P1.5 is done and verified, per the design spec's gate.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — P1.5 verified (pass); Stage 1 complete and gated-green
+
+Verifier returned **pass** on all 12 required cases, and — since this task
+gates the entire next stage — was explicitly asked to independently
+re-derive all three mutation-proofing claims rather than trust the
+implementer's reported numbers. It did: dropping
+`ledger_transactions_amount_sign_check` flipped exactly 2/35 assertions
+red; dropping the `ledger_transactions_select_self` RLS policy flipped
+exactly 1/35 (the Case 8 positive control, proving that case isn't a
+false-negative "everyone sees nothing" scenario); disabling the Parent-only
+check in `internal.record_balance_decrease` flipped exactly 7/35. All three
+restored, full suite re-confirmed green afterward.
+
+**What landed.** One new file,
+`supabase/tests/003_ledger_privilege_escalation.sql` — 35 pgTAP assertions
+covering every negative case from the design spec (Child attempting
+payment/adjustment/void/negative-expense/direct-UPDATE-DELETE/cross-household-
+read/sibling-read/audit_log-write, the `child_expense_scope` toggle actually
+changing behavior in both directions, a raw-table bypass hitting the CHECK
+constraint as backstop) plus the positive Parent-success path and
+structural RLS/policy assertions. `npm run test:db` now runs 54 assertions
+total across all three files (19 from Phase 0, unmodified; 35 new), all
+green from a clean `npx supabase db reset`.
+
+**Stage 1 (the DB/authorization layer) is done.** Every one of P1.1–P1.5 is
+verifier-passed, and the Child privilege-escalation suite — the specific
+gate this project's standing rules require before proceeding to
+convenience/UI features — is genuinely green, independently confirmed
+twice now (implementer's report, then the verifier's own re-derivation).
+
+**Next step, in a future session:** append Stage 2's task breakdown
+(Parent/Child dashboards, Add Expense, Record Payment, History) to
+`IMPLEMENTATION_PLAN.md`, per the design spec. This run has used its full
+`max_tasks_per_run` budget of 5 (P1.1–P1.5), so Stage 2 planning and
+delegation starts fresh next time.
 
 ### 2026-09-05 — P1.4 verified (pass)
 
