@@ -32,6 +32,22 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 
 _Newest entries on top._
 
+### 2026-09-05 — Merged to `main`; Phase 1 (Stage 1 + Stage 2) complete
+
+With every P1.x/S2.x task `done` and verified, dispatched a `supervisor`
+agent to merge `feature/phase-1-security-core-ledger` into `main` and push
+— the routine feature→integration-branch merge tier, standing-authorized
+under this project's `full` release mode (not the separate, always-gated
+`main` → `production` promotion, which was not attempted). The supervisor
+independently re-ran `npm run typecheck`/`lint`/`test` on the feature
+branch tip (`07a3eac`) before merging — clean, 185/185 — then merged with
+`--no-ff` (merge commit `d3bad52`, 39 files changed) and pushed
+`origin/main`. The feature branch was left in place, not deleted.
+
+**Phase 1 is now fully merged.** Next step, whenever picked up: decide what
+Phase 2 (or the next backlog item) is — this proposal folder's own scope
+ends here.
+
 ### 2026-09-05 — S2.6 done: Record Payment/Adjustment and Void flow (spot-checked); Stage 2 complete
 
 Default verification tier — no new RLS/RPC. Spot-checked the diff directly
