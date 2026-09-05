@@ -22,11 +22,79 @@ Branch: `feature/phase-0-foundations` (off `main`).
 | T5 | Local dev seed data | done | Verifier: PASS. Idempotent across resets (identical md5), no auth.users rows. |
 | T3a | Close two integrity gaps the T3 verifier found | done | Verifier: PASS. Validation survived a real search_path hijack attempt. |
 | T6 | Wrangler config + SPA fallback for Cloudflare | done | Verifier: PASS. Two dashboard-side items need the user — see log. |
-| T7 | Database invariant regression tests | todo | **Do before Phase 1 policies.** Nothing in CI currently re-checks the unique index or timezone trigger. |
+| T7 | Database invariant regression tests | done | Verifier: PASS on all 9 criteria. pgTAP via `npm run test:db`, 19 assertions. Mutation-proofed four ways. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-04 — T7 verified (pass); the DB test harness gap is closed
+
+Verifier returned **pass** on all nine acceptance criteria, re-deriving the
+mutation results itself rather than accepting the implementer's numbers.
+
+**Harness shape.** pgTAP via the Supabase CLI's own runner (`npx supabase
+test db --local`), wrapped as `npm run test:db`. Two files under
+`supabase/tests/`, 19 assertions. No new npm dependency — pgTAP 1.3.3 is
+already in the Supabase Postgres image.
+
+**pgTAP is deliberately NOT in a migration.** Each test file does `create
+extension if not exists pgtap with schema extensions` *inside* its own
+`begin`/`rollback`, so the test framework never becomes part of the
+production schema and does not even persist after a run (verified:
+`pg_extension` is clean afterwards). The CLI happens to pre-create pgTAP
+itself — hence the `already exists, skipping` NOTICE — but the verifier
+confirmed the files are genuinely self-sufficient by running them straight
+through `psql` with no CLI involved.
+
+**`npm run test` stays Docker-free.** The 146 Vitest unit tests must keep
+running anywhere, so the database suite is a separate command. Do not fold
+them together.
+
+**The mutation requirement earned its keep — it found a defect in the tests
+themselves.** The first version looked up the index with `::regclass`, which
+raises a hard error when the index is missing and aborted the transaction at
+assertion 2, so the *behavioural* assertions never got to report. Switched to
+`to_regclass()`, which returns NULL and lets each assertion fail cleanly.
+Nothing but a mutation test would have surfaced this: the suite passed
+identically against a healthy schema either way.
+
+Four mutations, each re-run by the verifier against the live local DB:
+
+- drop the unique index → 5/9 fail in file 001;
+- drop the timezone trigger → 7/10 fail in file 002. The `search_path`
+  assertion correctly still passes — dropping a trigger does not drop its
+  function, and that asymmetry is the expected signal, not a gap;
+- drop both `role`/`status` CHECK constraints → exactly tests 8 and 9 fail.
+  This is the proof the `23514` assertions were not passing for some
+  unrelated reason (a NOT NULL or FK rejection would have looked identical);
+- recreate the index **non-partial** → test 3 alone fails. An over-broad
+  index passes every behavioural test, so the predicate assertion is the only
+  thing catching it.
+
+**Carried forward to Phase 1:**
+
+- **The suite is superuser-only** (it needs `create extension`), so it cannot
+  double as a role-scoped RLS harness as-is. Phase 1's policy tests will need
+  `set local role` blocks layered on top — plan for that rather than
+  discovering it when the first policy lands.
+- **`insert into auth.users (id, email)` is a soft coupling.** File 001
+  hand-creates GoTrue rows with two columns because `household_members.user_id`
+  is a real FK. It works because every other column is nullable or defaulted
+  in the current GoTrue schema; a future Supabase image could break these
+  fixtures for reasons unrelated to the invariants under test. This is the
+  most likely source of a future spurious red.
+- Reconfirmed from the wrong-case test: `households.timezone` must be a
+  **picker** sourced from canonical identifiers, never free text. A session
+  that hits the `'america/chicago'` rejection should build the picker, not
+  loosen the trigger.
+
+Orchestrator dropped `--yes` from the `test:db` script after verification.
+The verifier flagged that `npx --yes` silently resolves an unpinned CLI from
+the registry; plain `npx supabase` matches how every other Supabase command
+in `CLAUDE.md` is written, and re-ran green.
+
+**T4 (auth proof of concept) is now the only task left in Phase 0.**
 
 ### 2026-09-04 — T6 verified (pass); Phase 0 local track complete
 

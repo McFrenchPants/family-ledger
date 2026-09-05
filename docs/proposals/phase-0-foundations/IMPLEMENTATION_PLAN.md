@@ -192,3 +192,86 @@ nothing to deploy.
 
 **Note:** this task only makes deployment *correct*; actually deploying is
 the supervisor role's job and is out of scope here.
+
+### T7 — Database invariant regression tests (added after T3a/T5 review)
+
+**Load the `supabase` and `supabase-postgres-best-practices` skills before
+starting this task.**
+
+**Scope:** A committed, runnable database test harness plus regression tests
+for the two schema invariants T3a introduced. Use **pgTAP** via the Supabase
+CLI's own `supabase test db` runner (tests live in `supabase/tests/*.sql`) —
+it needs no new npm dependency and runs inside the existing local stack.
+Add an `npm run test:db` script that wraps it.
+
+**Why this exists:** T3a's two integrity fixes were verified only by ad hoc
+SQL typed during a review session. Nothing in the repo re-checks them.
+Phase 1's RLS policies are about to be written directly on top of both
+guarantees — the policies resolve a caller's role by membership lookup
+(which the partial unique index makes unambiguous) and every due/overdue
+date derives from `households.timezone` (which the trigger keeps real). If
+either were dropped or weakened, nothing would currently catch it.
+
+**Files:** `supabase/tests/*.sql` (new), `package.json` (the `test:db`
+script only), `supabase/config.toml` **only if** enabling pgTAP genuinely
+requires it.
+
+**`npm run test` must stay Docker-free.** The existing Vitest suite is pure
+unit tests that run anywhere; do not fold the database tests into it or make
+it depend on a running container. `test:db` is a separate command.
+
+**Do not add pgTAP to a migration in `supabase/migrations/`** if it can be
+avoided — a test framework should not become part of the production schema.
+Prefer `create extension if not exists pgtap with schema extensions;` inside
+the test file itself. If that genuinely does not work, report what you
+found rather than silently adding it to a migration.
+
+**Acceptance criteria:**
+
+- `npm run test:db` runs against the local stack and passes, from a clean
+  `npx supabase db reset`.
+- Tests are self-contained: they create the rows they need and do not
+  depend on `seed.sql`'s contents, and they leave the database as they
+  found it (pgTAP's `begin` / `rollback` wrapper per file).
+- **Partial unique index** (`household_members_household_id_user_id_key`)
+  is covered by at least these cases, each asserting the *specific* failure,
+  not merely "some error":
+  - two members in one household with the same non-null `user_id` → rejected
+    on INSERT;
+  - repointing an existing second row at an already-linked `user_id` via
+    UPDATE → rejected (escalation path, not just the insert path);
+  - the same `user_id` in a **different** household → allowed (the index is
+    scoped, not over-broad);
+  - two or more rows with `user_id is null` in one household → allowed (the
+    partial predicate);
+  - a structural assertion that the index exists, is unique, and carries the
+    `where user_id is not null` predicate.
+- **Timezone validation trigger** (`households_timezone_is_valid`) is
+  covered by at least: a valid zone accepted; `'Not/AReal_Zone'` rejected;
+  `'localtime'` rejected (the server-local alias the standing rules forbid —
+  this is the most important single case); empty string rejected; an UPDATE
+  that changes `timezone` to an invalid value rejected (the trigger fires on
+  update, not only insert); and a structural assertion that the trigger
+  exists on `public.households` and its function is declared with an empty
+  `search_path`.
+- The `'america/chicago'` case (correct zone, wrong case) is asserted as
+  **rejected**, with a comment recording that this is deliberate
+  canonical-storage behavior and that Phase 1 must supply a picker rather
+  than free text — so a future session cannot mistake it for a bug.
+- Also cover the `household_members_role_check` and
+  `household_members_status_check` constraints: a bogus role and a bogus
+  status are each rejected. Cheap, and `role` is what every later
+  authorization decision reads.
+- **Mutation-proof the suite.** Demonstrate that the tests actually fail
+  when the invariant they protect is removed: temporarily drop the unique
+  index, run the suite, record the failures; restore; then temporarily drop
+  the trigger, run, record, restore. Report the actual failure counts. A
+  regression test that passes against a broken schema is worse than no test.
+  Do this against a scratch/reset database and leave the repo's migration
+  files untouched.
+
+**Do not touch:** `CLAUDE.md`, `BACKLOG.md`, `PROGRESS.md`, this
+`IMPLEMENTATION_PLAN.md`, anything under `.sdlc/` or `docs/`,
+`supabase/migrations/**`, `supabase/seed.sql`, `src/**`.
+
+**Depends on:** T3, T3a, T5 (all done).

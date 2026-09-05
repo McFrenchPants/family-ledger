@@ -87,6 +87,7 @@ npm run typecheck   # tsc -b --noEmit
 npm run lint        # eslint .
 npm run test        # vitest run (non-watch)
 npm run test:watch  # vitest
+npm run test:db     # pgTAP database invariant tests (needs Docker + local Supabase)
 ```
 
 ### Local Supabase
@@ -129,12 +130,26 @@ negative amount, an amount edit downward, a void, another household's data,
 a role escalation). Do not treat a phase as complete while any Child
 privilege-escalation test fails.
 
-**Known gap:** there is currently no committed database test harness, so the
-schema's security invariants (the `(household_id, user_id)` partial unique
-index and the `households.timezone` validation trigger) are not re-checked by
-anything automated. Closing this is tracked as T7 in
-`docs/proposals/phase-0-foundations/PROGRESS.md` and should land **before**
-Phase 1's RLS policies are written on top of those invariants.
+**Database tests run through pgTAP**, not Vitest: `npm run test:db` wraps
+`npx supabase test db --local` over `supabase/tests/*.sql`. It needs Docker
+and a running local stack. `npm run test` is deliberately kept Docker-free so
+the unit suite runs anywhere — do not fold the two together.
+
+pgTAP is created *inside* each test file's `begin`/`rollback`, never in a
+migration: the production schema must not carry a test framework. The
+Supabase CLI also pre-creates pgTAP before invoking pg_prove, but the files
+do not rely on that.
+
+**Every database invariant test must be mutation-proofed** — drop the thing
+it protects, confirm the suite actually goes red, restore. A regression test
+that passes against a broken schema is worse than none, and this is not
+hypothetical here: T7's first draft used `::regclass`, which aborted the
+transaction on a dropped index so the behavioural assertions never reported.
+`to_regclass()` fails cleanly instead. Only the mutation run exposed it.
+
+**The suite is superuser-only** (it needs `create extension`), so it cannot
+double as a role-scoped RLS harness. Phase 1's policy tests need `set local
+role` blocks layered on top.
 
 ## sdlc-supervisor framework
 
