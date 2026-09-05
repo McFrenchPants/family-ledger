@@ -17,7 +17,7 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 | --- | --- | --- | --- |
 | P2.1 | Schema: `payment_plans` and `payment_periods` | done | Verifier: PASS on all 7 criteria, independently re-derived. |
 | P2.2 | RLS policies for read access | done | Verifier: PASS on all 5 criteria, independently re-derived. |
-| P2.3 | Security-definer functions: create/deactivate plan, ensure-current-period, waive | todo | Depends on P2.1, P2.2. |
+| P2.3 | Security-definer functions: create/deactivate plan, ensure-current-period, waive | done | Verifier: FAIL on first pass (month-walk compounding drift for starts_on on day 29-31), fixed by orchestrator, re-verified independently PASS on all criteria. |
 | P2.4 | Period status derivation (allocation rule) | todo | Depends on P2.1–P2.3. |
 | P2.5 | pgTAP privilege-escalation and status regression suite | todo | Depends on P2.1–P2.4. Gates Stage 2. |
 | S3.1 | Parent payment-plan management screen | todo | Depends on Stage 1 complete. |
@@ -28,6 +28,45 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — P2.3 verifier FAIL, fixed by orchestrator, re-verified
+
+Verifier's first pass returned **fail**. Nine of ten acceptance criteria
+passed, but `ensure_current_payment_period`'s month-walk loop had a real,
+reachable bug: it compounded from its own previous iteration
+(`v_period_start := (v_period_start + interval '1 month')::date`), so for
+any plan with `starts_on` on day 29/30/31, Postgres's month-length clamping
+(e.g. `2025-01-31 + 1 month` → `2025-02-28`) never recovered — a
+`starts_on = '2025-01-31'` plan silently drifted to `period_start =
+2026-08-28` after ~20 iterations instead of the correct `2026-08-31`.
+`starts_on` is not schema-constrained to 1-28 (only `due_day` is), so this
+was a reachable input, not a contrived edge case, and directly undermines
+the household-timezone/due-date-correctness standing rule even though the
+timezone resolution itself was correct.
+
+**Fixed directly by the orchestrator** (small, precise correction): each
+candidate `period_start` is now anchored back to the plan's *original*
+`starts_on` (`starts_on + N months`, computed independently for each N)
+rather than compounding from the previous iteration's already-clamped
+result. Independently confirmed via direct SQL before re-verification:
+`('2025-01-31'::date + (19 || ' months')::interval)::date` = `2026-08-31`
+(correct) vs. the old buggy output of `2026-08-28`.
+
+Re-verified independently: the original repro now returns the correct
+date, all 10 original acceptance criteria still hold, and three additional
+boundary cases (leap-day `2024-02-29`, `starts_on` exactly today, and a
+non-boundary control date) all pass against independently-computed
+expected values. Verifier's one non-blocking note: no pgTAP regression
+test yet exists for this fix (expected — that's explicitly P2.5's job, not
+this task's, per the implementation plan), so nothing currently guards
+against this exact bug class recurring until P2.5 lands; flagged here so
+it isn't forgotten. The existence-check-before-authorization-check
+ordering asymmetry (`create_payment_plan` vs. `deactivate_payment_plan`/
+`waive_payment_period`) was re-confirmed non-blocking — matches an
+existing accepted pattern (`void_ledger_transaction`) and discloses only
+"this ID exists somewhere," never which household.
+
+Starting P2.4 (period status derivation) next.
 
 ### 2026-09-05 — P2.2 verified (pass)
 
