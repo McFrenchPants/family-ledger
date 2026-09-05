@@ -20,11 +20,52 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| — | _(none yet)_ | — | Add a row here for small work that doesn't need a proposal folder. |
+| 9 | Component-test tooling for the auth/session layer | done | Branch `feature/component-test-tooling`, merged to `main`. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — Item 9 done: component-test tooling for the auth layer
+
+Default verification tier (no RLS/monetary/audit-log/push/export changes,
+so outside the verifier-agent floor/widen list) — spot-checked the diff
+directly and independently re-ran `npm run typecheck`/`lint`/`test` rather
+than taking the implementer's report on faith.
+
+**What landed.** `jsdom`, `@testing-library/react`, `@testing-library/jest-dom`,
+`@testing-library/user-event` added as devDependencies. `vitest.config.ts`
+gained one `setupFiles` entry (`src/test/setup.ts`, registering jest-dom's
+matchers via the `/vitest` subpath and calling `cleanup()` after each test)
+— the global `environment: "node"` default was left untouched, per the
+existing docblock convention; each new test file opts into
+`// @vitest-environment jsdom` individually. Confirmed both kinds of test
+run correctly in the same `vitest run` (pure-logic tests stay ms-fast under
+`node`; the four new files run under `jsdom`).
+
+Four new test files, one per component, exactly the scope agreed with the
+user ahead of time (see `analysis/09-component-test-tooling.md`) — the
+auth/session layer only, not the already-hand-verified page components:
+`SessionProvider.test.tsx` (4 tests: initial `getSession` resolution,
+`onAuthStateChange` updates, unsubscribe on unmount), `MembershipProvider.test.tsx`
+(7 tests: signed-out short-circuit, successful row mapping, no-membership,
+query error + working `retry()`, re-fetch on user-id change, the defensive
+invalid-role/status branch), `RequireRole.test.tsx` (7 tests: all five
+`MembershipState` branches including both directions of the wrong-role
+cross-redirect), `SignInForm.test.tsx` (6 tests: typing, submit payload,
+success clears password, `signInError` surfaced as an alert, thrown/network
+error surfaced as a fallback message, submit button disabled while
+submitting). The Supabase client is mocked per-file with `vi.mock`, not
+MSW, per the agreed scope. No bugs found in any of the four components; no
+source changes to them.
+
+Verified: `npm run typecheck` clean, `npm run lint` clean, `npm run test`
+209/209 (185 pre-existing + 24 new), `npm run build` unaffected.
+
+Per this project's `full` release mode, dispatching a `supervisor` agent
+next to merge `feature/component-test-tooling` into `main` and push — the
+routine feature→integration-branch merge tier, standing-authorized once a
+task is done and verified.
 
 ### 2026-09-04 — Phase 0 complete (T4 auth PoC verified)
 
