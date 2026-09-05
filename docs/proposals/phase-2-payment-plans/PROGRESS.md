@@ -20,7 +20,7 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 | P2.3 | Security-definer functions: create/deactivate plan, ensure-current-period, waive | done | Verifier: FAIL on first pass (month-walk compounding drift for starts_on on day 29-31), fixed by orchestrator, re-verified independently PASS on all criteria. |
 | P2.4 | Period status derivation (allocation rule) | done | Verifier: PASS on all 10 criteria, independently re-derived. |
 | P2.5 | pgTAP privilege-escalation and status regression suite | done | Verifier: PASS on all criteria, all 3 mutation-proofing claims independently re-derived. **Stage 1 is gated-green.** |
-| S3.1 | Parent payment-plan management screen | todo | Depends on Stage 1 complete. |
+| S3.1 | Parent payment-plan management screen | done | Spot-checked (default tier, no RLS/security-definer changes). |
 | S3.2 | Child progress UI | todo | Depends on Stage 1 complete. |
 | S3.3 | Parent dashboard plan-status card | todo | Depends on Stage 1 complete. |
 | S3.4 | Record Payment: period effect on confirmation | todo | Depends on Stage 1 complete; benefits from S3.1 existing (a plan to test against). |
@@ -28,6 +28,36 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S3.1 done: Parent payment-plan management screen
+
+Default verification tier (no RLS/security-definer/audit_log changes — this
+task only calls the already-verified `create_payment_plan`/
+`deactivate_payment_plan` RPCs), so spot-checked directly: reviewed the full
+diff against all 5 acceptance criteria, then independently re-ran
+`npm run typecheck`/`lint`/`test` rather than taking the implementer's report
+on faith. Typecheck clean, lint clean, 222/222 tests passing (12 files,
+including a new 13-test `payment-plans.test.ts`).
+
+**What landed.** `src/features/payment-plans/payment-plans.ts` (pure types +
+`validatePlanForm`, mirroring `record-transaction.ts`'s split), `usePaymentPlan.ts`
+(fetches the member's current active plan, mirroring `useHouseholdBalances`'s
+retry-token pattern — `plan: null` is a normal "no active plan" outcome, not an
+error), and `src/pages/PaymentPlanPage.tsx` at `/child/:memberId/payment-plan`.
+Parent-only end to end via the same `RecordPaymentPage`-style membership gate
+(not `RequireRole`) — a Child hitting this route directly sees only "Only a
+parent can manage a payment plan.", no create/edit/deactivate control ever
+renders (AC4). "No active plan" is its own labeled state with a direct-submit
+create form (AC1, AC3's converse). An existing active plan shows its terms plus
+a `ReplacePlanControl` (collapsed→editing→confirming→submitting→error) that
+explicitly names the old plan's terms before calling `create_payment_plan` to
+supersede it (AC2), and a `DeactivatePlanControl` with the same two-step-confirm
+shape (AC3). Both mirror `HistoryPage`'s `VoidControl` state-machine shape.
+Every RPC failure surfaces `error.message` verbatim, re-submittable — no
+silent queue (ADR-007). Added the route in `router.tsx` and a
+"Manage payment plan" link on `HistoryPage`, gated on `viewerRole === "parent"`.
+
+Starting S3.2 (Child progress UI) next.
 
 ### 2026-09-05 — P2.5 verified (pass); Stage 1 complete and gated-green
 
