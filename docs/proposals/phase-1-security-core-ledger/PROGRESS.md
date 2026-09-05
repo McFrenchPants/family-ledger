@@ -17,7 +17,7 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | --- | --- | --- | --- |
 | P1.1 | Ledger schema: transactions, categories, audit log, household policy | done | Verifier: PASS on all 6 criteria. |
 | P1.2 | RLS policies for read access and audit-log protection | done | Verifier: PASS on all 7 criteria. |
-| P1.3 | Security-definer functions: insert expense/payment/adjustment, void | todo | Depends on P1.1, P1.2. |
+| P1.3 | Security-definer functions: insert expense/payment/adjustment, void | done | Verifier: FAIL on first pass (anon could still execute all four functions — default-privileges grant, not covered by `revoke ... from public`), fixed by orchestrator; re-verified independently. |
 | P1.4 | Balance derivation | todo | Depends on P1.1–P1.3. |
 | P1.5 | pgTAP privilege-escalation and integrity regression suite | todo | Depends on P1.1–P1.4. Gates Stage 2 — must be green before any UI task starts. |
 
@@ -28,6 +28,53 @@ once P1.5 is done and verified, per the design spec's gate.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — P1.3 verifier FAIL, fixed by orchestrator, re-verified
+
+Verifier's first pass returned **fail**. Every functional/authorization
+acceptance criterion passed (Child restricted from payment/adjustment/void,
+`child_expense_scope` enforced correctly, cross-household isolation held,
+sign checks fire at the function layer independent of the table CHECK,
+audit_log writes are atomic with the ledger insert), but one explicit
+requirement was not met: **`anon` could still execute all four public RPCs**.
+Root cause: Supabase's `ALTER DEFAULT PRIVILEGES` grants `EXECUTE` to
+`anon`/`authenticated`/`service_role` automatically at function-creation
+time, as a grant independent of the PUBLIC pseudo-role — so
+`revoke execute on function ... from public` (what the implementer wrote)
+never touched it. Not an exploitable write path (an unauthenticated `anon`
+caller still has no `auth.uid()`, so every function's own caller-membership
+check rejects it) but a real, testable miss against the stated requirement
+and the standing invariant that these functions must not be callable by
+`anon`.
+
+**Fixed directly by the orchestrator** (small, precise correction, not a
+re-spawn): every `revoke` in
+`supabase/migrations/20260904233000_ledger_write_functions.sql` now
+explicitly lists `anon` (and, for the two `internal`-schema helpers,
+`authenticated` too, since nothing outside the public wrapper functions
+should be able to call them directly). Re-verified independently:
+`has_function_privilege('anon', ..., 'execute')` now `false` for all six
+functions; `has_function_privilege('authenticated', ...)` still `true` for
+exactly the four intended public entry points.
+
+Also fixed the verifier's second, non-blocking finding: `record_expense`
+and `internal.record_balance_decrease` previously looked up the *target*
+member's existence/status before checking the *caller's* own household
+membership, letting an outsider distinguish "no such member" / "exists but
+archived" / "exists and active" for a member in a household they don't
+belong to. Reordered so the caller-membership (or Parent-role, for
+payment/adjustment) check runs first and produces one generic rejection in
+all three cases — verified directly: probing a nonexistent id, an archived
+household-A member, and an active household-A member, all as an
+unrelated household-B Parent, now raise the identical
+`'caller is not an active member of this household'` (or the Parent-only
+equivalent), and the legitimate expense-recording path still works
+unchanged.
+
+Re-ran the full verification set after both fixes: `npx supabase db reset`
+clean, `npm run test:db` still 19/19 on Phase 0's suite, and a fresh
+manual script confirming the three previously-distinguishable error paths
+now collapse to one.
 
 ### 2026-09-04 — P1.2 verified (pass)
 
