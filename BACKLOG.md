@@ -71,11 +71,17 @@ sequential except where noted.
    suite. Gate satisfied: every Child privilege-escalation negative test
    passed. Depends on Phase 1 (satisfied).
 
-4. **Phase 3 — PWA** — status: `ready` — analysis: not yet written
-   Web app manifest with a stable `id`, icons and Apple touch icon,
-   standalone display mode, service worker with conservative caching, mobile
-   install onboarding. No offline write queue (ADR-007). Depends on Phase 1;
-   independent of Phase 2 and could run in parallel with it.
+4. **Phase 3 — PWA** — status: `in progress` — analysis: analysis/03-phase-3-pwa.md
+   Tracking doc: `docs/proposals/phase-3-pwa/PROGRESS.md` (branch
+   `feature/phase-3-pwa`) — that file is the source of truth for task-level
+   status, not this entry. Web app manifest with a stable `id`, a generated
+   placeholder icon set, standalone display mode, an `injectManifest`
+   service worker with conservative caching, mobile install onboarding
+   (platform-conditional: Android's `beforeinstallprompt` vs. iOS's manual
+   Add to Home Screen). Real-device install testing via `vite-plugin-mkcert`
+   over LAN HTTPS, not a production deploy (user-confirmed — see the
+   analysis file). No offline write queue (ADR-007). Depends on Phase 1
+   (satisfied).
 
 5. **Phase 4 — Push technical spike** — status: `needs research` — analysis: not yet written
    VAPID key generation, `push_subscriptions` storage, a test Edge Function
