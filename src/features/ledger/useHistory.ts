@@ -7,7 +7,7 @@ import { toHistoryTransactions } from "./history";
 export type HistoryState =
   | { status: "loading" }
   | { status: "error"; message: string; retry: () => void }
-  | { status: "loaded"; transactions: HistoryTransaction[] };
+  | { status: "loaded"; transactions: HistoryTransaction[]; refetch: () => void };
 
 /**
  * Fetches a member's *full* ledger history (S2.7), newest-first, for the
@@ -68,7 +68,11 @@ export function useHistory(memberId: string): HistoryState {
           return;
         }
 
-        setState({ status: "loaded", transactions: toHistoryTransactions(data ?? []) });
+        setState({
+          status: "loaded",
+          transactions: toHistoryTransactions(data ?? []),
+          refetch: retry,
+        });
       } catch (caught) {
         if (!active) {
           return;

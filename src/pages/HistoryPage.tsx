@@ -1,10 +1,14 @@
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { Navigate, useParams } from "react-router-dom";
 
 import { useMembership } from "../features/auth/membership-context";
-import type { Membership } from "../features/auth/membership-context";
+import type { Membership, MembershipRole } from "../features/auth/membership-context";
 import type { HistoryTransaction } from "../features/ledger/history";
 import { useHistory } from "../features/ledger/useHistory";
+import { validateVoidReason } from "../features/ledger/record-transaction";
 import { formatCents } from "../lib/currency";
+import { supabase } from "../lib/supabase";
 
 const TYPE_LABELS: Record<string, string> = {
   expense: "Expense",
@@ -115,7 +119,12 @@ function History({ membership, memberId }: { membership: Membership; memberId: s
           ) : (
             <ul className="flex flex-col gap-2">
               {history.transactions.map((transaction) => (
-                <HistoryRow key={transaction.id} transaction={transaction} />
+                <HistoryRow
+                  key={transaction.id}
+                  transaction={transaction}
+                  viewerRole={membership.role}
+                  onVoided={history.refetch}
+                />
               ))}
             </ul>
           )}
@@ -125,7 +134,15 @@ function History({ membership, memberId }: { membership: Membership; memberId: s
   );
 }
 
-function HistoryRow({ transaction }: { transaction: HistoryTransaction }) {
+function HistoryRow({
+  transaction,
+  viewerRole,
+  onVoided,
+}: {
+  transaction: HistoryTransaction;
+  viewerRole: MembershipRole;
+  onVoided: () => void;
+}) {
   const sign = transaction.amountCents > 0 ? "+" : "";
 
   return (
@@ -171,10 +188,156 @@ function HistoryRow({ transaction }: { transaction: HistoryTransaction }) {
       )}
 
       {/*
-        Per-row action area reserved for S2.6's void button (a Parent voiding
-        an active, i.e. non-`isVoided`, entry). S2.6 is a separate,
-        not-yet-started task -- intentionally not implemented here.
+        S2.6's void action: only rendered for a Parent viewing a non-voided
+        row. `viewerRole` comes from this caller's own `useMembership()`
+        result, not from anything about the transaction, and a Child must
+        never see this control regardless of whose history they are
+        viewing -- verified against the rendered DOM as a Child session, not
+        just relying on the RPC's own Parent-only rejection.
       */}
+      {!transaction.isVoided && viewerRole === "parent" && (
+        <VoidControl transactionId={transaction.id} onVoided={onVoided} />
+      )}
     </li>
+  );
+}
+
+type VoidState =
+  | { status: "collapsed" }
+  | { status: "confirming"; reason: string; reasonError: string | null }
+  | { status: "submitting"; reason: string }
+  | { status: "error"; reason: string; message: string };
+
+/**
+ * A Parent-only void trigger for one active ledger row. Deliberately styled
+ * to look nothing like `AddExpensePage`'s (or `RecordPaymentPage`'s) primary
+ * actions -- a small outlined `owed`-red control, not a filled button -- per
+ * this task's requirement that every balance-decreasing/destructive action
+ * stay visually distinct from ordinary entry, including from each other's
+ * "this is destructive" signal being reserved for void alone.
+ *
+ * Expands inline into a reason field plus a second, explicit confirm step
+ * (`public.void_ledger_transaction` looks irreversible from the UI's
+ * perspective even though the row is only soft-voided), rather than a
+ * `window.confirm` -- an inline form can also require the non-empty reason
+ * before the confirm control is even enabled, per the acceptance criteria.
+ *
+ * On success, calls `onVoided` (`useHistory`'s `refetch`) rather than
+ * optimistically patching local state -- the row's `isVoided`/`voidedByName`
+ * fields come from a join this component has no independent copy of, and a
+ * refetch is one round-trip against data that is already cheap to reload.
+ *
+ * A rejection surfaces the RPC's own `error.message` verbatim (e.g. the
+ * already-voided race: two parents voiding the same row near-simultaneously,
+ * or a stale page) rather than a generic "something went wrong", per the
+ * acceptance criteria.
+ */
+function VoidControl({
+  transactionId,
+  onVoided,
+}: {
+  transactionId: string;
+  onVoided: () => void;
+}) {
+  const [state, setState] = useState<VoidState>({ status: "collapsed" });
+
+  if (state.status === "collapsed") {
+    return (
+      <button
+        type="button"
+        onClick={() => setState({ status: "confirming", reason: "", reasonError: null })}
+        className="min-h-touch self-start rounded-card border border-owed px-3 text-label font-medium text-owed"
+      >
+        Void
+      </button>
+    );
+  }
+
+  const reason = state.reason;
+
+  async function handleConfirm(event: FormEvent) {
+    event.preventDefault();
+
+    const validation = validateVoidReason(reason);
+    if (!validation.ok) {
+      setState({ status: "confirming", reason, reasonError: validation.error });
+      return;
+    }
+
+    setState({ status: "submitting", reason });
+
+    try {
+      const { error } = await supabase.rpc("void_ledger_transaction", {
+        p_transaction_id: transactionId,
+        p_void_reason: validation.reason,
+      });
+
+      if (error) {
+        // Surfaces the RPC's own rejection verbatim -- e.g. "ledger
+        // transaction ... is already voided" for the race-condition case, or
+        // "only an active Parent ... may void it" for a stale/downgraded
+        // session. Never a generic failure message.
+        setState({ status: "error", reason, message: error.message });
+        return;
+      }
+
+      onVoided();
+    } catch (caught) {
+      setState({
+        status: "error",
+        reason,
+        message:
+          caught instanceof Error
+            ? `Could not reach the ledger service: ${caught.message}`
+            : "Could not reach the ledger service.",
+      });
+    }
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-2 rounded-card border border-owed/60 bg-owed/5 p-3"
+      onSubmit={(event) => void handleConfirm(event)}
+    >
+      <label htmlFor={`void-reason-${transactionId}`} className="text-label font-medium text-owed">
+        Reason for voiding (required)
+      </label>
+      <input
+        id={`void-reason-${transactionId}`}
+        type="text"
+        value={reason}
+        onChange={(event) =>
+          setState({ status: "confirming", reason: event.target.value, reasonError: null })
+        }
+        className="min-h-touch rounded-card border border-surface-border px-3 text-body"
+      />
+      {state.status === "confirming" && state.reasonError && (
+        <p role="alert" className="text-label text-owed">
+          {state.reasonError}
+        </p>
+      )}
+      {state.status === "error" && (
+        <p role="alert" className="text-label text-owed">
+          Could not void this transaction: {state.message}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={state.status === "submitting" || reason.trim() === ""}
+          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-owed px-3 text-label font-medium text-white disabled:opacity-60"
+        >
+          {state.status === "submitting" ? "Voiding…" : "Confirm void"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setState({ status: "collapsed" })}
+          disabled={state.status === "submitting"}
+          className="min-h-touch flex-1 rounded-card border border-surface-border px-3 text-label text-ink-muted disabled:opacity-60"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

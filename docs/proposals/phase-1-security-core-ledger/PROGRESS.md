@@ -25,12 +25,67 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | S2.3 | Parent dashboard: household overview | done | Spot-checked: typecheck/lint/test clean, verified live with real balances ($187.32/$63.81) and a $0.00 zero-transaction case. |
 | S2.4 | Child dashboard: own balance and recent activity | done | Spot-checked: typecheck/lint/test clean, verified live including sibling-isolation and empty-state cases. |
 | S2.5 | Add Expense flow | done | Uncovered a real gap (`households` had zero RLS policies) fixed via a verifier-routed migration; UI spot-checked after the fix landed. |
-| S2.6 | Record Payment/Adjustment and Void flow | todo | Default tier. Depends on S2.1, S2.2, S2.3, S2.7. |
+| S2.6 | Record Payment/Adjustment and Void flow | done | Spot-checked: typecheck/lint/test clean (185/185, 13 new), verified live including balance decrease, Child-inaccessibility, empty-reason blocking, and the already-voided race. |
 | S2.7 | History view | done | Spot-checked: typecheck/lint/test clean (172/172, 5 new), verified live including sibling-attribution, RLS-blocked-vs-empty distinction, and a voided-entry render. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S2.6 done: Record Payment/Adjustment and Void flow (spot-checked); Stage 2 complete
+
+Default verification tier — no new RLS/RPC. Spot-checked the diff directly
+and re-ran `npm run typecheck`/`npm run lint`/`npm run test` myself
+(185/185, 13 new, clean) rather than taking the implementer's report on
+faith.
+
+**What landed.** `/record-payment` registered in `router.tsx`. One combined
+page, `RecordPaymentPage.tsx` (a Payment/Adjustment type toggle rather than
+two screens, since `record_payment`/`record_adjustment` share one signature
+and differ only in `type`): reuses `useAddExpenseFormData` for the active-
+member list/categories/timezone, a new `record-transaction.ts` module
+(`buildRecordMemberOptions` — Parent-only, no `child_expense_scope`
+branching; `validateRecordForm` — Parent types a positive amount, the
+function negates it before returning `amountCents` so no call site has to
+remember the sign flip; `validateVoidReason`), and a post-submit
+confirmation panel showing the resulting balance via a second
+`household_member_balances` call. Not wrapped in `RequireRole` (that guard's
+two-way redirect doesn't fit a route with no legitimate Child destination at
+all) — instead renders an explicit "Parents only" message for a loaded Child
+membership, confirmed to render zero form elements.
+
+**Visual distinctness (§11.1 principle 5) achieved concretely, not just by
+route:** Add Expense stays `bg-accent` blue; Record Payment/Adjustment uses
+`bg-settled` green plus a type toggle and confirmation panel Add Expense has
+neither of; Void (in History) uses an outlined `border-owed`/`bg-owed` red
+control with its own inline reason-then-confirm step, distinct from both.
+
+**Void wiring:** `HistoryPage.tsx`'s reserved per-row slot now renders
+`VoidControl` only for `!transaction.isVoided && viewerRole === "parent"`.
+Confirm is DOM-`disabled` until the reason is non-empty. `useHistory.ts`
+gained a `refetch` on its `loaded` state (same `retryToken` bump as `retry`)
+so a successful void reloads the row rather than patching local state
+against a join this component has no independent copy of. An
+already-voided rejection surfaces the RPC's own message verbatim.
+
+Verified live against the local Docker Supabase stack with real seeded
+Parent/Child accounts: a $4.99 payment against a child correctly dropped
+their balance from $9.99 to $5.00 with the confirmation panel showing the
+new balance; voiding that same transaction was blocked with an empty reason
+(confirm button disabled) and succeeded with one, updating the row in place
+to "Voided by Parent One" with the reason shown; voiding it again reproduced
+the already-voided rejection (`23514`) surfaced verbatim; as a Child,
+`/record-payment` rendered zero form elements and no History page rendered
+any Void button anywhere in the DOM.
+
+**Stage 2 (S2.1–S2.7) is now complete.** Per the design spec, next step is
+confirming all seven tasks are genuinely done/verified and, per this
+project's `full` release mode, dispatching a `supervisor` agent to merge
+`feature/phase-1-security-core-ledger` into `main` and push (routine,
+standing-authorized once the whole phase is verified — not the separate,
+always-gated `main` → `production` promotion). **Deliberately not done in
+this run** — the user asked to stop after this task while approaching a
+usage limit. A future session should pick this up as the very next step.
 
 ### 2026-09-05 — S2.7 done: History view (spot-checked)
 
