@@ -24,13 +24,59 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | S2.2 | Session/role context, membership hook, and route guarding | done | Spot-checked: typecheck/lint/test clean, redirect behavior verified live in-browser. |
 | S2.3 | Parent dashboard: household overview | done | Spot-checked: typecheck/lint/test clean, verified live with real balances ($187.32/$63.81) and a $0.00 zero-transaction case. |
 | S2.4 | Child dashboard: own balance and recent activity | done | Spot-checked: typecheck/lint/test clean, verified live including sibling-isolation and empty-state cases. |
-| S2.5 | Add Expense flow | todo | Default tier. Depends on S2.1–S2.4. |
+| S2.5 | Add Expense flow | done | Uncovered a real gap (`households` had zero RLS policies) fixed via a verifier-routed migration; UI spot-checked after the fix landed. |
 | S2.6 | Record Payment/Adjustment and Void flow | todo | Default tier. Depends on S2.1, S2.2, S2.3, S2.7. |
 | S2.7 | History view | todo | Default tier. Depends on S2.1, S2.2. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S2.5 done: uncovered and closed a real RLS gap, then verified
+
+While building the Add Expense form, the implementer found that
+`public.households` has carried RLS enabled with **zero policies** since
+Phase 0 — nobody could read `timezone` or `child_expense_scope`. Its first
+pass worked around this with a browser-timezone fallback and a forced
+`self_only` default. **Rejected that workaround outright**: a
+browser-driven "today" directly violates `CLAUDE.md`'s standing rule that
+dates use the household's configured IANA timezone, never the browser's.
+Treated S2.5 as not-done and dispatched a fix instead of accepting it.
+
+**The fix**, `supabase/migrations/20260905020000_household_settings_and_sibling_read_access.sql`
+(+ 19 new pgTAP assertions, `supabase/tests/004_...sql`, suite now 73/73):
+a `households_select_member` policy (any active member reads their own
+household's row, reusing P1.2's `internal.is_household_member`), and a
+third `household_members` policy,
+`household_members_select_siblings_when_any_member`, letting a Child see
+active siblings **only when** `child_expense_scope = 'any_member'` — in
+`self_only` mode this grants nothing beyond S2.1's existing policies.
+Verifier: **PASS** on all 7 criteria, independently re-derived, including
+an independent mutation test proving the `any_member` gate is genuinely
+load-bearing (removing it let a `self_only` Child incorrectly see 2 rows
+instead of 1).
+
+With the gap closed, `useAddExpenseFormData.ts` was updated to read the
+real `timezone`/`child_expense_scope` — the browser-timezone fallback and
+forced-`self_only` default are gone entirely; a missing/unreadable
+household row is now a genuine, distinct error state instead of a silent
+degraded default.
+
+**The Add Expense form itself** (`AddExpensePage.tsx`, `add-expense.ts`):
+child selector (Parent sees all active children; a Child is locked to
+themselves in `self_only` mode, offered a real sibling selector in
+`any_member` mode), amount via `parsePositiveMoney` (never `parseFloat`),
+category dropdown, description/note/date fields, calling `record_expense`.
+Rejected/failed writes show a retry-able error, never a silent queue
+(ADR-007). Spot-checked directly (no new RLS in this half of the diff) —
+typecheck/lint/test clean (167/167), and live-verified end to end: a
+Parent recording for a child, and (after the fix) a Child recording
+against a sibling via the newly-real selector, both with correct balance
+updates observed on the relevant dashboards.
+
+**This closes out this run's `max_tasks_per_run` budget of 5 (S2.1–S2.5).**
+S2.6 (Record Payment/Adjustment/Void) and S2.7 (History) carry to a future
+run.
 
 ### 2026-09-05 — S2.4 spot-checked (pass)
 

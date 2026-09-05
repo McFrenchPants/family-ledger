@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { RootLayout } from "./RootLayout";
 import { RequireRole } from "../features/auth/RequireRole";
+import { AddExpensePage } from "../pages/AddExpensePage";
 import { ChildDashboardPage } from "../pages/ChildDashboardPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { ParentDashboardPage } from "../pages/ParentDashboardPage";
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
           </RequireRole>
         ),
       },
+      { path: "add-expense", element: <AddExpensePage /> },
       { path: "sign-in", element: <SignInPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
