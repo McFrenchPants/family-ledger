@@ -23,7 +23,7 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | S2.1 | Household membership read access (RLS/RPC) | done | Verifier: PASS on all 5 criteria, independently re-derived. |
 | S2.2 | Session/role context, membership hook, and route guarding | done | Spot-checked: typecheck/lint/test clean, redirect behavior verified live in-browser. |
 | S2.3 | Parent dashboard: household overview | done | Spot-checked: typecheck/lint/test clean, verified live with real balances ($187.32/$63.81) and a $0.00 zero-transaction case. |
-| S2.4 | Child dashboard: own balance and recent activity | todo | Default tier. Depends on S2.1, S2.2. |
+| S2.4 | Child dashboard: own balance and recent activity | done | Spot-checked: typecheck/lint/test clean, verified live including sibling-isolation and empty-state cases. |
 | S2.5 | Add Expense flow | todo | Default tier. Depends on S2.1–S2.4. |
 | S2.6 | Record Payment/Adjustment and Void flow | todo | Default tier. Depends on S2.1, S2.2, S2.3, S2.7. |
 | S2.7 | History view | todo | Default tier. Depends on S2.1, S2.2. |
@@ -31,6 +31,35 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S2.4 spot-checked (pass)
+
+Default verification tier — no new RLS/RPC. Spot-checked the diff and
+re-ran `npm run typecheck`/`npm run lint`/`npm run test` myself (152/152,
+3 new, clean).
+
+**What landed.** `ChildDashboardPage.tsx` rewritten: own balance via a new
+`useOwnBalance` (single call to the existing `household_member_balances`
+RPC, picking out the caller's own row rather than assuming `data[0]` —
+deliberately not built on S2.3's `useHouseholdBalances`, which is
+Parent-shaped and would pull in an unneeded `household_members` listing
+read), a recent-activity list via `useRecentActivity` (a plain
+`ledger_transactions` select relying entirely on P1.2's
+`ledger_transactions_select_self` RLS policy for correctness — no new
+authorization logic in the client), newest-first by `occurred_on` with
+`created_at` as a same-day tiebreaker, limited to 8 rows. "+ Add Expense"
+links to `/add-expense` (S2.3's established path). No control anywhere on
+this screen implies the Child can record a payment/adjustment/void.
+
+Verified live against the local Docker Supabase stack with the same seeded
+Child One/Child Two fixtures S2.3 left behind: confirmed sibling isolation
+(Child One's screen shows only their own transaction, never Child Two's),
+a genuine $0.00/empty-state case for a zero-transaction Child, and a
+network-log-confirmed single RPC + single scoped query per load.
+
+Starting S2.5 (Add Expense flow) next — the last task this run's
+`max_tasks_per_run` budget of 5 covers (S2.1–S2.5). S2.6/S2.7 (Record
+Payment/Adjustment/Void, History) carry to a future run.
 
 ### 2026-09-05 — S2.3 spot-checked (pass)
 
