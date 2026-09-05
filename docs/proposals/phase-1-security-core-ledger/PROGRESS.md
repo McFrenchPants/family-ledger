@@ -26,11 +26,58 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | S2.4 | Child dashboard: own balance and recent activity | done | Spot-checked: typecheck/lint/test clean, verified live including sibling-isolation and empty-state cases. |
 | S2.5 | Add Expense flow | done | Uncovered a real gap (`households` had zero RLS policies) fixed via a verifier-routed migration; UI spot-checked after the fix landed. |
 | S2.6 | Record Payment/Adjustment and Void flow | todo | Default tier. Depends on S2.1, S2.2, S2.3, S2.7. |
-| S2.7 | History view | todo | Default tier. Depends on S2.1, S2.2. |
+| S2.7 | History view | done | Spot-checked: typecheck/lint/test clean (172/172, 5 new), verified live including sibling-attribution, RLS-blocked-vs-empty distinction, and a voided-entry render. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S2.7 done: History view (spot-checked)
+
+Picked up S2.7 out of order ahead of S2.6, since S2.6's own dependency list
+names S2.7 (void needs a place in history to act from) and S2.7 only depended
+on already-done S2.1/S2.2. New run, budget reset.
+
+Default verification tier — no new RLS/RPC. Spot-checked the diff directly
+and re-ran `npm run typecheck`/`npm run lint`/`npm run test` myself
+(172/172, 5 new, clean) rather than taking the implementer's report on faith.
+
+**What landed.** `/child/:memberId/history` registered in `router.tsx`
+(previously fell through to `NotFoundPage`, per S2.3's note). A new sibling
+module `history.ts` (deliberately not an extension of `recent-activity.ts`
+— different consumer, would leak unused optional fields onto the Child
+dashboard's row type) adds `HistoryTransactionRow`/`toHistoryTransactions`
+covering `voided_at`/`void_reason` and two FK-disambiguated embeds
+(`created_by_member`/`voided_by_member`, since `ledger_transactions` has two
+FKs to `household_members`). `useHistory.ts` mirrors `useRecentActivity`'s
+loading/error/loaded shape but deliberately has no `.limit()`. `HistoryPage.tsx`
+handles `useMembership()` states directly (like `AddExpensePage`, since both
+roles reach this route), renders newest-first with type label, date,
+description/category, creator name, and — for a voided row — a strikethrough
+amount, shaded row, "Voided by X" badge, and reason shown, not hidden. A
+per-row action area is reserved (commented) for S2.6's void button.
+
+**One real, accepted limitation surfaced and documented, not routed around:**
+`created_by_member`/`voided_by_member` can legitimately come back `null` for
+a Child viewer, because S2.1's `household_members` RLS only lets a Child read
+their own row plus active siblings under `any_member` scope — a Parent's own
+row is not necessarily readable by a Child. `toHistoryTransactions` falls back
+to rendering `"someone"` rather than adding any elevated-privilege client-side
+workaround.
+
+Verified live against the local Docker Supabase stack with real seeded
+Parent/Child users and real RPC-generated transactions (`record_expense`/
+`record_payment`/`void_ledger_transaction`, never raw inserts): a Parent
+viewing a child's full history including a sibling-attributed `any_member`
+entry; a Child viewing their own equivalent history; a Child manually
+navigating to a sibling's `memberId` who *does* have a transaction, confirming
+RLS returns zero rows (rendered as "No history to show", not an error/crash) —
+distinguishing "blocked" from "genuinely empty"; and a voided transaction
+rendering with the strikethrough/badge/reason treatment rather than looking
+like an active entry.
+
+S2.6 (Record Payment/Adjustment/Void) is next — its only remaining
+dependency (S2.7) is now satisfied.
 
 ### 2026-09-05 — S2.5 done: uncovered and closed a real RLS gap, then verified
 

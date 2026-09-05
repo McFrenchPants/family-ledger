@@ -4,6 +4,7 @@ import { RootLayout } from "./RootLayout";
 import { RequireRole } from "../features/auth/RequireRole";
 import { AddExpensePage } from "../pages/AddExpensePage";
 import { ChildDashboardPage } from "../pages/ChildDashboardPage";
+import { HistoryPage } from "../pages/HistoryPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { ParentDashboardPage } from "../pages/ParentDashboardPage";
 import { SignInPage } from "../pages/SignInPage";
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "add-expense", element: <AddExpensePage /> },
+      { path: "child/:memberId/history", element: <HistoryPage /> },
       { path: "sign-in", element: <SignInPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
