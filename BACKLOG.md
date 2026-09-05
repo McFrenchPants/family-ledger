@@ -51,12 +51,15 @@ sequential except where noted.
      to the real Supabase project (`fsszkclgeekdyyspgrhg`) is deferred
      until there's a migration worth pushing to it.
 
-2. **Phase 1 — Security and core ledger** — status: `ready` — analysis: analysis/01-phase-1-security-core-ledger.md
-   Households/members model, RLS policies, Parent/Child role enforcement,
-   add expense, record payment, derived balances, transaction history,
-   audit trail. Gate: **do not proceed past this phase until every Child
-   privilege-escalation negative test passes** (`ARCHITECTURE.md` §24, §29).
-   Depends on Phase 0.
+2. **Phase 1 — Security and core ledger** — status: `done` — analysis: analysis/01-phase-1-security-core-ledger.md
+   Tracking doc: `docs/proposals/phase-1-security-core-ledger/PROGRESS.md`
+   (branch `feature/phase-1-security-core-ledger`, merged into `main` at
+   `d3bad52` on 2026-09-05). Households/members model, RLS policies,
+   Parent/Child role enforcement, add expense, record payment, derived
+   balances, transaction history, audit trail, and the Stage 2 UI (Parent/
+   Child dashboards, Add Expense, Record Payment/Adjustment + Void,
+   History). Gate satisfied: every Child privilege-escalation negative test
+   passed (`ARCHITECTURE.md` §24, §29). Depends on Phase 0.
 
 3. **Phase 2 — Payment plans** — status: `ready` — analysis: not yet written
    Monthly payment-plan model, payment periods, upcoming/due/partial/
@@ -104,7 +107,12 @@ sequential except where noted.
    top. Independent of the phase sequence; can be done any time after
    Phase 1 lands enough routes to make the split meaningful.
 
-9. **Component-test tooling for the auth and UI layer** — status: `idea` — analysis: not yet written
+9. **Component-test tooling for the auth and UI layer** — status: `in progress` — analysis: analysis/09-component-test-tooling.md
+   Tracking: root `PROGRESS.md` Post-Launch table (branch
+   `feature/component-test-tooling`). Scoped narrowly to the auth/session
+   layer (`SessionProvider`, `MembershipProvider`, `RequireRole`,
+   `SignInForm`) after a user check-in — see the analysis file for why page
+   components are explicitly out of scope.
    `npm run test` covers only the pure `currency`/`dates` modules; there is
    no jsdom or testing-library in `devDependencies`, so nothing guards the
    sign-in flow or session persistence that Phase 0 T4 built — both were
