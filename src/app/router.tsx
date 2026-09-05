@@ -7,6 +7,7 @@ import { ChildDashboardPage } from "../pages/ChildDashboardPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { ParentDashboardPage } from "../pages/ParentDashboardPage";
+import { PaymentPlanPage } from "../pages/PaymentPlanPage";
 import { RecordPaymentPage } from "../pages/RecordPaymentPage";
 import { SignInPage } from "../pages/SignInPage";
 
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { path: "add-expense", element: <AddExpensePage /> },
       { path: "record-payment", element: <RecordPaymentPage /> },
       { path: "child/:memberId/history", element: <HistoryPage /> },
+      { path: "child/:memberId/payment-plan", element: <PaymentPlanPage /> },
       { path: "sign-in", element: <SignInPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],

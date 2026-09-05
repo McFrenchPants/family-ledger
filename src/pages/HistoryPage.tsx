@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership, MembershipRole } from "../features/auth/membership-context";
@@ -91,7 +91,24 @@ function History({ membership, memberId }: { membership: Membership; memberId: s
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-title font-semibold">{isOwnHistory ? "Your History" : "History"}</h2>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-title font-semibold">{isOwnHistory ? "Your History" : "History"}</h2>
+
+        {/*
+          Visible only to a Parent, never to a Child viewing their own or a
+          sibling's history -- `membership.role` comes from this viewer's own
+          `useMembership()` result, mirroring `VoidControl`'s
+          `viewerRole === "parent"` gate above.
+        */}
+        {membership.role === "parent" && (
+          <Link
+            to={`/child/${memberId}/payment-plan`}
+            className="min-h-touch inline-flex items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
+          >
+            Manage payment plan
+          </Link>
+        )}
+      </div>
 
       {history.status === "loading" && (
         <p role="status" className="text-label text-ink-subtle">
