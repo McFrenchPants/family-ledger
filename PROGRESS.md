@@ -26,6 +26,33 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 _Newest entries on top._
 
+### 2026-09-05 — Phase 2 (payment plans) complete and merged to `main`
+
+Both stages done and verified — full detail lives in
+`docs/proposals/phase-2-payment-plans/PROGRESS.md`, this entry is the
+summary. Stage 1 (P2.1–P2.5: schema, RLS, security-definer functions,
+period-status derivation, a mutation-proofed pgTAP privilege-escalation
+suite) was entirely verifier-routed and gated-green — the Child
+privilege-escalation suite this project's standing rules require before any
+UI work. Stage 2 (S3.1–S3.4: Parent plan management screen, Child progress
+UI, Parent dashboard plan-status card, Record Payment period effect) was
+spot-checked per task, with each task independently re-verified by the
+orchestrator (typecheck/lint/test rerun directly, plus live browser
+verification against a local Supabase stack covering every named status —
+Due/Overdue/Partially Paid/Satisfied/Waived/no-active-plan — with scratch
+fixtures always cleaned up and independently confirmed clean afterward via
+direct `docker exec` queries).
+
+**Merged.** `feature/phase-2-payment-plans` fast-forwarded into `main` at
+`03afa6f` and pushed to `origin` (`git merge --ff-only` + `git push origin
+main`), per this project's `full`-mode routine feature→integration-branch
+merge tier (standing-authorized, no approval record needed). The feature
+branch still exists at the same SHA; it was not deleted.
+
+`production` is still behind `main` — this push did not trigger a deploy
+(Cloudflare's production branch is `production`). Promoting it needs an
+explicit go-ahead and an approval record; nothing here authorizes that.
+
 ### 2026-09-05 — Item 9 done: component-test tooling for the auth layer
 
 Default verification tier (no RLS/monetary/audit-log/push/export changes,
