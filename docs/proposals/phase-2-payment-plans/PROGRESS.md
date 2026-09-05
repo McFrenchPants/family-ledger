@@ -16,7 +16,7 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | P2.1 | Schema: `payment_plans` and `payment_periods` | done | Verifier: PASS on all 7 criteria, independently re-derived. |
-| P2.2 | RLS policies for read access | todo | Depends on P2.1. |
+| P2.2 | RLS policies for read access | done | Verifier: PASS on all 5 criteria, independently re-derived. |
 | P2.3 | Security-definer functions: create/deactivate plan, ensure-current-period, waive | todo | Depends on P2.1, P2.2. |
 | P2.4 | Period status derivation (allocation rule) | todo | Depends on P2.1–P2.3. |
 | P2.5 | pgTAP privilege-escalation and status regression suite | todo | Depends on P2.1–P2.4. Gates Stage 2. |
@@ -28,6 +28,34 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — P2.2 verified (pass)
+
+Verifier returned **pass** on all five acceptance criteria, all
+independently re-derived against the live local database with real
+two-household/Parent+Child(+sibling) fixtures inside a rolled-back
+transaction — not taken on the implementer's report.
+
+**What landed.** One migration,
+`supabase/migrations/20260905040000_payment_plans_rls_policies.sql`: four
+SELECT policies (Parent-sees-household, Child-sees-own, one pair per
+table) reusing P1.2's `internal.is_household_parent`/
+`internal.current_household_member_id` helpers with no reimplementation.
+No INSERT/UPDATE/DELETE policy on either table — deliberate default-deny,
+matching `ledger_transactions`' exact precedent; writes are P2.3's job.
+
+Verifier specifically probed the RLS null-membership edge case: a caller
+with no `household_members` row at all gets `current_household_member_id
+= NULL`, and confirmed `member_id = NULL` correctly evaluates to
+unknown/false (zero rows), not a dangerous all-rows leak. Also confirmed a
+sibling with no plan of their own sees zero rows under the self-policy
+(true `member_id` scoping, not just household membership). One
+non-blocking observation: INSERT violations raise a loud Postgres error
+while UPDATE/DELETE silently affect zero rows — expected RLS behavior,
+already identical in the `ledger_transactions` precedent, not a new
+inconsistency.
+
+Starting P2.3 (security-definer functions) next.
 
 ### 2026-09-05 — P2.1 verified (pass)
 
