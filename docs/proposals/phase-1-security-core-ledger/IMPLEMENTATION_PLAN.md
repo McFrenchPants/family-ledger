@@ -470,7 +470,9 @@ duplicating them.
 ### S2.5 — Add Expense flow
 
 **Scope:** A form (per §11.4's minimum fields: child, amount, category,
-description/note, date defaulting to today) reachable from both dashboards,
+description/note, date defaulting to today) reachable from both dashboards
+(S2.3 already links a Parent's "+ Expense" button to `/add-expense` — route
+this task's form to that exact path rather than inventing a new one),
 calling `public.record_expense`. Amount entry uses `parseMoney`/
 `parsePositiveMoney` from `src/lib/currency.ts` (never a raw
 `parseFloat`/`Number()` on the typed string). The child selector: a Parent
@@ -515,7 +517,9 @@ no new one.
 ### S2.6 — Record Payment / Adjustment and Void flow
 
 **Scope:** Parent-only. A Record Payment form (per §11.5: child, amount,
-date, optional note/method) calling `public.record_payment`, whose
+date, optional note/method) reachable at `/record-payment` (S2.3 already
+links the Parent dashboard's "Record Payment" button there — route this
+task's form to that exact path) calling `public.record_payment`, whose
 confirmation shows the resulting balance (no due-date/period language yet,
 per the design spec's explicit Phase 1 carve-out of §11.5's due-date
 mention). A minimal Adjustment entry point calling `public.record_adjustment`
@@ -559,7 +563,9 @@ new one.
 
 ### S2.7 — History view
 
-**Scope:** A ledger history view per §11.6: newest-first, clearly
+**Scope:** A ledger history view per §11.6, at the `/child/:memberId/history`
+route S2.3's dashboard already links to (its cards currently fall through
+to `NotFoundPage` until this task lands): newest-first, clearly
 distinguishing expense/payment/adjustment/voided entries, always showing
 who created each entry and when, plus description/category. A Parent can
 view any child's history (drill-in from S2.3's dashboard); a Child sees

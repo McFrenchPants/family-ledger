@@ -22,7 +22,7 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 | P1.5 | pgTAP privilege-escalation and integrity regression suite | done | Verifier: PASS on all 12 cases, all 3 mutation-proofing claims independently re-derived. **Stage 1 is gated-green.** |
 | S2.1 | Household membership read access (RLS/RPC) | done | Verifier: PASS on all 5 criteria, independently re-derived. |
 | S2.2 | Session/role context, membership hook, and route guarding | done | Spot-checked: typecheck/lint/test clean, redirect behavior verified live in-browser. |
-| S2.3 | Parent dashboard: household overview | todo | Default tier. Depends on S2.1, S2.2. |
+| S2.3 | Parent dashboard: household overview | done | Spot-checked: typecheck/lint/test clean, verified live with real balances ($187.32/$63.81) and a $0.00 zero-transaction case. |
 | S2.4 | Child dashboard: own balance and recent activity | todo | Default tier. Depends on S2.1, S2.2. |
 | S2.5 | Add Expense flow | todo | Default tier. Depends on S2.1–S2.4. |
 | S2.6 | Record Payment/Adjustment and Void flow | todo | Default tier. Depends on S2.1, S2.2, S2.3, S2.7. |
@@ -31,6 +31,36 @@ Branch: `feature/phase-1-security-core-ledger` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S2.3 spot-checked (pass)
+
+Default verification tier — no new RLS/RPC. Spot-checked the diff and
+re-ran `npm run typecheck`/`npm run lint`/`npm run test` myself (149/149,
+3 new, clean).
+
+**What landed.** `ParentDashboardPage.tsx` rewritten to a real household
+overview: `useHouseholdBalances` (new, `src/features/ledger/`) issues two
+parallel reads — `household_members` filtered to active members of the
+household (S2.1's Parent-listing RLS policy) and the
+`household_member_balances` RPC — joined client-side by
+`joinChildBalances` (`household-balances.ts`, unit-tested), which
+deliberately excludes Parent rows and defaults a missing balance to 0. Money
+rendered via `formatCents` exclusively. Loading/error(+retry)/loaded states
+distinct.
+
+Verified live against the local Docker Supabase stack with real seeded
+data pushed through the actual `record_expense`/`record_payment` RPCs (not
+raw inserts): correct per-child balances, a genuine $0.00 case for a
+zero-transaction member, and a simulated RPC-permission failure producing a
+visible error+retry that recovered on click.
+
+**Placeholder routes established for later tasks to stay consistent with:**
+child history drill-in `/child/:memberId/history` (not yet built — falls
+through to `NotFoundPage`), Add Expense `/add-expense`, Record Payment
+`/record-payment`. S2.5/S2.6/S2.7 should target these exact paths rather
+than inventing new ones.
+
+Starting S2.4 (Child dashboard) next.
 
 ### 2026-09-05 — S2.2 spot-checked (pass)
 
