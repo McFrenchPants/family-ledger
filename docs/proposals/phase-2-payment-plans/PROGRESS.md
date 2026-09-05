@@ -23,11 +23,50 @@ Branch: `feature/phase-2-payment-plans` (off `main`).
 | S3.1 | Parent payment-plan management screen | done | Spot-checked (default tier, no RLS/security-definer changes). |
 | S3.2 | Child progress UI | done | Spot-checked (default tier); live-verified against local Supabase (Due/Partially Paid/Satisfied/no-plan). |
 | S3.3 | Parent dashboard plan-status card | done | Spot-checked (default tier); live-verified against local Supabase (Due/Overdue/Satisfied/no-plan, four children). |
-| S3.4 | Record Payment: period effect on confirmation | todo | Depends on Stage 1 complete; benefits from S3.1 existing (a plan to test against). |
+| S3.4 | Record Payment: period effect on confirmation | done | Spot-checked (default tier); live-verified all 4 scenarios (in-window/no-plan/out-of-window/adjustment). |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-05 — S3.4 done: Record Payment period effect. **Phase 2 complete.**
+
+Default verification tier (only read-path RPCs, already verified in Stage
+1). Spot-checked the diff against all 4 acceptance criteria, independently
+re-ran `npm run typecheck`/`lint`/`test` (clean; 222/222), and independently
+confirmed via `docker exec` that `payment_plans`/`payment_periods`/
+`ledger_transactions`/`audit_log`/`auth.users` are all back to 0 rows and
+`household_members` shows no residual scratch data.
+
+**What landed.** `src/pages/RecordPaymentPage.tsx` only: the confirmation
+panel gains a period-effect block, populated only for `type === "payment"`
+(never for an adjustment — adjustments don't count toward a period, so
+showing period UI there would mislead, not help). Fetches the member's
+active plan, then `ensure_current_payment_period`→`payment_period_status`
+inline in `handleSubmit`, right before the final `"done"` state transition.
+A failure in this secondary read is deliberately swallowed to `periodEffect:
+null` (documented inline) rather than surfaced as a second error — the
+payment write itself already succeeded by that point, so a read-only
+follow-up failing must not read as the payment having failed. A payment
+dated outside the current period's allocation window correctly shows the
+period's real (unaffected) numbers, never a false "counted" state — the
+existing `payment_period_status` allocation rule already handles this
+correctly with no UI-side special-casing needed.
+
+**Live-verified** all four required scenarios against the local Supabase
+stack: in-window payment (correct paid/remaining/status), no-active-plan
+(plain confirmation only, no error), out-of-window payment (period numbers
+correctly unchanged), and an adjustment (no period UI at all). All scratch
+fixtures removed; independently re-confirmed clean (see above).
+
+**Phase 2 (payment plans) is done.** Both stages complete and verified:
+Stage 1 (P2.1–P2.5, verifier-routed, gated-green — the Child
+privilege-escalation suite this project's standing rules require before UI
+work) and Stage 2 (S3.1–S3.4, spot-checked, each independently re-verified
+by the orchestrator against real fixtures or independent test/typecheck
+reruns). This run used 4 of its `max_tasks_per_run` budget of 5. Next step
+is a `full`-mode routine merge of `feature/phase-2-payment-plans` into
+`main` via the supervisor role.
 
 ### 2026-09-05 — S3.3 done: Parent dashboard plan-status card
 
