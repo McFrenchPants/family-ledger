@@ -116,9 +116,10 @@ sequential except where noted.
    `feature/phase-6-member-management`) — turned out to require the
    project's first Edge Function, since there's currently no way for a
    Parent-created member to get real login credentials at all. Design spec
-   signed off 2026-09-06. Tracking doc:
-   `docs/proposals/phase-6-member-management/PROGRESS.md`; that file is the
-   source of truth for task-level status.
+   signed off 2026-09-06. **Done and merged into `main`** (fast-forward,
+   2026-09-06). Tracking doc:
+   `docs/proposals/phase-6-member-management/PROGRESS.md` has full
+   task-level detail.
 
    The remaining four sub-pieces (categories/presets, notification
    preferences, transaction filtering, accessibility review) stay

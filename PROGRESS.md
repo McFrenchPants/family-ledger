@@ -26,6 +26,53 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 _Newest entries on top._
 
+### 2026-09-06 — Phase 6 member-management slice complete and merged to `main`
+
+Full detail lives in `docs/proposals/phase-6-member-management/PROGRESS.md`,
+this entry is the summary. Picked up next after the export/backup slice
+per the user's choice among the remaining Phase 6 sub-pieces.
+
+Research before scaffolding surfaced that this was bigger than a CRUD
+screen: `household_members` had zero write policies, and there was no
+existing mechanism for a Parent-created member to get real login
+credentials at all (no self-signup per `ARCHITECTURE.md` §6.2, no email
+provider per the cost guardrail). Checked in with the user on the
+provisioning approach; chose a Parent-invoked Edge Function using the
+Auth admin API (service_role), mirroring the existing password-reset
+precedent (ADR-010). Design spec written and approved 2026-09-06.
+
+Four tasks, all on `feature/phase-6-member-management`: M6.1 (RLS UPDATE
+policy + a new invariant — a household may never end up with zero active
+Parents — plus audit logging, via a `BEFORE UPDATE` trigger so it holds
+regardless of write path) and M6.2 (`add_household_member` SQL function,
+the sole INSERT path) were both verifier-routed (`authentication_authorization`
+floor) and passed independent review, including reproduced mutation-proof
+runs. M6.3 was this project's **first Edge Function**
+(`add-household-member`) — creates the `auth.users` row via the Admin API
+and links it via M6.2's function, with rollback on partial failure;
+verifier-routed and passed, with live HTTP-tested evidence for every path
+including the rollback (verified against the actual deployed code by
+temporarily revoking a DB grant, not a modified copy). M6.4 (the
+Parent-facing "Manage members" UI) was default-tier — spot-checked
+directly since it introduces no new authorization logic, only calls
+already-verified paths.
+
+One verification gap noted rather than overstated: the sandboxed browser
+tool couldn't get past the local dev server's mkcert self-signed HTTPS
+cert, so M6.4's UI wasn't pixel-confirmed in an actual browser — curl-level
+API verification plus mocked-`supabase` component tests substituted.
+Worth a real browser/device spot-check next time an interactive session
+with a trusted local cert is available.
+
+**Merged.** `feature/phase-6-member-management` fast-forwarded into `main`
+at `a153114` and pushed to `origin`, per this project's `full`-mode routine
+feature→integration-branch merge tier. The feature branch still exists at
+the same SHA; it was not deleted.
+
+`production` is still behind `main` — this push did not trigger a deploy.
+Promoting it needs an explicit go-ahead and an approval record; nothing
+here authorizes that.
+
 ### 2026-09-06 — Phase 6 export/backup slice complete and merged to `main`
 
 Full detail lives in `docs/proposals/phase-6-admin-polish/PROGRESS.md`,
