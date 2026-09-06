@@ -26,6 +26,43 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 _Newest entries on top._
 
+### 2026-09-06 — Phase 3 (PWA) complete and merged to `main`
+
+Full detail lives in `docs/proposals/phase-3-pwa/PROGRESS.md`, this entry is
+the summary. All five tasks (S4.1–S4.5) done: Vite PWA tooling/manifest, a
+generated placeholder icon set, an `injectManifest` service worker that
+precaches the app shell only (deliberately never caches ledger/Supabase
+data, per ADR-007), a platform-conditional mobile install banner
+(Android's `beforeinstallprompt` vs. iOS's manual Add to Home Screen), and
+real-device confirmation — genuinely the user's own step, not something a
+subagent could do.
+
+The real-device pass surfaced two environment issues neither a subagent nor
+this session could have hit without the user's actual machine/network, both
+resolved: a Windows Firewall rule scoped to the wrong network profile
+(`Public` instead of the Wi-Fi adapter's `Private`), fixed by the user via a
+scoped `New-NetFirewallRule`; and no seed data includes a real `auth.users`
+row, resolved by creating one persistent local Parent login linked to the
+seeded "Parent One" member (intentionally not cleanup-deleted, unlike every
+scratch account created during automated verification). It also caught a
+real bug on the first live attempt — `vite-plugin-pwa` silently serves
+neither the manifest nor the service worker under `npm run dev` without
+`devOptions.enabled`, so the phone saw only a generic bookmark shortcut with
+no error — fixed directly (one config block), and the user's own
+already-running dev server picked it up on Vite's automatic config-reload
+without needing a restart. After removing the stale shortcuts and
+reinstalling, the user confirmed the real "FL" icon, the install banner,
+and standalone launch on both a real Android phone and a real iPhone.
+
+**Merged.** `feature/phase-3-pwa` fast-forwarded into `main` at `fef4055`
+and pushed to `origin`, per this project's `full`-mode routine
+feature→integration-branch merge tier. The feature branch still exists at
+the same SHA; it was not deleted.
+
+`production` is still behind `main` — this push did not trigger a deploy.
+Promoting it needs an explicit go-ahead and an approval record; nothing
+here authorizes that.
+
 ### 2026-09-05 — Phase 2 (payment plans) complete and merged to `main`
 
 Both stages done and verified — full detail lives in
