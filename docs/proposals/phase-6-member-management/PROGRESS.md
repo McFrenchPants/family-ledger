@@ -16,13 +16,46 @@ Branch: `feature/phase-6-member-management` (off `main`).
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | M6.1 | RLS write policies + last-active-Parent invariant | done | Verifier-routed (auth floor). Passed, no blocking findings. Commit `9f4420a`. |
-| M6.2 | `add_household_member` groundwork (non-Auth half) | todo | Verifier-routed (auth floor). Depends on M6.1's trigger/audit pattern existing. |
+| M6.2 | `add_household_member` groundwork (non-Auth half) | done | Verifier-routed (auth floor). Passed, no blocking findings. Commit `d8b95ea`. |
 | M6.3 | Edge Function: `add-household-member` | todo | Verifier-routed (auth floor). Depends on M6.2. Project's first Edge Function. |
 | M6.4 | "Manage members" page | todo | Default tier unless it adds new authz logic. Depends on Stage 1 fully done. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-06 — M6.2 done: `add_household_member` SQL function
+
+Verifier-routed (auth floor). Verdict: **pass**, all 5 acceptance criteria
+met, no forbidden-path or architectural-invariant violations. New
+migration `20260905080000_add_household_member_function.sql` adds
+`public.add_household_member(p_household_id, p_user_id, p_name, p_role)`
+— re-derives the caller's Parent-ness from `auth.uid()` (never trusts
+client-supplied household_id/role, matching the `record_expense` pattern),
+inserts the new `household_members` row (`status = 'active'` per the
+design spec's decision) plus a paired `audit_log` 'created' row, atomic in
+one function transaction. Does not create the `auth.users` row — that
+stays M6.3's job. `household_members` still has no INSERT policy; this
+function is the sole INSERT path, `execute` granted only to
+`authenticated` (explicitly revoked from `anon` too, not just `public`,
+per this project's own documented default-grant gotcha).
+
+Both the implementer and the verifier independently mutation-proofed the
+Parent-only check (disabled it, confirmed red via a wrong errcode from the
+FK constraint, restored). The verifier also directly confirmed a
+nonexistent `p_user_id` fails cleanly via the FK constraint (no partial
+writes) — relevant since this function runs before M6.3's Edge Function
+exists to actually create that `auth.users` row.
+
+One non-blocking observation carried forward to M6.3: nothing in the
+schema restricts one `auth.users` id to a single household's
+`household_members` — not a defect here, but worth keeping in mind once
+M6.3's Edge Function and its UI exist, in case multi-household membership
+produces confusing behavior that wasn't an explicit product decision.
+
+`npm run test:db`: 159/159 green (up from 145 pre-task). Commit `d8b95ea`
+on `feature/phase-6-member-management`. Not pushed, not merged. Next:
+M6.3 (the Edge Function itself — project's first).
 
 ### 2026-09-06 — M6.1 done: RLS UPDATE policy + last-active-Parent invariant
 
