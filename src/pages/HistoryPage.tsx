@@ -5,7 +5,9 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership, MembershipRole } from "../features/auth/membership-context";
 import type { HistoryTransaction } from "../features/ledger/history";
+import type { HistoryFilters } from "../features/ledger/useHistory";
 import { useHistory } from "../features/ledger/useHistory";
+import { useHouseholdCategories } from "../features/ledger/useHouseholdCategories";
 import { validateVoidReason } from "../features/ledger/record-transaction";
 import { formatCents } from "../lib/currency";
 import { supabase } from "../lib/supabase";
@@ -86,8 +88,28 @@ export function HistoryPage() {
 }
 
 function History({ membership, memberId }: { membership: Membership; memberId: string }) {
-  const history = useHistory(memberId);
+  const [type, setType] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const filters: HistoryFilters = {
+    type: type === "" ? undefined : type,
+    categoryId: categoryId === "" ? undefined : categoryId,
+    from: from === "" ? undefined : from,
+    to: to === "" ? undefined : to,
+  };
+
+  const history = useHistory(memberId, filters);
+  const categoriesState = useHouseholdCategories(membership.householdId);
   const isOwnHistory = membership.memberId === memberId;
+
+  function clearFilters() {
+    setType("");
+    setCategoryId("");
+    setFrom("");
+    setTo("");
+  }
 
   return (
     <section className="flex flex-col gap-4">
@@ -108,6 +130,90 @@ function History({ membership, memberId }: { membership: Membership; memberId: s
             Manage payment plan
           </Link>
         )}
+      </div>
+
+      {/*
+        F6.2: client-side filter controls that narrow the same RLS-scoped
+        query `useHistory` already runs -- no new permission logic, purely
+        query shaping identical for a Parent or a Child viewer. An empty
+        select/date value means "no filter" and is passed to `useHistory` as
+        `undefined`, not `""`, per `HistoryFilters`' documented "omitted
+        field" contract.
+      */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="history-filter-type" className="text-label text-ink-muted">
+            Type
+          </label>
+          <select
+            id="history-filter-type"
+            value={type}
+            onChange={(event) => setType(event.target.value)}
+            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
+          >
+            <option value="">All</option>
+            {Object.entries(TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="history-filter-category" className="text-label text-ink-muted">
+            Category
+          </label>
+          <select
+            id="history-filter-category"
+            value={categoryId}
+            onChange={(event) => setCategoryId(event.target.value)}
+            disabled={categoriesState.status !== "loaded"}
+            className="min-h-touch rounded-card border border-surface-border px-3 text-body disabled:opacity-60"
+          >
+            <option value="">All</option>
+            {categoriesState.status === "loaded" &&
+              categoriesState.categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="history-filter-from" className="text-label text-ink-muted">
+            From
+          </label>
+          <input
+            id="history-filter-from"
+            type="date"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="history-filter-to" className="text-label text-ink-muted">
+            To
+          </label>
+          <input
+            id="history-filter-to"
+            type="date"
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
+        >
+          Clear filters
+        </button>
       </div>
 
       {history.status === "loading" && (
