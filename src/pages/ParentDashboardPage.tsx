@@ -137,12 +137,27 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
         wrapped in `RequireRole role="parent"` in router.tsx, this link is
         just where a Parent finds it.
       */}
-      <Link
-        to="/export"
-        className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
-      >
-        Export ledger (CSV)
-      </Link>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          to="/export"
+          className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
+        >
+          Export ledger (CSV)
+        </Link>
+        {/*
+          M6.4: a Parent-only "Manage members" page (add/archive/restore/
+          rename household_members rows). Linked here for the same reason as
+          "Export ledger" just above -- `/members` itself is wrapped in
+          `RequireRole role="parent"` in router.tsx, this link is just where
+          a Parent finds it.
+        */}
+        <Link
+          to="/members"
+          className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
+        >
+          Manage members
+        </Link>
+      </div>
     </section>
   );
 }
