@@ -233,11 +233,17 @@ reset role;
 -- exactly one new policy was added to household_members.
 -- ---------------------------------------------------------------------------
 
+-- NOTE (M6.1): this count was 3 when this file was first written (S2.1's two
+-- plus this migration's one). M6.1's household_members_update_policy
+-- migration added a 4th SELECT policy (household_members_select_parent_any_
+-- status) -- required for its Parent UPDATE policy to function at all under
+-- Postgres's implicit SELECT/WITH CHECK combination for UPDATE, see that
+-- migration's own comment. Bumped here rather than left to silently drift.
 select is(
   (select count(*) from pg_catalog.pg_policies
     where schemaname = 'public' and tablename = 'household_members' and cmd = 'SELECT'),
-  3::bigint,
-  'Structural: household_members now carries exactly 3 SELECT policies (S2.1''s two, plus this migration''s one)'
+  4::bigint,
+  'Structural: household_members now carries exactly 4 SELECT policies (S2.1''s two, S2.5''s one, M6.1''s one)'
 );
 
 select ok(

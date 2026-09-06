@@ -97,15 +97,25 @@ select throws_ok(
 
 -- 2. The escalation path proper: an existing second row is *repointed* at an
 --    already-linked user_id. An insert-only guard would miss this.
+--
+-- NOTE (M6.1): this used to assert 23505 (unique_violation), reached via the
+-- partial unique index above. M6.1's household_members_before_update trigger
+-- now rejects ANY change to user_id outright (42501) before the UPDATE ever
+-- reaches that index -- a strictly earlier, more specific backstop for the
+-- exact same "repoint this row at a different identity" attack this case
+-- was already guarding against. The row-level index itself is untouched and
+-- still verified structurally above; this assertion is updated to match
+-- which layer actually fires first now, not which one fired when this file
+-- predated M6.1.
 select throws_ok(
   $$
     update public.household_members
        set user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
      where id = 'a0000000-0000-0000-0000-000000000002'
   $$,
-  '23505',
+  '42501',
   null,
-  'UPDATE repointing a row at an already-linked user_id is rejected with unique_violation'
+  'UPDATE repointing a row at an already-linked user_id is rejected (M6.1 trigger fires before the unique index would)'
 );
 
 -- 3. The index is scoped to one household, not global: the same person may
