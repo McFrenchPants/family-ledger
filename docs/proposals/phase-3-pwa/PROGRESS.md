@@ -19,11 +19,58 @@ Branch: `feature/phase-3-pwa` (off `main`).
 | S4.2 | Placeholder app icon set | done | All 4 files + safe-zone check verified. |
 | S4.3 | Service worker: app-shell precaching, no ledger-API caching | done | AC1/2/3 verified by static analysis + build inspection; live registration blocked by a sandbox limitation, independently reproduced. AC4 fully verified. |
 | S4.4 | Mobile install onboarding | done | All 5 criteria verified (synthetic-event + spoofed-UA testing, since no real device is available here). |
-| S4.5 | Real-device confirmation | blocked | User-performed, not delegated — requires a physical Android phone and iPhone. Blocked until S4.1–S4.4 are done. |
+| S4.5 | Real-device confirmation | done | User confirmed install + correct icon + standalone launch on both a real Android phone and a real iPhone. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-06 — S4.5 done: real-device confirmation. **Phase 3 complete.**
+
+The user ran `npm run dev` on their own machine, hit two environment
+issues neither this session nor S4.1's implementer could have exercised
+without a real device/network, and both were resolved:
+
+1. **Windows Firewall silently blocked the phone from reaching the dev
+   server.** The existing Node.js inbound-allow rules were scoped to the
+   `Public` firewall profile only, but the Wi-Fi adapter is `Private` — so
+   there was no matching allow rule at all. Diagnosed via
+   `Get-NetConnectionProfile`/`Get-NetFirewallRule`; fixed by the user
+   (firewall changes are a system-security setting, not something this
+   session modifies on someone's behalf) with a single scoped
+   `New-NetFirewallRule` for TCP 5173 on the `Private` profile.
+2. **No seed data includes a real `auth.users` row** (`supabase/seed.sql`
+   deliberately keeps every member `'invited'`/`user_id null` — linking to
+   real auth is explicitly out of scope for a seed fixture). Created one
+   persistent local-only Parent login (`parent@familyledger.local`) via the
+   local GoTrue admin API and linked it to the seeded "Parent One" member
+   (`status='active'`) so the user has a durable way to sign in for manual
+   testing going forward — unlike every other Parent/Child test account
+   created during this phase's automated verification, this one is
+   intentionally NOT cleanup-deleted.
+
+**A real bug surfaced on first live test, found and fixed.** The user's
+first install attempt showed no real app icon, no install banner, and (in
+hindsight) no active service worker at all — traced to `vite-plugin-pwa`
+requiring `devOptions.enabled` to serve the manifest/service worker under
+`npm run dev` at all; without it, `vite dev` silently serves neither, so a
+phone testing against the dev server sees only the browser's generic
+"bookmark this page" fallback with no error to explain why. **Fixed
+directly by the orchestrator** (small, precise config addition — one
+`devOptions: { enabled: true, type: "module" }` block in `vite.config.ts`),
+confirmed via direct `curl` against the user's own already-running dev
+server that it picked up the fix on Vite's automatic config-reload without
+needing a manual restart. This is exactly the class of gap S4.1's own
+automated verification could not have caught — its only sandbox blocker was
+the interactive mkcert cert-trust dialog, and nothing in that session ever
+reached an actual phone to notice the dev-mode manifest was never being
+served at all.
+
+After removing the stale (wrong-icon) shortcuts and reinstalling with the
+fix live, the user confirmed: real "FL" monogram icon on both home screens,
+the install banner visible and correctly platform-differentiated, and both
+installs launch standalone. **All five tasks (S4.1–S4.5) are done.** Phase
+3 (PWA) is complete.
 
 ### 2026-09-05 — S4.4 done: mobile install onboarding. Only S4.5 (user-performed) remains.
 
