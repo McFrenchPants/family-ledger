@@ -157,6 +157,19 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
         >
           Manage members
         </Link>
+        {/*
+          C1: a Parent-only "Manage categories" page (add/rename/deactivate/
+          reactivate `categories` rows). Linked here for the same reason as
+          "Manage members" just above -- `/parent/categories` itself is
+          wrapped in `RequireRole role="parent"` in router.tsx, this link is
+          just where a Parent finds it.
+        */}
+        <Link
+          to="/parent/categories"
+          className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
+        >
+          Manage categories
+        </Link>
       </div>
     </section>
   );

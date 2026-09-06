@@ -6,6 +6,7 @@ import { AddExpensePage } from "../pages/AddExpensePage";
 import { ChildDashboardPage } from "../pages/ChildDashboardPage";
 import { ExportPage } from "../pages/ExportPage";
 import { HistoryPage } from "../pages/HistoryPage";
+import { ManageCategoriesPage } from "../pages/ManageCategoriesPage";
 import { ManageMembersPage } from "../pages/ManageMembersPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { ParentDashboardPage } from "../pages/ParentDashboardPage";
@@ -50,6 +51,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireRole role="parent">
             <ManageMembersPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: "parent/categories",
+        element: (
+          <RequireRole role="parent">
+            <ManageCategoriesPage />
           </RequireRole>
         ),
       },
