@@ -26,6 +26,48 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 _Newest entries on top._
 
+### 2026-09-06 — Phase 6 export/backup slice complete and merged to `main`
+
+Full detail lives in `docs/proposals/phase-6-admin-polish/PROGRESS.md`,
+this entry is the summary. Item 8 (split the Supabase client out of the
+main bundle) was investigated first and deferred — its cited justification
+turned out to point at the wrong spec section (Accessibility, not
+performance), and the fix it proposed (route-level splitting) wouldn't
+meaningfully shrink the bundle anyway since almost every route needs
+`@supabase/supabase-js`. See `analysis/08-split-supabase-client.md`.
+
+Picked up item 7 (Phase 6 — administration and polish) instead, scoped
+down to just the export/backup slice: a named MVP acceptance criterion
+(`PROJECT_REQUIREMENTS.md` §20 #12), fully schema-ready, no physical-device
+dependency. Two tasks, both default verification tier (spot-checked by the
+orchestrator, independently re-running typecheck/lint/test each time — no
+RLS/security-definer/balance-logic changes in either): S6.1 added a
+Parent-only CSV export of the full household ledger at `/export`; S6.2
+added a JSON full-household-backup download next to it (households,
+members, transactions, payment plans/periods, categories, and audit log —
+push subscriptions excluded per `ARCHITECTURE.md` §19), keeping monetary
+amounts as integer cents since it's a re-importable backup, not a report.
+
+No local Supabase stack was running during implementation, so Parent-only
+gating and household-scoping were verified at the code/migration level
+(confirmed directly against the RLS policies and `household_id` columns in
+`supabase/migrations/*.sql`) rather than a live signed-in-Child negative
+test. Worth a live spot-check next time a local stack is up — flagged, not
+blocking.
+
+The remaining Phase 6 sub-pieces (categories/quick-add presets, member
+management, notification preferences, transaction filtering, accessibility
+review) stay deferred as separate future picks under backlog item 7.
+
+**Merged.** `feature/phase-6-admin-polish` merged into `main` and pushed to
+`origin`, per this project's `full`-mode routine feature→integration-branch
+merge tier. The feature branch still exists at the same SHA; it was not
+deleted.
+
+`production` is still behind `main` — this push did not trigger a deploy.
+Promoting it needs an explicit go-ahead and an approval record; nothing
+here authorizes that.
+
 ### 2026-09-06 — Phase 3 (PWA) complete and merged to `main`
 
 Full detail lives in `docs/proposals/phase-3-pwa/PROGRESS.md`, this entry is
