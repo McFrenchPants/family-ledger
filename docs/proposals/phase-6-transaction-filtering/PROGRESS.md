@@ -48,9 +48,9 @@ reasonable confidence level for a default-tier, non-authz, display-only
 task, but a follow-up manual smoke test on a running dev server would be
 worth doing before this branch merges, if the user wants extra assurance.
 
-Both tasks done. Ready to merge into `main` (routine per `full` release
-mode — supervisor role, standing-authorized, no fresh approval needed for
-this feature→integration merge).
+Both tasks done. **Merged into `main`** (routine per `full` release mode —
+supervisor role, standing-authorized, no fresh approval needed for this
+feature→integration merge) and pushed to `origin/main`.
 
 ### 2026-09-06 — F6.1 done: `useHistory` filters + `useHouseholdCategories`
 
