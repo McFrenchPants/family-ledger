@@ -17,12 +17,42 @@ Branch: `feature/phase-6-member-management` (off `main`).
 | --- | --- | --- | --- |
 | M6.1 | RLS write policies + last-active-Parent invariant | done | Verifier-routed (auth floor). Passed, no blocking findings. Commit `9f4420a`. |
 | M6.2 | `add_household_member` groundwork (non-Auth half) | done | Verifier-routed (auth floor). Passed, no blocking findings. Commit `d8b95ea`. |
-| M6.3 | Edge Function: `add-household-member` | todo | Verifier-routed (auth floor). Depends on M6.2. Project's first Edge Function. |
+| M6.3 | Edge Function: `add-household-member` | done | Verifier-routed (auth floor). Passed, no blocking findings. Commit `d442ccd`. |
 | M6.4 | "Manage members" page | todo | Default tier unless it adds new authz logic. Depends on Stage 1 fully done. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-06 — M6.3 done: `add-household-member` Edge Function
+
+Verifier-routed (auth floor) — this project's first Edge Function.
+Verdict: **pass**, all 6 acceptance criteria met, no forbidden-path or
+architectural-invariant violations. `supabase/functions/add-household-member/index.ts`
+keeps two privilege boundaries cleanly separated: a `service_role` Admin
+API client used only to create/delete the `auth.users` row, and the
+caller's own JWT-scoped client used for the Parent-check read and for
+calling M6.2's `add_household_member()` RPC (which re-derives Parent-ness
+itself from `auth.uid()`). Generates the initial password server-side
+(`crypto.getRandomValues`, never client-chosen), `email_confirm: true`
+(no email provider per this project's cost guardrail), and rolls back the
+`auth.users` row if the RPC call fails so a rejected request never leaves
+an orphaned credentialed account.
+
+The verifier independently exercised the function over live HTTP against
+the real deployed code (not a modified copy) for every case: Child
+rejection, cross-household-Parent rejection, success (confirmed the
+returned password actually authenticates), and the orphan-rollback path —
+which it tested more rigorously than the task even asked for, by
+temporarily revoking the DB-level EXECUTE grant on `add_household_member`
+to force step 4 to fail without touching the Edge Function's own
+pre-check, then restoring it and reconfirming the normal success path.
+Also grepped function-serve logs across every test run and confirmed the
+`service_role` key value never appears in them.
+
+Commit `d442ccd` on `feature/phase-6-member-management`. Not pushed, not
+merged. Next: M6.4 (the "Manage members" UI) — Stage 1 (data/auth/Edge
+Function) is now fully done and verified, so Stage 2 can start.
 
 ### 2026-09-06 — M6.2 done: `add_household_member` SQL function
 
