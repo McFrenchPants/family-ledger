@@ -135,8 +135,8 @@ sequential except where noted.
    by `PROJECT_REQUIREMENTS.md` §8/§18 and the member-management CRUD
    convention. `categories` already existed with Parent-only RLS (just no
    UI); `expense_presets` was new — schema/RLS routed through the verifier
-   agent (pass on all criteria). **Done, committed to the feature branch,
-   ready for the routine feature→`main` merge** — see
+   agent (pass on all criteria). **Done and merged into `main`**
+   (fast-forward, `0677f10..ee8bdd5`) — see
    `docs/proposals/phase-6-categories-presets/PROGRESS.md` for task-level
    detail.
 

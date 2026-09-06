@@ -42,9 +42,10 @@ existed before) covers rendering, prefill-without-submit, post-prefill
 editability, and the zero-preset case. `npm run typecheck`/`lint`/`test`
 all clean (263/263 tests). Commit `a835be3`.
 
-All four tasks done. Ready for the routine feature→`main` merge (per
-`full` release mode — supervisor role, standing-authorized, no fresh
-approval needed for this feature→integration merge).
+All four tasks done. **Merged into `main`** (fast-forward,
+`0677f10..ee8bdd5`, per `full` release mode — supervisor role,
+standing-authorized, no fresh approval needed for this feature→integration
+merge) and pushed to `origin/main`.
 
 ### 2026-09-06 — C3 done: preset management UI
 
