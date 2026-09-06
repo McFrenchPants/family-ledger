@@ -47,9 +47,9 @@ export function ToggleField({
         disabled={disabled}
         aria-labelledby={labelId}
         aria-describedby={description ? descriptionId : undefined}
-        className="relative h-6 w-11 shrink-0 rounded-full border border-surface-border bg-surface-sunken transition-colors data-[state=checked]:border-accent data-[state=checked]:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        className="relative h-6 w-11 shrink-0 rounded-full border border-surface-border bg-surface-sunken transition-colors motion-reduce:transition-none data-[state=checked]:border-accent data-[state=checked]:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <Switch.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-surface shadow transition-transform will-change-transform data-[state=checked]:translate-x-[1.375rem]" />
+        <Switch.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-surface shadow transition-transform will-change-transform motion-reduce:transition-none data-[state=checked]:translate-x-[1.375rem]" />
       </Switch.Root>
     </div>
   );

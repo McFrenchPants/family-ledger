@@ -64,7 +64,7 @@ export function SessionStatus() {
         type="button"
         onClick={() => void handleSignOut()}
         disabled={signingOut}
-        className="rounded-card border border-surface-border px-2 py-1 text-label text-ink-muted disabled:opacity-50"
+        className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted disabled:opacity-50"
       >
         Sign out
       </button>

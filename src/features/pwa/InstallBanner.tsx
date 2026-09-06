@@ -105,7 +105,7 @@ export function InstallBanner() {
       <button
         type="button"
         onClick={handleDismiss}
-        className="self-start text-label text-ink-muted underline"
+        className="inline-flex min-h-touch items-center self-start px-2 text-label text-ink-muted underline"
       >
         Dismiss
       </button>

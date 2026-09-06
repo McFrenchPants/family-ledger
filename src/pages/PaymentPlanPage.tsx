@@ -343,7 +343,7 @@ function ReplacePlanControl({
 
   return (
     <div className="flex flex-col gap-3 rounded-card border border-accent/40 bg-accent/5 p-4">
-      <h4 className="text-body font-semibold">Replace plan</h4>
+      <h3 className="text-body font-semibold">Replace plan</h3>
       <form className="flex flex-col gap-3" onSubmit={handleValidate}>
         <PlanFieldset
           idPrefix="replace"
