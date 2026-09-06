@@ -8,6 +8,7 @@ import { ExportPage } from "../pages/ExportPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { ManageCategoriesPage } from "../pages/ManageCategoriesPage";
 import { ManageMembersPage } from "../pages/ManageMembersPage";
+import { ManagePresetsPage } from "../pages/ManagePresetsPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { ParentDashboardPage } from "../pages/ParentDashboardPage";
 import { PaymentPlanPage } from "../pages/PaymentPlanPage";
@@ -59,6 +60,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireRole role="parent">
             <ManageCategoriesPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: "parent/presets",
+        element: (
+          <RequireRole role="parent">
+            <ManagePresetsPage />
           </RequireRole>
         ),
       },

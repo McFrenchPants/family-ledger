@@ -170,6 +170,19 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
         >
           Manage categories
         </Link>
+        {/*
+          C3: a Parent-only "Manage presets" page (add/edit/deactivate/
+          reactivate `expense_presets` rows). Linked here for the same reason
+          as "Manage categories" just above -- `/parent/presets` itself is
+          wrapped in `RequireRole role="parent"` in router.tsx, this link is
+          just where a Parent finds it.
+        */}
+        <Link
+          to="/parent/presets"
+          className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
+        >
+          Manage presets
+        </Link>
       </div>
     </section>
   );
