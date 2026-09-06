@@ -17,12 +17,26 @@ Branch: `feature/phase-6-categories-presets` (off `main`).
 | --- | --- | --- | --- |
 | C1 | Category management UI | done | Spot-checked (default tier). Commit `e0bc22d`. |
 | C2 | `expense_presets` schema + RLS migration | done | **Verifier-agent tier** — pass on all criteria. Commit `dfcb349`. |
-| C3 | Preset management UI | todo | Depends on C2 (done). Default verification tier. |
-| C4 | Quick-add presets on `AddExpensePage` | todo | Depends on C2 (done), C3. Default verification tier. |
+| C3 | Preset management UI | done | Spot-checked (default tier). Commit `bb1dda3`. |
+| C4 | Quick-add presets on `AddExpensePage` | todo | Depends on C2 (done), C3 (done). Default verification tier. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-06 — C3 done: preset management UI
+
+Default tier, spot-checked against all 5 acceptance criteria: new
+`/parent/presets` page + `useManagePresets` hook (mirrors
+`useManageCategories`'s shape, resolves category name via an embedded
+`categories(name)` select, same convention `useHistory`/`useLedgerExport`
+already use). Add/edit both reuse `AddExpensePage`'s decimal-safe
+`parsePositiveMoney`/`toDecimalString` helpers and `HistoryPage`'s
+`formatCents` for display — no second money-parsing path. Deactivate/
+reactivate is soft (`active` toggle), matching C1's precedent exactly. No
+migration or RLS touched; relies on `expense_presets`' existing
+Parent-only policies from C2. `npm run typecheck`/`lint`/`test` all clean
+(259/259 tests, 5 new in `ManagePresetsPage.test.tsx`). Commit `bb1dda3`.
 
 ### 2026-09-06 — C2 done: `expense_presets` schema + RLS migration. Verifier-agent pass.
 
