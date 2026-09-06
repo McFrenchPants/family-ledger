@@ -18,11 +18,48 @@ Branch: `feature/phase-6-member-management` (off `main`).
 | M6.1 | RLS write policies + last-active-Parent invariant | done | Verifier-routed (auth floor). Passed, no blocking findings. Commit `9f4420a`. |
 | M6.2 | `add_household_member` groundwork (non-Auth half) | done | Verifier-routed (auth floor). Passed, no blocking findings. Commit `d8b95ea`. |
 | M6.3 | Edge Function: `add-household-member` | done | Verifier-routed (auth floor). Passed, no blocking findings. Commit `d442ccd`. |
-| M6.4 | "Manage members" page | todo | Default tier unless it adds new authz logic. Depends on Stage 1 fully done. |
+| M6.4 | "Manage members" page | done | Default tier (no new authz logic — spot-checked). Commit `eea8419`. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-06 — M6.4 done: "Manage members" page. **Slice complete.**
+
+Default verification tier (UI-only, calls only already-verified RLS/
+trigger/Edge Function paths, introduces no new authorization logic) —
+spot-checked directly rather than verifier-routed. Independently re-ran
+`npm run typecheck`/`lint`/`test` myself (clean; 249/249, up from 244) and
+read the full diff. New: `src/features/members/useHouseholdMembers.ts`
+(fetch hook, any status, mirrors `useHouseholdBackup`'s convention),
+`src/features/members/member-errors.ts` (maps M6.1's last-active-Parent
+trigger rejection to a friendly message, distinguishing it from a generic
+`42501` RLS error by message text, not code alone), `src/pages/ManageMembersPage.tsx`
+(list with a plain-text status label alongside color per the accessibility
+rule, add-member form invoking the Edge Function with the returned
+password shown in a dismissible panel, two-step archive confirmation with
+"can be restored" copy, restore, inline rename). New route `/members`
+(Parent-only, same `RequireRole` pattern as `/export`), linked from
+`ParentDashboardPage`.
+
+**Verification gap, noted rather than overstated**: the sandboxed browser
+tool couldn't get past the local dev server's mkcert self-signed HTTPS
+cert, so pixel-level UI rendering was not confirmed in an actual browser
+(same limitation the Phase 3 PWA work navigated around differently, using
+a real device). Substitute evidence: curl-level verification of every
+underlying operation (sign-in, the any-status SELECT, the Edge Function
+call including its returned password actually authenticating,
+archive/restore/rename PATCH calls, and the exact last-active-Parent
+rejection shape) plus 5 new mocked-`supabase` component tests exercising
+the real React code paths. Worth a real browser/device spot-check next
+time a local stack is up with an interactive session available — flagged,
+not blocking.
+
+Commit `eea8419` on `feature/phase-6-member-management`. Not pushed, not
+merged. **This closes out the member-management slice** — all four tasks
+(M6.1–M6.4) done and verified. Per this project's `full`-mode routine
+feature→integration-branch merge tier, next step is a `supervisor`-agent
+merge into `main`.
 
 ### 2026-09-06 — M6.3 done: `add-household-member` Edge Function
 
