@@ -5,10 +5,13 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { buildExpenseMemberSelector, validateExpenseForm } from "../features/ledger/add-expense";
 import type { ExpenseFormErrors } from "../features/ledger/add-expense";
 import { useAddExpenseFormData } from "../features/ledger/useAddExpenseFormData";
+import { useExpensePresets } from "../features/ledger/useExpensePresets";
+import type { ExpensePreset } from "../features/ledger/useExpensePresets";
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership } from "../features/auth/membership-context";
 import { supabase } from "../lib/supabase";
 import { todayInZone } from "../lib/dates";
+import { toDecimalString } from "../lib/currency";
 
 /**
  * `/add-expense` is reachable from both the Parent and Child dashboards
@@ -69,6 +72,7 @@ export function AddExpensePage() {
 
 function AddExpenseForm({ membership }: { membership: Membership }) {
   const formData = useAddExpenseFormData(membership.householdId);
+  const presetsState = useExpensePresets(membership.householdId);
   const navigate = useNavigate();
 
   const [memberId, setMemberId] = useState("");
@@ -147,6 +151,17 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
     childExpenseScope: formData.childExpenseScope,
   });
 
+  // Prefills the form's amount/category/description from a preset (C4). Never
+  // submits -- the Parent or Child can still change any field afterward, the
+  // same as manual entry. `amount_cents` -> the decimal-string amount field
+  // via `toDecimalString`, the same conversion `ManagePresetsPage.tsx` uses
+  // when populating its own edit form from a stored preset.
+  function handlePresetClick(preset: ExpensePreset) {
+    setAmountInput(toDecimalString(preset.amountCents));
+    setCategoryId(preset.categoryId ?? "");
+    setDescription(preset.description ?? "");
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
@@ -191,6 +206,24 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-title font-semibold">Add Expense</h2>
+
+      {presetsState.status === "loaded" && presetsState.presets.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-label text-ink-muted">Quick add</span>
+          <div className="flex flex-wrap gap-2">
+            {presetsState.presets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => handlePresetClick(preset)}
+                className="min-h-touch rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)}>
         <div className="flex flex-col gap-1">
