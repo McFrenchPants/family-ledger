@@ -98,23 +98,33 @@ sequential except where noted.
    sends, manual Parent reminder, dead-subscription cleanup. Depends on the
    Phase 4 spike succeeding — do not scaffold this before that result is in.
 
-7. **Phase 6 — Administration and polish** — status: `idea` — analysis: not yet written
+7. **Phase 6 — Administration and polish** — status: `in progress` — analysis: analysis/07-phase-6-admin-and-polish.md
    Categories and quick-add presets, CSV + full JSON export/backup, member
    management, notification preferences, transaction filtering, and an
    accessibility/performance review against `PROJECT_REQUIREMENTS.md` §17.
    Several of these are independently shippable and need not wait for each
    other. Depends on Phase 1 at minimum.
 
-8. **Split the Supabase client out of the main bundle** — status: `idea` — analysis: not yet written
-   Adding `@supabase/supabase-js` in Phase 0 T4 took the built bundle from
-   ~60 kB to 451 kB (132 kB gzip), all in a single chunk. This is a
-   phone-first PWA on possibly-poor connections, and
-   `PROJECT_REQUIREMENTS.md` §17 sets performance expectations, so a
-   route-level code-split or a Vite `manualChunks` decision is owed before
-   anything ships. Not urgent — it is a build-config change, not a
-   rewrite — but it gets worse to retrofit the more feature code piles on
-   top. Independent of the phase sequence; can be done any time after
-   Phase 1 lands enough routes to make the split meaningful.
+   Scoped down to the export/backup slice first (an explicit
+   `PROJECT_REQUIREMENTS.md` §20 acceptance criterion, schema-ready, no
+   physical-device dependency) — see the analysis file. Tracking doc:
+   `docs/proposals/phase-6-admin-polish/PROGRESS.md` (branch
+   `feature/phase-6-admin-polish`); that file is the source of truth for
+   task-level status. The remaining five sub-pieces stay `idea`-equivalent,
+   to be picked up as separate future slices under this same item.
+
+8. **Split the Supabase client out of the main bundle** — status: `deferred` — analysis: analysis/08-split-supabase-client.md
+   Investigated 2026-09-05: the original justification cited
+   `PROJECT_REQUIREMENTS.md` §17, which is actually Accessibility, not
+   performance. Route-level splitting wouldn't meaningfully shrink the
+   critical path anyway, since almost every route (including sign-in)
+   needs `@supabase/supabase-js`, which dominates the bundle. The one real
+   lever (a `manualChunks` vendor split for update-caching) is a marginal
+   win with no observed problem behind it, in tension with
+   `ARCHITECTURE.md` §27's "don't optimize without an observed need."
+   Confirmed with the user as low value for this app — deferred, not
+   deleted. Revisit only on a real signal: reported slow loads, a measured
+   perf regression, or substantial further bundle growth.
 
 9. **Component-test tooling for the auth and UI layer** — status: `done` — analysis: analysis/09-component-test-tooling.md
    Tracking: root `PROGRESS.md` Post-Launch table (branch
