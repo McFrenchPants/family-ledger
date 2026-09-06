@@ -1,26 +1,30 @@
 import { useMembership } from "../features/auth/membership-context";
+import { toHouseholdBackupJson } from "../features/backup/household-backup";
+import { useHouseholdBackup } from "../features/backup/useHouseholdBackup";
 import { toLedgerCsv } from "../features/ledger/ledger-export";
 import { useLedgerExport } from "../features/ledger/useLedgerExport";
 import { todayInZone } from "../lib/dates";
 
 /**
- * `/export` (S6.1): lets a signed-in Parent download their household's full
- * `ledger_transactions` history as a CSV file.
+ * `/export` (S6.1 + S6.2): lets a signed-in Parent download their household's
+ * full `ledger_transactions` history as a CSV file, or a complete JSON
+ * snapshot of the whole household (settings, members, transactions, payment
+ * plans/periods, categories, and audit history) for backup/re-import.
  *
  * Parent-only the same way `/parent` is: `router.tsx` wraps this page in
  * `RequireRole role="parent"`, so this component can assume
  * `useMembership()` is already `{status: "loaded", ..., role: "parent"}` by
  * the time it renders (see `ParentDashboardPage`'s identical assumption).
  * That guard is routing convenience, not the security control -- a Child who
- * reached this route anyway would still only be able to read what
- * `ledger_transactions_select_parent` (P1.2) returns for *their own*
- * membership, and that policy requires an active Parent row, so a Child
- * fetch here returns zero rows rather than leaking anything. This page adds
- * no new database writes.
+ * reached this route anyway would still only be able to read what each
+ * table's own Parent-scoped SELECT policy returns for *their own*
+ * membership (zero rows in most cases, since these are Parent-only reads),
+ * so a Child fetch here returns nothing useful rather than leaking anything.
+ * This page adds no new database writes.
  *
  * Kept as its own small route (linked from `ParentDashboardPage`) rather than
- * folded into the dashboard itself, so a future JSON export (S6.2) can sit
- * next to this CSV button without reworking either.
+ * folded into the dashboard itself -- S6.2's JSON backup button sits next to
+ * S6.1's CSV button here without reworking either.
  */
 export function ExportPage() {
   const membership = useMembership();
@@ -36,6 +40,7 @@ export function ExportPage() {
 
 function Export({ householdId }: { householdId: string }) {
   const state = useLedgerExport(householdId);
+  const backupState = useHouseholdBackup(householdId);
 
   function handleDownloadCsv() {
     if (state.status !== "loaded") {
@@ -45,6 +50,24 @@ function Export({ householdId }: { householdId: string }) {
     const csv = toLedgerCsv(state.transactions);
     const filename = `family-ledger-export-${todayInZone(state.timezone)}.csv`;
     downloadTextFile(filename, csv, "text/csv;charset=utf-8;");
+  }
+
+  function handleDownloadJsonBackup() {
+    if (backupState.status !== "loaded") {
+      return;
+    }
+
+    const json = toHouseholdBackupJson(backupState.snapshot);
+    // Full ISO timestamp (colons/dots stripped for filesystem safety), not
+    // just `todayInZone` -- a household backup, unlike the once-a-day-ish CSV
+    // export, is reasonable to take more than once in a day, and a
+    // date-only filename would let a second same-day backup silently
+    // overwrite the first in the downloads folder. `exportedAt` inside the
+    // JSON itself already carries this same instant for anything that reads
+    // the file's contents rather than its name.
+    const filenameStamp = backupState.snapshot.exportedAt.replace(/[:.]/g, "-");
+    const filename = `family-ledger-backup-${filenameStamp}.json`;
+    downloadTextFile(filename, json, "application/json;charset=utf-8;");
   }
 
   return (
@@ -84,6 +107,44 @@ function Export({ householdId }: { householdId: string }) {
             className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
           >
             Download CSV
+          </button>
+        </>
+      )}
+
+      <h2 className="text-title font-semibold">Full Household Backup</h2>
+
+      {backupState.status === "loading" && (
+        <p role="status" className="text-label text-ink-subtle">
+          Preparing backup…
+        </p>
+      )}
+
+      {backupState.status === "error" && (
+        <div role="alert" className="flex flex-col items-start gap-2">
+          <p className="text-label text-owed">Could not prepare backup: {backupState.message}</p>
+          <button
+            type="button"
+            onClick={backupState.retry}
+            className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {backupState.status === "loaded" && (
+        <>
+          <p className="text-label text-ink-subtle">
+            A complete JSON snapshot of this household&apos;s settings, members, ledger
+            transactions, payment plans and periods, categories, and audit history -- suitable
+            for backup or re-import, not for reading.
+          </p>
+          <button
+            type="button"
+            onClick={handleDownloadJsonBackup}
+            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
+          >
+            Download JSON Backup
           </button>
         </>
       )}
