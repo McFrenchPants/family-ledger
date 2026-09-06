@@ -26,6 +26,55 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 _Newest entries on top._
 
+### 2026-09-06 — Phase 6 accessibility-review slice complete and merged to `main`
+
+Full detail lives in
+`docs/proposals/phase-6-accessibility-review/PROGRESS.md`, this entry is
+the summary. Picked up after the user's choice between the two remaining
+Phase 6 sub-pieces surfaced that notification preferences is actually
+blocked: `PROJECT_REQUIREMENTS.md` §9.2 defines it entirely in terms of
+push subscriptions and notification-event dedup — Phase 4/5
+infrastructure that hasn't been built (Phase 4 push spike is still `needs
+research`, and Phase 5 explicitly says not to scaffold before that
+result is in). Flagged to the user before scaffolding anything; they
+chose accessibility review instead.
+
+An orchestrator-run read-only audit (Explore agent) checked all eight
+`PROJECT_REQUIREMENTS.md` §17 accessibility items against the actual
+codebase: keyboard access, form labels, semantic landmarks, color-alone
+status indication, and screen-reader-friendly currency/status labels were
+all already fully compliant, no changes needed. Two real gaps: `ink.subtle`
+computed to ~3.10:1/~2.85:1 contrast (fails WCAG AA's 4.5:1) at ~56 call
+sites, and three small unrelated one-file issues (two persistent buttons
+under the 44px touch-target minimum, a missing `prefers-reduced-motion`
+guard on an as-yet-unused toggle component, and an h2→h4 heading-level
+skip). No design spec needed — two default-verification-tier tasks (A6.1,
+A6.2), delegated in parallel since they touched disjoint files. The
+orchestrator independently re-ran typecheck/lint/test (263 tests, all
+green) rather than trusting either subagent's self-report, and
+cross-checked A6.1's WCAG contrast-ratio math by hand.
+
+One verification gap noted rather than overstated, the same recurring
+cause as prior Phase 6 slices: the sandboxed browser couldn't get past
+the local dev server's mkcert self-signed HTTPS cert, so neither task got
+a pixel-rendered visual check — compiled-CSS inspection and
+utility-class-equivalence checks substituted. Worth a real browser/device
+spot-check next time an interactive session with a trusted local cert is
+available.
+
+**Merged.** `feature/phase-6-accessibility-review` fast-forwarded into
+`main` at `1189b36` and pushed to `origin`, per this project's `full`-mode
+routine feature→integration-branch merge tier. The feature branch still
+exists at the same SHA; it was not deleted.
+
+This closes out five of Phase 6's six sub-pieces. The last one
+(notification preferences) stays blocked on Phase 4/5, not simply
+unpicked — see `BACKLOG.md` items 5–7.
+
+`production` is still behind `main` — this push did not trigger a deploy.
+Promoting it needs an explicit go-ahead and an approval record; nothing
+here authorizes that.
+
 ### 2026-09-06 — Phase 6 member-management slice complete and merged to `main`
 
 Full detail lives in `docs/proposals/phase-6-member-management/PROGRESS.md`,

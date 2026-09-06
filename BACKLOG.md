@@ -140,9 +140,26 @@ sequential except where noted.
    `docs/proposals/phase-6-categories-presets/PROGRESS.md` for task-level
    detail.
 
-   The remaining two sub-pieces (notification preferences, accessibility
-   review) stay `idea`-equivalent, to be picked up as separate future
-   slices under this same item.
+   Accessibility review picked up next as its own slice (branch
+   `feature/phase-6-accessibility-review`), per the user's 2026-09-06
+   choice after notification preferences turned out to be blocked (see
+   below). No design spec needed — an orchestrator-run audit against
+   `PROJECT_REQUIREMENTS.md` §17 found six of eight checklist items
+   already fully compliant; the other two (a contrast token used ~56
+   places, and three small unrelated one-file gaps: touch targets on two
+   persistent buttons, a missing reduced-motion guard, a heading-level
+   skip) were fixed as two default-verification-tier tasks. **Done and
+   merged into `main`** (fast-forward, `3c0fab8..1189b36`) — see
+   `docs/proposals/phase-6-accessibility-review/PROGRESS.md` for
+   task-level detail.
+
+   The remaining sub-piece, **notification preferences, is blocked**, not
+   merely unpicked: `PROJECT_REQUIREMENTS.md` §9.2 defines it entirely in
+   terms of push subscriptions, device-level opt-in, and notification-event
+   dedup — all Phase 4/5 infrastructure. Phase 4 (item 5 below, the push
+   spike) hasn't started, and Phase 5 (item 6) explicitly says not to
+   scaffold before Phase 4's result is in. Don't pick this sub-piece again
+   until Phase 4 lands.
 
 8. **Split the Supabase client out of the main bundle** — status: `deferred` — analysis: analysis/08-split-supabase-client.md
    Investigated 2026-09-05: the original justification cited
