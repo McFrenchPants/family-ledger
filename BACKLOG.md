@@ -110,8 +110,20 @@ sequential except where noted.
    physical-device dependency) — see the analysis file. Tracking doc:
    `docs/proposals/phase-6-admin-polish/PROGRESS.md` (branch
    `feature/phase-6-admin-polish`); that file is the source of truth for
-   task-level status. The remaining five sub-pieces stay `idea`-equivalent,
-   to be picked up as separate future slices under this same item.
+   task-level status. **Done and merged into `main`.**
+
+   Member management picked up next as its own slice (branch
+   `feature/phase-6-member-management`) — turned out to require the
+   project's first Edge Function, since there's currently no way for a
+   Parent-created member to get real login credentials at all. Design spec
+   signed off 2026-09-06. Tracking doc:
+   `docs/proposals/phase-6-member-management/PROGRESS.md`; that file is the
+   source of truth for task-level status.
+
+   The remaining four sub-pieces (categories/presets, notification
+   preferences, transaction filtering, accessibility review) stay
+   `idea`-equivalent, to be picked up as separate future slices under this
+   same item.
 
 8. **Split the Supabase client out of the main bundle** — status: `deferred` — analysis: analysis/08-split-supabase-client.md
    Investigated 2026-09-05: the original justification cited
