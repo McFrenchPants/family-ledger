@@ -18,11 +18,33 @@ Branch: `feature/phase-6-categories-presets` (off `main`).
 | C1 | Category management UI | done | Spot-checked (default tier). Commit `e0bc22d`. |
 | C2 | `expense_presets` schema + RLS migration | done | **Verifier-agent tier** — pass on all criteria. Commit `dfcb349`. |
 | C3 | Preset management UI | done | Spot-checked (default tier). Commit `bb1dda3`. |
-| C4 | Quick-add presets on `AddExpensePage` | todo | Depends on C2 (done), C3 (done). Default verification tier. |
+| C4 | Quick-add presets on `AddExpensePage` | done | Spot-checked (default tier). Commit `a835be3`. **Slice complete.** |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-06 — C4 done: quick-add presets on `AddExpensePage`. **Categories/presets slice complete.**
+
+Default tier, spot-checked against all 5 acceptance criteria: new
+`useExpensePresets` read hook (mirrors `useHouseholdCategories`'s
+active-only, `sort_order`-ordered shape — deliberately not
+`useManagePresets`, which is shaped for Parent management and returns
+inactive rows too). Preset buttons render above the form only when at
+least one active preset exists; clicking one prefills amount (via
+`toDecimalString`, the same conversion `ManagePresetsPage.tsx` uses),
+category, and description without submitting — every field stays
+editable afterward, matching `PROJECT_REQUIREMENTS.md` §8 verbatim. A
+zero-preset household regresses nothing (no placeholder rendered).
+`AddExpensePage` is reachable by both Parent and Child (unguarded route),
+so presets are available to either. New `AddExpensePage.test.tsx` (none
+existed before) covers rendering, prefill-without-submit, post-prefill
+editability, and the zero-preset case. `npm run typecheck`/`lint`/`test`
+all clean (263/263 tests). Commit `a835be3`.
+
+All four tasks done. Ready for the routine feature→`main` merge (per
+`full` release mode — supervisor role, standing-authorized, no fresh
+approval needed for this feature→integration merge).
 
 ### 2026-09-06 — C3 done: preset management UI
 

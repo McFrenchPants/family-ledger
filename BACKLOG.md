@@ -129,9 +129,20 @@ sequential except where noted.
    `docs/proposals/phase-6-transaction-filtering/PROGRESS.md` for
    task-level detail.
 
-   The remaining three sub-pieces (categories/presets, notification
-   preferences, accessibility review) stay `idea`-equivalent, to be picked
-   up as separate future slices under this same item.
+   Categories & quick-add presets picked up next as its own slice (branch
+   `feature/phase-6-categories-presets`), per the user's 2026-09-06 choice
+   among the remaining sub-pieces. No design spec needed — fully determined
+   by `PROJECT_REQUIREMENTS.md` §8/§18 and the member-management CRUD
+   convention. `categories` already existed with Parent-only RLS (just no
+   UI); `expense_presets` was new — schema/RLS routed through the verifier
+   agent (pass on all criteria). **Done, committed to the feature branch,
+   ready for the routine feature→`main` merge** — see
+   `docs/proposals/phase-6-categories-presets/PROGRESS.md` for task-level
+   detail.
+
+   The remaining two sub-pieces (notification preferences, accessibility
+   review) stay `idea`-equivalent, to be picked up as separate future
+   slices under this same item.
 
 8. **Split the Supabase client out of the main bundle** — status: `deferred` — analysis: analysis/08-split-supabase-client.md
    Investigated 2026-09-05: the original justification cited
