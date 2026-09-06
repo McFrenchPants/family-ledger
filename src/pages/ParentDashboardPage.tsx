@@ -127,6 +127,22 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
           Record Payment
         </Link>
       </div>
+
+      {/*
+        S6.1: a Parent-only CSV export of the whole household's ledger.
+        Placed here (not the top nav, which only carries role-dashboard/
+        sign-in links) so it sits alongside this dashboard's other
+        Parent-only actions -- discoverable the same way "Manage payment
+        plan" is on HistoryPage, and gated the same way: `/export` itself is
+        wrapped in `RequireRole role="parent"` in router.tsx, this link is
+        just where a Parent finds it.
+      */}
+      <Link
+        to="/export"
+        className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
+      >
+        Export ledger (CSV)
+      </Link>
     </section>
   );
 }
