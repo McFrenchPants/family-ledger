@@ -16,13 +16,35 @@ Branch: `feature/phase-6-categories-presets` (off `main`).
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | C1 | Category management UI | done | Spot-checked (default tier). Commit `e0bc22d`. |
-| C2 | `expense_presets` schema + RLS migration | todo | No dependency. **Verifier-agent tier** (new migration + RLS). |
-| C3 | Preset management UI | todo | Depends on C2. Default verification tier. |
-| C4 | Quick-add presets on `AddExpensePage` | todo | Depends on C2, C3. Default verification tier. |
+| C2 | `expense_presets` schema + RLS migration | done | **Verifier-agent tier** — pass on all criteria. Commit `dfcb349`. |
+| C3 | Preset management UI | todo | Depends on C2 (done). Default verification tier. |
+| C4 | Quick-add presets on `AddExpensePage` | todo | Depends on C2 (done), C3. Default verification tier. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-06 — C2 done: `expense_presets` schema + RLS migration. Verifier-agent pass.
+
+New `public.expense_presets` table mirroring `categories`' shape exactly
+(same `internal.is_household_member`/`internal.is_household_parent`
+gating, composite FK to `categories(id, household_id)` copying
+`ledger_transactions`' pattern). Mutation-proofed pgTAP suite
+(`supabase/tests/008_expense_presets_privilege_escalation.sql`, 10
+assertions) covers Parent CRUD, Child privilege-escalation negatives, and
+cross-household FK rejection — uses `to_regclass()`, not the unsafe
+`::regclass` (the documented T7 failure mode). Routed through the verifier
+agent per this project's floor/widen tiers (new migration + new RLS): pass
+on every acceptance criterion, forbidden-path compliance (only
+`supabase/migrations/` and `supabase/tests/` touched), and standing
+architectural invariants. The one judgment call — whether preset writes
+need an `audit_log` row — resolved as no, consistent with `categories`'
+own precedent (audit rows are reserved for the balance-affecting RPCs;
+presets don't touch the ledger, a preset only prefills a form that still
+goes through the existing `record_expense` RPC). `npx supabase db reset`
+and `npm run test:db` (169/169) both independently re-run and confirmed
+by the verifier, not just trusted from the implementer's report. Commit
+`dfcb349`.
 
 ### 2026-09-06 — C1 done: category management UI
 
