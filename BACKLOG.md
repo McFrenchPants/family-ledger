@@ -121,10 +121,17 @@ sequential except where noted.
    `docs/proposals/phase-6-member-management/PROGRESS.md` has full
    task-level detail.
 
-   The remaining four sub-pieces (categories/presets, notification
-   preferences, transaction filtering, accessibility review) stay
-   `idea`-equivalent, to be picked up as separate future slices under this
-   same item.
+   Transaction filtering picked up next as its own slice (branch
+   `feature/phase-6-transaction-filtering`), per the user's 2026-09-06
+   choice among the remaining sub-pieces. No design spec needed — fully
+   determined by the existing schema and `HistoryPage`/`useHistory`.
+   **Done, committed to the feature branch, not yet merged** — see
+   `docs/proposals/phase-6-transaction-filtering/PROGRESS.md` for
+   task-level detail. Ready for the routine feature→`main` merge.
+
+   The remaining three sub-pieces (categories/presets, notification
+   preferences, accessibility review) stay `idea`-equivalent, to be picked
+   up as separate future slices under this same item.
 
 8. **Split the Supabase client out of the main bundle** — status: `deferred` — analysis: analysis/08-split-supabase-client.md
    Investigated 2026-09-05: the original justification cited
