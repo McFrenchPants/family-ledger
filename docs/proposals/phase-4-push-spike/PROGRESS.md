@@ -15,7 +15,7 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| N4.1 | `push_subscriptions` table and RLS | todo | Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`). |
+| N4.1 | `push_subscriptions` table and RLS | done | Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`). Passed, no blocking findings. |
 | N4.2 | VAPID keypair generation and secret wiring | todo | Verifier-routed (credential handling). |
 | N4.3 | Edge Function: `push-test` | todo | Verifier-routed (auth floor + credential handling). Depends on N4.1, N4.2. |
 | N4.4 | Subscribe UI and persistence | todo | Default tier. Depends on N4.1–N4.3 (Stage 1 complete). |
@@ -25,6 +25,50 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-07 — N4.1 done: `push_subscriptions` table and RLS
+
+Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`).
+New: `supabase/migrations/20260907090000_push_subscriptions.sql`
+(table + four owner-scoped RLS policies + a new `internal.is_own_household_member`
+helper + the `household_member_push_status` read-only view for Parent
+existence/count visibility) and `supabase/tests/009_push_subscriptions_privilege_escalation.sql`
+(18 pgTAP assertions). No `household_id` column on the table (deliberate —
+documented in the migration's own header comment; authorization is always
+"this one member's own row," never "any member of household X," unlike
+`payment_plans`/`expense_presets`). No `audit_log` row for subscribe/
+unsubscribe (deliberate, per the design spec's leaning).
+
+One notable design point: `household_member_push_status` is a plain
+(non-`security_invoker`) view — a deliberate, documented exception to this
+project's usual view posture, needed because a Parent's existence-check
+must read across a child's own RLS-protected rows. The verifier
+independently checked this against the actual `internal.is_household_parent`/
+`internal.current_household_member_id` definitions (not just the
+migration's comment) and confirmed the reasoning holds — no cross-household
+leak path, and the view never selects `p256dh`/`auth` regardless.
+
+Verified via: independent re-run of `npx supabase db reset` +
+`npm run test:db` (187/187, up from 169) by both the orchestrator and the
+`verifier` subagent's static read; full acceptance-criteria + forbidden-path
+audit by the verifier (pass, no blocking findings); the verifier could not
+execute the mutation-proofing check itself (no DB access in its sandbox),
+so the orchestrator independently reproduced it live — temporarily disabled
+RLS on `push_subscriptions`, confirmed 8/18 assertions failed exactly as
+the implementer's own report claimed, then restored. (One process note,
+not a code issue: restoring the migration file via `git checkout --`
+after that spot-check clobbered it back to an empty blob, because an
+earlier `git add -N` had staged an empty intent-to-add entry for the
+not-yet-committed new file — caught immediately by the next test run
+failing with "relation does not exist," fixed by rewriting the file from
+its known-good content and reconfirming green. Lesson for future
+scratch-edits on brand-new untracked files in this loop: verify a
+`git checkout --` restore actually produced non-empty content before
+trusting it, or avoid `git add -N` on files that might still need a real
+revert.)
+
+Commit `<pending>`. Starting N4.2 (VAPID keypair generation and secret
+wiring) next.
 
 ### 2026-09-07 — Plan created; Stage 1 starting next
 
