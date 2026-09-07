@@ -18,7 +18,7 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 | N4.1 | `push_subscriptions` table and RLS | done | Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`). Passed, no blocking findings. Commit `d5953c0`. |
 | N4.2 | VAPID keypair generation and secret wiring | done | No tracked-file diff produced (real keys live only in gitignored `.env`/`supabase/functions/.env`) — see session log for why this was spot-checked directly rather than sent to the verifier agent. |
 | N4.3 | Edge Function: `push-test` | done | Verifier-routed (auth floor + credential handling). Passed, no blocking findings. Commit `76fc6b9`. |
-| N4.4 | Subscribe UI and persistence | done | Default tier, spot-checked. |
+| N4.4 | Subscribe UI and persistence | done | Default tier, spot-checked. Commit `8c3ee75`. |
 | N4.5 | Test-send trigger | todo | Default tier. Depends on N4.3, N4.4. |
 | N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable — requires user's own hardware. Depends on N4.1–N4.5. Phase's hard exit criterion. |
 
@@ -61,7 +61,7 @@ service-worker timing, and real iOS Safari/standalone detection on a
 device — all exercised here only via mocked browser APIs in component
 tests, per this project's standing "don't overstate confidence" norm.
 
-Commit `<pending>`. Starting N4.5 (test-send trigger) next.
+Commit `8c3ee75`. Starting N4.5 (test-send trigger) next.
 
 ### 2026-09-07 — N4.3 done: Edge Function `push-test`. **Stage 1 complete.**
 
