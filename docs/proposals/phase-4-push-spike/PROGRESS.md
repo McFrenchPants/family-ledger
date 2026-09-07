@@ -17,7 +17,7 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 | --- | --- | --- | --- |
 | N4.1 | `push_subscriptions` table and RLS | done | Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`). Passed, no blocking findings. Commit `d5953c0`. |
 | N4.2 | VAPID keypair generation and secret wiring | done | No tracked-file diff produced (real keys live only in gitignored `.env`/`supabase/functions/.env`) — see session log for why this was spot-checked directly rather than sent to the verifier agent. |
-| N4.3 | Edge Function: `push-test` | todo | Verifier-routed (auth floor + credential handling). Depends on N4.1, N4.2. |
+| N4.3 | Edge Function: `push-test` | done | Verifier-routed (auth floor + credential handling). Passed, no blocking findings. |
 | N4.4 | Subscribe UI and persistence | todo | Default tier. Depends on N4.1–N4.3 (Stage 1 complete). |
 | N4.5 | Test-send trigger | todo | Default tier. Depends on N4.3, N4.4. |
 | N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable — requires user's own hardware. Depends on N4.1–N4.5. Phase's hard exit criterion. |
@@ -25,6 +25,50 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-07 — N4.3 done: Edge Function `push-test`. **Stage 1 complete.**
+
+Verifier-routed (`authentication_authorization` floor +
+`push_credential_or_subscription_handling` widen). New:
+`supabase/functions/push-test/index.ts`. Request shape `POST
+{ subscription_id }`. Authorization sequence: (1) try reading the target
+row through the caller's own RLS-scoped client — success alone proves
+ownership (N4.1's `push_subscriptions_select_own` policy does the work,
+no app logic needed); (2) only if empty, resolve the owning household via
+two narrow `service_role` reads that select only foreign keys, never
+`p256dh`/`auth`; (3) re-derive the caller's own Parent-ness of that
+household through their own RLS-scoped client (mirrors
+`add-household-member`'s pattern exactly); (4) only once that passes, a
+second `service_role` read fetches the real key material — the only line
+in the file that does. Builds the payload via
+`@block65/webcrypto-web-push@2`'s `buildPushPayload`, `fetch`s it to the
+endpoint, returns the raw status.
+
+**Gap found and correctly escalated, not silently patched:** the push
+library requires an explicit VAPID public key input (does not derive it
+from the private key), which N4.2 hadn't provisioned into
+`supabase/functions/.env` (only `VITE_VAPID_PUBLIC_KEY` existed, a
+Vite-only var not reachable from Edge Function runtime). The implementer
+flagged this rather than editing a file outside its declared scope; the
+orchestrator added the one-line `VAPID_PUBLIC_KEY` entry (same public
+value) directly to that gitignored local secrets file as a small
+out-of-band fix.
+
+Verified by both the implementer (real local run: unrelated-caller and
+different-household-Parent → identical 403, owner and same-household
+Parent → successful payload build against a fake and a real
+404-returning endpoint, both surfaced cleanly) and the `verifier` agent
+(independent code trace confirming p256dh/auth is never read before
+authorization passes, no key material in any log/response, and the two
+rejection paths share the exact same message/status so existence is
+never disclosed). Verifier could not execute the function itself
+(no Docker in its sandbox) — noted as a limitation, not a blocker, since
+its own static trace was unambiguous and corroborated the implementer's
+live-run transcript.
+
+**Stage 1 (data, authorization, Edge Function) is now fully done and
+verified.** Commit `<pending>`. Starting Stage 2: N4.4 (subscribe UI and
+persistence) next.
 
 ### 2026-09-07 — N4.2 done: VAPID keypair generation and secret wiring
 
