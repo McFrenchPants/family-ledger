@@ -18,13 +18,50 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 | N4.1 | `push_subscriptions` table and RLS | done | Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`). Passed, no blocking findings. Commit `d5953c0`. |
 | N4.2 | VAPID keypair generation and secret wiring | done | No tracked-file diff produced (real keys live only in gitignored `.env`/`supabase/functions/.env`) — see session log for why this was spot-checked directly rather than sent to the verifier agent. |
 | N4.3 | Edge Function: `push-test` | done | Verifier-routed (auth floor + credential handling). Passed, no blocking findings. Commit `76fc6b9`. |
-| N4.4 | Subscribe UI and persistence | todo | Default tier. Depends on N4.1–N4.3 (Stage 1 complete). |
+| N4.4 | Subscribe UI and persistence | done | Default tier, spot-checked. |
 | N4.5 | Test-send trigger | todo | Default tier. Depends on N4.3, N4.4. |
 | N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable — requires user's own hardware. Depends on N4.1–N4.5. Phase's hard exit criterion. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-07 — N4.4 done: Subscribe UI and persistence
+
+Default verification tier (calls only N4.1's already-verified RLS-scoped
+upsert; introduces no new authorization logic — the RLS enforces row
+ownership regardless of what the client sends) — spot-checked directly,
+not verifier-routed. Independently re-ran `npm run typecheck`/`lint`/`test`
+(clean; 275/275, up from 263 — 12 new tests) and read the full diff.
+
+New: `src/features/push/push-subscribe.ts` (pure: `isPushSupported()`,
+`decideInitialPushState()` — unsupported / iOS-not-standalone / idle —
+and a `base64UrlToUint8Array()` helper for the VAPID public key, no new
+dependency), `src/features/push/PushSubscribeButton.tsx` (rendered once
+from `RootLayout.tsx`, next to `InstallBanner`, so any active member gets
+it from whichever dashboard they're on — reuses `isIOS()`/`isStandalone()`
+from Phase 3's `install-prompt.ts` rather than re-deriving detection).
+`RootLayout.tsx` got a two-line addition (import + render). Subscribe flow:
+`Notification.requestPermission()` → `navigator.serviceWorker.ready` →
+`pushManager.subscribe(...)` → `supabase.from("push_subscriptions").upsert({...}, { onConflict: "endpoint" })`,
+with distinct unsupported/iOS/denied/subscribing/subscribed/error states
+(no offline queue — a failed upsert shows a retryable alert, matching
+ADR-007).
+
+**One correction to the implementer's own report:** it flagged that a
+push_subscriptions DELETE RLS policy "may not yet exist" as something a
+future unsubscribe follow-up would need to confirm — checked directly,
+N4.1 already added `push_subscriptions_delete_own` (all four
+SELECT/INSERT/UPDATE/DELETE policies exist). Noted here so a future
+session doesn't waste time re-verifying a settled fact.
+
+**What remains unverified pending real hardware (N4.6):** actual
+`PushManager.subscribe()` behavior against a real push service, real
+service-worker timing, and real iOS Safari/standalone detection on a
+device — all exercised here only via mocked browser APIs in component
+tests, per this project's standing "don't overstate confidence" norm.
+
+Commit `<pending>`. Starting N4.5 (test-send trigger) next.
 
 ### 2026-09-07 — N4.3 done: Edge Function `push-test`. **Stage 1 complete.**
 
