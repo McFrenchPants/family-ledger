@@ -83,14 +83,25 @@ sequential except where noted.
    HTTPS, not a production deploy (user-confirmed — see the analysis file).
    Depends on Phase 1 (satisfied).
 
-5. **Phase 4 — Push technical spike** — status: `needs research` — analysis: not yet written
+5. **Phase 4 — Push technical spike** — status: `in progress` — analysis: analysis/05-phase-4-push-spike.md
    VAPID key generation, `push_subscriptions` storage, a test Edge Function
    proving encrypted payload delivery, and physical validation on both an
    Android browser and an installed iPhone PWA. Explicitly a spike: prove
    end-to-end delivery on both platforms **before** building any notification
-   UI (`ARCHITECTURE.md` §12.4). Open question: which Deno-compatible Web
-   Push implementation actually works in Supabase Edge Functions. Requires
-   real devices. Depends on Phase 3.
+   UI (`ARCHITECTURE.md` §12.4). Depends on Phase 3 (satisfied).
+
+   Research done and user-confirmed 2026-09-07: library choice resolved to
+   `@block65/webcrypto-web-push` (actively maintained, explicit Deno
+   support, RFC 8291/8292-compliant, Apple-compatible) — see the analysis
+   file for the comparison against three rejected alternatives.
+   Real-device validation reuses Phase 3's existing mkcert LAN setup;
+   confirmed with the user that this phase's migration does *not* trigger
+   the project's first production deploy — stays on the local Docker
+   stack. One open question remains for a design spec before
+   implementation: the `push_subscriptions` RLS/visibility shape (finding
+   3). **Still requires physical Android + iPhone hardware to actually
+   close out** — implementation can start without the devices in hand, but
+   the phase can't be marked done without real-device validation.
 
 6. **Phase 5 — Reminder system** — status: `idea` — analysis: not yet written
    Configurable reminder rules, scheduled processor (pg_cron → Edge
