@@ -19,7 +19,7 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 | N4.2 | VAPID keypair generation and secret wiring | done | No tracked-file diff produced (real keys live only in gitignored `.env`/`supabase/functions/.env`) — see session log for why this was spot-checked directly rather than sent to the verifier agent. |
 | N4.3 | Edge Function: `push-test` | done | Verifier-routed (auth floor + credential handling). Passed, no blocking findings. Commit `76fc6b9`. |
 | N4.4 | Subscribe UI and persistence | done | Default tier, spot-checked. Commit `8c3ee75`. |
-| N4.5 | Test-send trigger | done | Default tier, spot-checked. |
+| N4.5 | Test-send trigger | done | Default tier, spot-checked. Commit `7ceb666`. |
 | N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable — requires user's own hardware. Depends on N4.1–N4.5. Phase's hard exit criterion. |
 
 ## Session log
@@ -58,7 +58,7 @@ case a future session wants to pick it up.
 proposal's delegable, non-hardware work (N4.1–N4.5) is complete. Only
 N4.6 remains: real-device validation on Android Chrome and an installed
 iPhone PWA, which requires the user's own hardware and cannot be
-delegated. Commit `<pending>`.
+delegated. Commit `7ceb666`.
 
 ### 2026-09-07 — N4.4 done: Subscribe UI and persistence
 
