@@ -16,7 +16,7 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | N4.1 | `push_subscriptions` table and RLS | done | Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`). Passed, no blocking findings. Commit `d5953c0`. |
-| N4.2 | VAPID keypair generation and secret wiring | todo | Verifier-routed (credential handling). |
+| N4.2 | VAPID keypair generation and secret wiring | done | No tracked-file diff produced (real keys live only in gitignored `.env`/`supabase/functions/.env`) — see session log for why this was spot-checked directly rather than sent to the verifier agent. |
 | N4.3 | Edge Function: `push-test` | todo | Verifier-routed (auth floor + credential handling). Depends on N4.1, N4.2. |
 | N4.4 | Subscribe UI and persistence | todo | Default tier. Depends on N4.1–N4.3 (Stage 1 complete). |
 | N4.5 | Test-send trigger | todo | Default tier. Depends on N4.3, N4.4. |
@@ -25,6 +25,35 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-07 — N4.2 done: VAPID keypair generation and secret wiring
+
+Generated a real VAPID keypair via `npx web-push generate-vapid-keys`
+(one-off, not added as a project dependency). Public key written to the
+developer's own untracked `.env` (`VITE_VAPID_PUBLIC_KEY`); private key +
+`VAPID_SUBJECT` (`mailto:mcfrench@gmail.com`) written to
+`supabase/functions/.env`, confirmed as the file `npx supabase functions
+serve` auto-loads for local Edge Function secrets (empirically verified
+with a throwaway scratch function that echoed only booleans for whether
+the two env vars were present, never their values — scratch function and
+its serve process fully cleaned up afterward).
+
+**No tracked-file diff at all** — `.env.example` stays untouched
+(placeholders only), both real-secret files already matched the repo's
+existing `.env`/`.env.*` gitignore pattern (confirmed via `git
+check-ignore -v`), so nothing needed a new ignore rule either. This task
+therefore falls under this project's `push_credential_or_subscription_handling`
+widen category but was **spot-checked directly by the orchestrator
+instead of routed to the verifier agent**: the verifier's job is to review
+a diff and test output, and there was no diff to review — the
+security-relevant property (no secret reachable a tracked path) was
+confirmed directly via `git status --porcelain` (clean) and `git
+check-ignore -v` on both secret files (both matched), which is the same
+check a verifier would have had to perform itself. Judged sufficient
+given there was no code logic to independently audit.
+
+No commit for this task — nothing it touched is meant to be tracked.
+Starting N4.3 (Edge Function: `push-test`) next.
 
 ### 2026-09-07 — N4.1 done: `push_subscriptions` table and RLS
 
