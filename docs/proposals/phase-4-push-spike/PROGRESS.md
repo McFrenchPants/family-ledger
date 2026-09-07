@@ -19,12 +19,46 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 | N4.2 | VAPID keypair generation and secret wiring | done | No tracked-file diff produced (real keys live only in gitignored `.env`/`supabase/functions/.env`) — see session log for why this was spot-checked directly rather than sent to the verifier agent. |
 | N4.3 | Edge Function: `push-test` | done | Verifier-routed (auth floor + credential handling). Passed, no blocking findings. Commit `76fc6b9`. |
 | N4.4 | Subscribe UI and persistence | done | Default tier, spot-checked. Commit `8c3ee75`. |
-| N4.5 | Test-send trigger | todo | Default tier. Depends on N4.3, N4.4. |
+| N4.5 | Test-send trigger | done | Default tier, spot-checked. |
 | N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable — requires user's own hardware. Depends on N4.1–N4.5. Phase's hard exit criterion. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-07 — N4.5 done: Test-send trigger. **All delegable work complete —**
+**only N4.6 (real-device validation) remains.**
+
+Default verification tier (UI-only, calls an already-verified Edge
+Function, no new authorization logic — RLS scopes the self-read, and
+`push-test` itself re-derives all authorization server-side) —
+spot-checked directly. Independently re-ran `npm run typecheck`/`lint`/`test`
+(clean; 282/282, up from 275) and read the full diff.
+
+New: `src/features/push/PushTestSendButton.tsx`, rendered from
+`RootLayout.tsx` right under `PushSubscribeButton`. Fetches the caller's
+own `push_subscriptions` rows (RLS-scoped self-read) and renders a "Send
+test push" button per row, invoking `supabase.functions.invoke("push-test", { body: { subscription_id } })`
+and showing the raw returned status verbatim ("201 OK", "410 not ok",
+etc.) rather than a generic success message. Deliberately styled as a
+debug tool (dashed border, muted background, uppercase "Debug" label,
+explicit "not a real notification feature" copy) so it can't be mistaken
+for production UI.
+
+**Scope call, explicitly made rather than silently expanded:** only the
+self-test affordance (any member testing their own subscription) was
+built. A Parent-testing-a-child's-subscription variant on
+`ManageMembersPage.tsx` was judged a second, independently-scoped feature
+surface (would need a new query joining member rosters to subscription
+ids, plus per-member row UI) rather than a minimal addition, and was
+deferred — noted here as a real, deliberate gap, not an oversight, in
+case a future session wants to pick it up.
+
+**Stage 2 (client subscribe UI) is now fully done.** All of this
+proposal's delegable, non-hardware work (N4.1–N4.5) is complete. Only
+N4.6 remains: real-device validation on Android Chrome and an installed
+iPhone PWA, which requires the user's own hardware and cannot be
+delegated. Commit `<pending>`.
 
 ### 2026-09-07 — N4.4 done: Subscribe UI and persistence
 
