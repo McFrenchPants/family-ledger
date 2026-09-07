@@ -15,7 +15,7 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| N4.1 | `push_subscriptions` table and RLS | done | Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`). Passed, no blocking findings. |
+| N4.1 | `push_subscriptions` table and RLS | done | Verifier-routed (`data_persistence_migrations`, `push_credential_or_subscription_handling`). Passed, no blocking findings. Commit `d5953c0`. |
 | N4.2 | VAPID keypair generation and secret wiring | todo | Verifier-routed (credential handling). |
 | N4.3 | Edge Function: `push-test` | todo | Verifier-routed (auth floor + credential handling). Depends on N4.1, N4.2. |
 | N4.4 | Subscribe UI and persistence | todo | Default tier. Depends on N4.1–N4.3 (Stage 1 complete). |
@@ -67,7 +67,7 @@ scratch-edits on brand-new untracked files in this loop: verify a
 trusting it, or avoid `git add -N` on files that might still need a real
 revert.)
 
-Commit `<pending>`. Starting N4.2 (VAPID keypair generation and secret
+Commit `d5953c0`. Starting N4.2 (VAPID keypair generation and secret
 wiring) next.
 
 ### 2026-09-07 — Plan created; Stage 1 starting next
