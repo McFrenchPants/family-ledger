@@ -55,5 +55,16 @@ export default defineConfig({
   ],
   server: {
     host: true,
+    // Lets a phone on the LAN (or `npm run dev` on localhost) reach the local
+    // Supabase stack through the same HTTPS origin it already loaded the app
+    // from -- avoids a phone browser blocking a direct http://127.0.0.1:54321
+    // API call as mixed content when the page itself is https://<lan-ip>:5173.
+    proxy: {
+      "/supabase-api": {
+        target: "http://127.0.0.1:54321",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/supabase-api/, ""),
+      },
+    },
   },
 });

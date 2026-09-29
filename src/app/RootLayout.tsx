@@ -2,6 +2,8 @@ import { NavLink, Outlet } from "react-router-dom";
 
 import { SessionStatus } from "../features/auth/SessionStatus";
 import { InstallBanner } from "../features/pwa/InstallBanner";
+import { PushSubscribeButton } from "../features/push/PushSubscribeButton";
+import { PushTestSendButton } from "../features/push/PushTestSendButton";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -35,6 +37,8 @@ export function RootLayout() {
 
       <main className="flex-1 px-gutter py-4">
         <InstallBanner />
+        <PushSubscribeButton />
+        <PushTestSendButton />
         <Outlet />
       </main>
     </div>
