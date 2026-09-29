@@ -29,7 +29,11 @@ The seven phases below are transcribed from `docs/ARCHITECTURE.md` §29 and
 order and its dependencies. They are not invented work. Phases are strictly
 sequential except where noted.
 
-1. **Phase 0 — Technical foundations** — status: `ready` — analysis: analysis/00-phase-0-foundations.md
+1. **Phase 0 — Technical foundations** — status: `done` — analysis: analysis/00-phase-0-foundations.md
+   Tracking doc: `docs/proposals/phase-0-foundations/PROGRESS.md` (branch
+   `feature/phase-0-foundations`) — that file is the source of truth for
+   task-level status, not this entry.
+
    Vite + React + TypeScript app skeleton, Tailwind CSS + Radix UI setup
    (ADR-008), local Supabase project via CLI, initial schema and first
    migration, Cloudflare Pages deployment, authentication proof of concept.
@@ -37,48 +41,79 @@ sequential except where noted.
    every later task's verification commands depend on — nothing else can
    be properly verified until this lands.
 
-   Split into two tracks — do the local one first:
-   - **Local track** (startable now): app skeleton, Tailwind/Radix setup,
-     `supabase start` against local Docker, first migration, auth PoC
-     against the local Supabase instance. No external accounts needed
-     beyond what already exists.
-   - **Hosted track** (blocked on one manual step): linking the CLI to the
-     real Supabase project (`fsszkclgeekdyyspgrhg` — see
-     `docs/ARCHITECTURE.md` §21) and connecting Cloudflare Pages to the
-     GitHub repo with preview deployments disabled (§20/ADR-009). The
-     Supabase project and GitHub repo already exist; Cloudflare Pages does
-     not yet have the project connected — that's a one-time dashboard
-     action only a human can complete (OAuth-style repo connection), not
-     something this framework should attempt on its own.
+   Two tracks:
+   - **Local track** (done — see the proposal's PROGRESS.md): app
+     skeleton, Tailwind/Radix setup, `supabase start` against local
+     Docker, first migration, auth PoC against the local Supabase
+     instance. All eight tasks (T1–T7 plus T3a) are done and verified.
+   - **Hosted track** (done): Cloudflare Pages is connected to the GitHub
+     repo with the production branch set to `production`. Linking the CLI
+     to the real Supabase project (`fsszkclgeekdyyspgrhg`) is deferred
+     until there's a migration worth pushing to it.
 
-2. **Phase 1 — Security and core ledger** — status: `ready` — analysis: not yet written
-   Households/members model, RLS policies, Parent/Child role enforcement,
-   add expense, record payment, derived balances, transaction history,
-   audit trail. Gate: **do not proceed past this phase until every Child
-   privilege-escalation negative test passes** (`ARCHITECTURE.md` §24, §29).
-   Depends on Phase 0.
+2. **Phase 1 — Security and core ledger** — status: `done` — analysis: analysis/01-phase-1-security-core-ledger.md
+   Tracking doc: `docs/proposals/phase-1-security-core-ledger/PROGRESS.md`
+   (branch `feature/phase-1-security-core-ledger`, merged into `main` at
+   `d3bad52` on 2026-09-05). Households/members model, RLS policies,
+   Parent/Child role enforcement, add expense, record payment, derived
+   balances, transaction history, audit trail, and the Stage 2 UI (Parent/
+   Child dashboards, Add Expense, Record Payment/Adjustment + Void,
+   History). Gate satisfied: every Child privilege-escalation negative test
+   passed (`ARCHITECTURE.md` §24, §29). Depends on Phase 0.
 
-3. **Phase 2 — Payment plans** — status: `ready` — analysis: not yet written
-   Monthly payment-plan model, payment periods, upcoming/due/partial/
-   satisfied/overdue status calculations, Parent management UI, Child
-   progress UI. The payment-to-period allocation rule must be documented in
-   code and covered by tests (`PROJECT_REQUIREMENTS.md` §7.3). Depends on
-   Phase 1.
+3. **Phase 2 — Payment plans** — status: `done` — analysis: analysis/02-phase-2-payment-plans.md
+   Tracking doc: `docs/proposals/phase-2-payment-plans/PROGRESS.md` (branch
+   `feature/phase-2-payment-plans`, merged into `main` at `03afa6f` on
+   2026-09-05). Monthly payment-plan model, payment periods, upcoming/due/
+   partial/satisfied/overdue status calculations, Parent management UI,
+   Child progress UI. The payment-to-period allocation rule is documented in
+   code (`payment_period_status`) and covered by a mutation-proofed pgTAP
+   suite. Gate satisfied: every Child privilege-escalation negative test
+   passed. Depends on Phase 1 (satisfied).
 
-4. **Phase 3 — PWA** — status: `ready` — analysis: not yet written
-   Web app manifest with a stable `id`, icons and Apple touch icon,
-   standalone display mode, service worker with conservative caching, mobile
-   install onboarding. No offline write queue (ADR-007). Depends on Phase 1;
-   independent of Phase 2 and could run in parallel with it.
+4. **Phase 3 — PWA** — status: `done` — analysis: analysis/03-phase-3-pwa.md
+   Tracking doc: `docs/proposals/phase-3-pwa/PROGRESS.md` (branch
+   `feature/phase-3-pwa`, merged into `main` at `fef4055` on 2026-09-06).
+   Web app manifest with a stable `id`, a generated placeholder icon set,
+   standalone display mode, an `injectManifest` service worker with
+   conservative caching (no ledger-API caching, ADR-007), mobile install
+   onboarding (platform-conditional: Android's `beforeinstallprompt` vs.
+   iOS's manual Add to Home Screen). Real-device install confirmed on both
+   a physical Android phone and iPhone via `vite-plugin-mkcert` over LAN
+   HTTPS, not a production deploy (user-confirmed — see the analysis file).
+   Depends on Phase 1 (satisfied).
 
-5. **Phase 4 — Push technical spike** — status: `needs research` — analysis: not yet written
+5. **Phase 4 — Push technical spike** — status: `in progress` — analysis: analysis/05-phase-4-push-spike.md
    VAPID key generation, `push_subscriptions` storage, a test Edge Function
    proving encrypted payload delivery, and physical validation on both an
    Android browser and an installed iPhone PWA. Explicitly a spike: prove
    end-to-end delivery on both platforms **before** building any notification
-   UI (`ARCHITECTURE.md` §12.4). Open question: which Deno-compatible Web
-   Push implementation actually works in Supabase Edge Functions. Requires
-   real devices. Depends on Phase 3.
+   UI (`ARCHITECTURE.md` §12.4). Depends on Phase 3 (satisfied).
+
+   Research done and user-confirmed 2026-09-07: library choice resolved to
+   `@block65/webcrypto-web-push` (actively maintained, explicit Deno
+   support, RFC 8291/8292-compliant, Apple-compatible) — see the analysis
+   file for the comparison against three rejected alternatives.
+   Real-device validation reuses Phase 3's existing mkcert LAN setup;
+   confirmed with the user that this phase's migration does *not* trigger
+   the project's first production deploy — stays on the local Docker
+   stack. One open question remains for a design spec before
+   implementation: the `push_subscriptions` RLS/visibility shape (finding
+   3). **Still requires physical Android + iPhone hardware to actually
+   close out** — implementation can start without the devices in hand, but
+   the phase can't be marked done without real-device validation.
+
+   **Update 2026-09-29:** all implementation work is done. Real-device
+   testing found and fixed a genuine bug (notifications were silently
+   never shown — see `docs/proposals/phase-4-push-spike/PROGRESS.md`) and
+   confirmed the feature works end-to-end on a real Android phone. Still
+   open: an iPhone check (the only iPhone on hand is locked to an old,
+   unknown account — a hardware problem, unrelated to this project) and
+   one more automated check (confirming a dead/removed subscription is
+   reported clearly). Decision: pause here and finish both after a
+   production deploy, since a real hosted address sidesteps most of the
+   local-testing friction hit this session (see the PROGRESS.md session
+   log for detail). Phase 4 is not yet marked done.
 
 6. **Phase 5 — Reminder system** — status: `idea` — analysis: not yet written
    Configurable reminder rules, scheduled processor (pg_cron → Edge
@@ -86,9 +121,93 @@ sequential except where noted.
    sends, manual Parent reminder, dead-subscription cleanup. Depends on the
    Phase 4 spike succeeding — do not scaffold this before that result is in.
 
-7. **Phase 6 — Administration and polish** — status: `idea` — analysis: not yet written
+7. **Phase 6 — Administration and polish** — status: `in progress` — analysis: analysis/07-phase-6-admin-and-polish.md
    Categories and quick-add presets, CSV + full JSON export/backup, member
    management, notification preferences, transaction filtering, and an
    accessibility/performance review against `PROJECT_REQUIREMENTS.md` §17.
    Several of these are independently shippable and need not wait for each
    other. Depends on Phase 1 at minimum.
+
+   Scoped down to the export/backup slice first (an explicit
+   `PROJECT_REQUIREMENTS.md` §20 acceptance criterion, schema-ready, no
+   physical-device dependency) — see the analysis file. Tracking doc:
+   `docs/proposals/phase-6-admin-polish/PROGRESS.md` (branch
+   `feature/phase-6-admin-polish`); that file is the source of truth for
+   task-level status. **Done and merged into `main`.**
+
+   Member management picked up next as its own slice (branch
+   `feature/phase-6-member-management`) — turned out to require the
+   project's first Edge Function, since there's currently no way for a
+   Parent-created member to get real login credentials at all. Design spec
+   signed off 2026-09-06. **Done and merged into `main`** (fast-forward,
+   2026-09-06). Tracking doc:
+   `docs/proposals/phase-6-member-management/PROGRESS.md` has full
+   task-level detail.
+
+   Transaction filtering picked up next as its own slice (branch
+   `feature/phase-6-transaction-filtering`), per the user's 2026-09-06
+   choice among the remaining sub-pieces. No design spec needed — fully
+   determined by the existing schema and `HistoryPage`/`useHistory`.
+   **Done and merged into `main`** — see
+   `docs/proposals/phase-6-transaction-filtering/PROGRESS.md` for
+   task-level detail.
+
+   Categories & quick-add presets picked up next as its own slice (branch
+   `feature/phase-6-categories-presets`), per the user's 2026-09-06 choice
+   among the remaining sub-pieces. No design spec needed — fully determined
+   by `PROJECT_REQUIREMENTS.md` §8/§18 and the member-management CRUD
+   convention. `categories` already existed with Parent-only RLS (just no
+   UI); `expense_presets` was new — schema/RLS routed through the verifier
+   agent (pass on all criteria). **Done and merged into `main`**
+   (fast-forward, `0677f10..ee8bdd5`) — see
+   `docs/proposals/phase-6-categories-presets/PROGRESS.md` for task-level
+   detail.
+
+   Accessibility review picked up next as its own slice (branch
+   `feature/phase-6-accessibility-review`), per the user's 2026-09-06
+   choice after notification preferences turned out to be blocked (see
+   below). No design spec needed — an orchestrator-run audit against
+   `PROJECT_REQUIREMENTS.md` §17 found six of eight checklist items
+   already fully compliant; the other two (a contrast token used ~56
+   places, and three small unrelated one-file gaps: touch targets on two
+   persistent buttons, a missing reduced-motion guard, a heading-level
+   skip) were fixed as two default-verification-tier tasks. **Done and
+   merged into `main`** (fast-forward, `3c0fab8..1189b36`) — see
+   `docs/proposals/phase-6-accessibility-review/PROGRESS.md` for
+   task-level detail.
+
+   The remaining sub-piece, **notification preferences, is blocked**, not
+   merely unpicked: `PROJECT_REQUIREMENTS.md` §9.2 defines it entirely in
+   terms of push subscriptions, device-level opt-in, and notification-event
+   dedup — all Phase 4/5 infrastructure. Phase 4 (item 5 below, the push
+   spike) hasn't started, and Phase 5 (item 6) explicitly says not to
+   scaffold before Phase 4's result is in. Don't pick this sub-piece again
+   until Phase 4 lands.
+
+8. **Split the Supabase client out of the main bundle** — status: `deferred` — analysis: analysis/08-split-supabase-client.md
+   Investigated 2026-09-05: the original justification cited
+   `PROJECT_REQUIREMENTS.md` §17, which is actually Accessibility, not
+   performance. Route-level splitting wouldn't meaningfully shrink the
+   critical path anyway, since almost every route (including sign-in)
+   needs `@supabase/supabase-js`, which dominates the bundle. The one real
+   lever (a `manualChunks` vendor split for update-caching) is a marginal
+   win with no observed problem behind it, in tension with
+   `ARCHITECTURE.md` §27's "don't optimize without an observed need."
+   Confirmed with the user as low value for this app — deferred, not
+   deleted. Revisit only on a real signal: reported slow loads, a measured
+   perf regression, or substantial further bundle growth.
+
+9. **Component-test tooling for the auth and UI layer** — status: `done` — analysis: analysis/09-component-test-tooling.md
+   Tracking: root `PROGRESS.md` Post-Launch table (branch
+   `feature/component-test-tooling`, merged into `main`). Scoped narrowly to the auth/session
+   layer (`SessionProvider`, `MembershipProvider`, `RequireRole`,
+   `SignInForm`) after a user check-in — see the analysis file for why page
+   components are explicitly out of scope.
+   `npm run test` covers only the pure `currency`/`dates` modules; there is
+   no jsdom or testing-library in `devDependencies`, so nothing guards the
+   sign-in flow or session persistence that Phase 0 T4 built — both were
+   verified once, by hand, and have no regression net. `ARCHITECTURE.md`
+   §24 puts database/security tests first and that ordering is right, so
+   this is deliberately *not* a blocker for Phase 1. Revisit once Phase 1's
+   RLS suite is in place and there is real UI worth pinning down. Keep
+   `npm run test` Docker-free.

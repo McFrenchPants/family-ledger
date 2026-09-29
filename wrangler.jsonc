@@ -1,0 +1,34 @@
+{
+  // Cloudflare Workers static-assets configuration for the Family Ledger PWA.
+  //
+  // The Cloudflare dashboard's Git integration deploys this repo with
+  // `npx wrangler deploy`, which reads the static-assets directory from this
+  // file. Without it, the connected project has nothing correct to deploy.
+  //
+  // No secrets belong in this file. The browser-facing build-time variables
+  // (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_VAPID_PUBLIC_KEY) are set
+  // in the Cloudflare dashboard's build environment. The Supabase service_role
+  // key and the VAPID private key must never appear in this repo at all.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // MUST match the Worker name in the connected Cloudflare project. If it does
+  // not, `wrangler deploy` cheerfully creates and deploys a DIFFERENT Worker --
+  // the command succeeds while nothing changes at the expected URL.
+  "name": "family-ledger",
+  "compatibility_date": "2026-09-04",
+  // ADR-009: this app is a private household ledger and must not publish a
+  // guessable public preview URL on every non-production push. This is already
+  // wrangler's default, but it is stated explicitly so the decision survives a
+  // future change of default. Preview deployments are also switched off on the
+  // Cloudflare side; these are two independent controls and both should stay off.
+  "preview_urls": false,
+  "assets": {
+    // Vite's build output (`npm run build`).
+    "directory": "./dist",
+    // Client-side routing: react-router's createBrowserRouter serves real
+    // paths (/parent, /child), so a direct browser hit on one of those is a
+    // genuine HTTP request for that path. "single-page-application" makes
+    // unmatched requests return ./dist/index.html with HTTP 200 instead of a
+    // 404, letting the router resolve the route in the browser.
+    "not_found_handling": "single-page-application"
+  }
+}

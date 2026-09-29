@@ -28,10 +28,14 @@ framework.
   change still lands in `supabase/migrations/` under source control, never
   applied ad hoc through the MCP connection against the production
   project.
-- Cloudflare Pages: account created, project not yet connected. Preview
-  deployments are to be disabled once it is (see `docs/ARCHITECTURE.md`
-  §20 "Preview deployments" / ADR-009) — use `vite preview` or
-  `wrangler pages dev` locally instead of a public preview URL.
+- Cloudflare: connected to the GitHub repo, production branch set to
+  `production`. Deploys via `npx wrangler deploy`, configured by
+  `wrangler.jsonc` at the repo root. Per ADR-009 there are **no public
+  preview URLs** — that is enforced in two independent places, the
+  dashboard's preview-deployment setting and `preview_urls: false` in
+  `wrangler.jsonc`; both must stay off. Review changes locally through
+  wrangler instead (see Testing below — `npm run preview` gives a false
+  pass on routing).
 
 ## Project-specific standing rules
 
@@ -74,14 +78,78 @@ should be corrected.
 
 ## Testing
 
+### Commands
+
+```bash
+npm run dev         # Vite dev server
+npm run build       # tsc -b && vite build -> dist/
+npm run typecheck   # tsc -b --noEmit
+npm run lint        # eslint .
+npm run test        # vitest run (non-watch)
+npm run test:watch  # vitest
+npm run test:db     # pgTAP database invariant tests (needs Docker + local Supabase)
+```
+
+### Local Supabase
+
+Requires Docker running. The CLI is not installed globally — use `npx`.
+
+```bash
+npx supabase start      # bring up local Postgres/Auth/Studio
+npx supabase db reset   # re-apply migrations + seed from scratch
+npx supabase stop       # tear down (do this — containers are heavy)
+```
+
+The hosted project is deliberately **not linked**. Everything local runs
+against the Docker stack. Do not use the Supabase MCP server's write tools
+(`apply_migration`, remote `execute_sql`) to change schema — every schema
+change is a versioned migration file, reviewed like code.
+
+### Verifying a deployment change
+
+`npm run preview` applies an SPA fallback automatically and will therefore
+show a **false pass** for client-side routing. To check what Cloudflare will
+actually serve, go through wrangler:
+
+```bash
+npm run build
+npx wrangler dev              # then request /parent directly, expect 200
+npx wrangler deploy --dry-run # validates config without deploying
+```
+
+**Windows process-cleanup gotcha:** `pkill -f wrangler` does *not* work here.
+It reports success while the node parents survive and respawn `workerd.exe`
+children. Kill the node parents by PID with PowerShell `Stop-Process` first,
+then any `workerd` children, and confirm with a process listing.
+
+### What to actually test
+
 Database/security tests are the critical ones: run them as both Parent and
 Child identities, and include negative tests (Child attempts a payment, a
 negative amount, an amount edit downward, a void, another household's data,
 a role escalation). Do not treat a phase as complete while any Child
 privilege-escalation test fails.
 
-Commands are not yet established — this project has no `package.json` as of
-framework init. Fill this section in during Phase 0 and keep it current.
+**Database tests run through pgTAP**, not Vitest: `npm run test:db` wraps
+`npx supabase test db --local` over `supabase/tests/*.sql`. It needs Docker
+and a running local stack. `npm run test` is deliberately kept Docker-free so
+the unit suite runs anywhere — do not fold the two together.
+
+pgTAP is created *inside* each test file's `begin`/`rollback`, never in a
+migration: the production schema must not carry a test framework. The
+Supabase CLI also pre-creates pgTAP before invoking pg_prove, but the files
+do not rely on that.
+
+**Every database invariant test must be mutation-proofed** — drop the thing
+it protects, confirm the suite actually goes red, restore. A regression test
+that passes against a broken schema is worse than none, and this is not
+hypothetical here: T7's first draft used `::regclass`, which aborted the
+transaction on a dropped index so the behavioural assertions never reported.
+`to_regclass()` fails cleanly instead. Only the mutation run exposed it.
+
+**The suite is superuser-only** (it needs `create extension`), so it cannot
+double as a role-scoped RLS harness. Phase 1's policy tests need `set local
+role` blocks layered on top.
 
 ## sdlc-supervisor framework
 
