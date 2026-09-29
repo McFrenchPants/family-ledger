@@ -20,11 +20,95 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 | N4.3 | Edge Function: `push-test` | done | Verifier-routed (auth floor + credential handling). Passed, no blocking findings. Commit `76fc6b9`. |
 | N4.4 | Subscribe UI and persistence | done | Default tier, spot-checked. Commit `8c3ee75`. |
 | N4.5 | Test-send trigger | done | Default tier, spot-checked. Commit `7ceb666`. |
-| N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable — requires user's own hardware. Depends on N4.1–N4.5. Phase's hard exit criterion. |
+| N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable. Android AC1 (subscribe + real notification) confirmed 2026-09-29 on a real Pixel 7 Pro, after fixing a real bug this testing surfaced (see session log). iPhone deferred indefinitely — the only iPhone on hand is activation-locked to an unknown old account, not a project blocker. AC3 (dead-subscription status) attempted but inconclusive on Android; not retried before local testing was paused. Phase's hard exit criterion — still not met. Decision: pause further local-environment testing and resume validation after a production deploy (see session log). |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-09-29 — Real-device testing session: one real bug found and fixed, Android confirmed working, iPhone and the dead-subscription check deferred to a production deploy
+
+**What this session verified, in plain terms:** on a real Android phone (Pixel 7 Pro,
+Chrome), a person can turn on notifications for Family Ledger and receive an actual
+notification on their phone when the test-send button is used. That's N4.6's first
+acceptance criterion (AC1), genuinely confirmed on real hardware — not simulated, not
+mocked.
+
+**What it did not verify:** the iPhone half of N4.6 (AC2), and the "sending to a dead
+subscription is reported clearly rather than silently" check (AC3). Both are still open.
+See "What's next" below for why and what unblocks them.
+
+**A real bug was found and fixed, not just a test-environment problem.** The very first
+Android attempt showed the test-send button report success (`201 OK`) but no
+notification ever appeared on the phone. The cause: `src/sw.ts` (the service worker —
+the small background script a browser runs to receive push messages even when the app
+isn't open) never had code to actually display a notification when a push arrived. It
+correctly received the message and then did nothing with it. This is a real defect in
+what would ship to production, not a quirk of the test setup, and it's now fixed. It
+would have caused every real notification, from any future feature built on this
+infrastructure, to silently vanish for every user.
+
+**A second real bug was found and fixed: the subscribe button could get stuck forever
+with no error.** Enabling notifications calls a browser API that, on some real phones,
+can hang indefinitely instead of failing — it doesn't time out on its own. The button
+just showed "Enabling…" forever with no way to know if it had failed. Added a
+15-second timeout so a stall now surfaces as a normal, retryable error message instead
+of leaving someone staring at a button that never finishes. Landed by a separate,
+parallel Claude Code session working the same file during this testing window, reviewed
+and kept.
+
+**Most of this session was fighting the local test setup, not the app.** Worth recording
+plainly since it explains the pivot decision below:
+- The app previously couldn't be tested from a phone at all over the home network,
+  because the phone couldn't reach the local test database (a mismatch between "the page
+  loads over a secure connection" and "the database it talks to doesn't" that phone
+  browsers correctly refuse to allow). Fixed with a small, permanent, dev-only addition
+  (`vite.config.ts` + `src/lib/supabase.ts`) that routes local API calls through the same
+  address the page itself loads from — this fix is harmless to keep and makes any future
+  phone-based local testing easier.
+- The "accept the security warning" step for the home-network address turned out not to
+  be enough on either phone — Android flatly refused to let notifications work at all
+  behind it (a security check stricter than a normal page load), and the iPhone showed a
+  blank page. Switched to a temporary, real, trusted web address (a Cloudflare quick
+  tunnel) instead of trying to install a custom security certificate on each phone by
+  hand, which is genuinely fiddly to do correctly.
+- Mid-session, sign-in itself started failing with no clear reason. Root cause: the
+  local test database (which runs in Docker) had been sitting idle for a few weeks and
+  needed Docker Desktop restarted to recover — not a code problem.
+- After all that, two different test phone entries had piled up under the same test
+  account from earlier sessions, and the debug "send test push" list doesn't label which
+  entry belongs to which device — so a tap sent a test notification to a leftover desktop
+  entry instead of the phone. Cleaned up (deleted the stale entry directly in the test
+  database); a real rough edge in this throwaway debug tool, not fixed in code since the
+  tool is explicitly not meant to ship.
+- The dead-subscription check (AC3) was attempted by turning off notification
+  permission on the Android phone and testing again — that alone didn't actually
+  invalidate anything server-side (the phone's own push service still had the
+  subscription live, so the send reported success with no notification shown, not the
+  "this doesn't exist anymore" response the check is looking for). A more decisive way
+  to test it (clearing all of the site's stored data, not just the notification
+  permission) was suggested but not completed before the tunnel address stopped
+  working.
+
+**What's next, and why:** rather than keep fighting the local test setup, the decision
+was to pause here and resume N4.6's remaining checks after a real production deploy —
+a real hosted address has a real, already-trusted security certificate, so most of the
+friction above (certificates, local-network reachability, the local database going
+stale) simply doesn't exist there. The iPhone gap is separate and unrelated to any of
+this: the only iPhone available is locked to an old, unknown account from one of the
+kids' first phones, with no way to sign into or factory-reset it right now — a hardware
+problem, not a code or infrastructure one. Getting a usable iPhone (a different device,
+or recovering that one) is needed before AC2 can be attempted at all.
+
+Housekeeping: the temporary Cloudflare tunnel and local Edge Functions test server used
+during this session were both stopped; nothing from this session is left running.
+
+Four files changed, all worth keeping: `src/sw.ts` (the notification-display fix —
+important), `src/features/push/PushSubscribeButton.tsx` (the stuck-button timeout fix,
+landed by a parallel session and reviewed here), `vite.config.ts` and
+`src/lib/supabase.ts` (the dev-only local-network proxy fix). Typecheck, lint, and the
+full unit test suite (282/282) all pass. Not yet committed — see this proposal folder's
+next step.
 
 ### 2026-09-07 — N4.5 done: Test-send trigger. **All delegable work complete —**
 **only N4.6 (real-device validation) remains.**

@@ -103,6 +103,18 @@ sequential except where noted.
    close out** — implementation can start without the devices in hand, but
    the phase can't be marked done without real-device validation.
 
+   **Update 2026-09-29:** all implementation work is done. Real-device
+   testing found and fixed a genuine bug (notifications were silently
+   never shown — see `docs/proposals/phase-4-push-spike/PROGRESS.md`) and
+   confirmed the feature works end-to-end on a real Android phone. Still
+   open: an iPhone check (the only iPhone on hand is locked to an old,
+   unknown account — a hardware problem, unrelated to this project) and
+   one more automated check (confirming a dead/removed subscription is
+   reported clearly). Decision: pause here and finish both after a
+   production deploy, since a real hosted address sidesteps most of the
+   local-testing friction hit this session (see the PROGRESS.md session
+   log for detail). Phase 4 is not yet marked done.
+
 6. **Phase 5 — Reminder system** — status: `idea` — analysis: not yet written
    Configurable reminder rules, scheduled processor (pg_cron → Edge
    Function), idempotent `notification_events` keyed to prevent duplicate

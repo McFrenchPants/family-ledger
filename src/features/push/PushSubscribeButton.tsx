@@ -19,6 +19,30 @@ import { supabase } from "../../lib/supabase";
  * (see that task's notes; unsubscribe is a plausible immediate follow-up
  * but is left out here rather than snuck in).
  */
+// `pushManager.subscribe()` in particular has no built-in timeout and can
+// hang indefinitely on some real devices (e.g. Android Chrome waiting on a
+// stalled Google Play Services / FCM registration) instead of rejecting --
+// observed during N4.6 hardware validation as a button stuck on "Enabling…"
+// forever with no error. Race every awaited step below against this so a
+// stall surfaces as a normal, retryable error state instead of a silent hang.
+const SUBSCRIBE_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
 export function PushSubscribeButton() {
   const membership = useMembership();
   const [state, setState] = useState<PushSubscribeState>("idle");
@@ -58,11 +82,19 @@ export function PushSubscribeButton() {
         throw new Error("Push notifications are not configured for this deployment.");
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
-      });
+      const registration = await withTimeout(
+        navigator.serviceWorker.ready,
+        SUBSCRIBE_TIMEOUT_MS,
+        "Timed out waiting for the service worker to become ready.",
+      );
+      const subscription = await withTimeout(
+        registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
+        }),
+        SUBSCRIBE_TIMEOUT_MS,
+        "Timed out registering this device for push notifications. This step talks to your browser's push service (e.g. Google Play Services on Android) -- check your connection and try again.",
+      );
 
       const { keys, endpoint } = subscription.toJSON();
       if (!keys?.p256dh || !keys?.auth) {

@@ -25,8 +25,17 @@ function readRequiredEnv(name: "VITE_SUPABASE_URL" | "VITE_SUPABASE_ANON_KEY"): 
   return value;
 }
 
+// In `npm run dev`, always go through Vite's own `/supabase-api` proxy
+// (see vite.config.ts) rather than the literal `VITE_SUPABASE_URL` value --
+// this makes API calls same-origin with whatever host loaded the page
+// (localhost, or a LAN IP when testing from a phone), instead of hardcoding
+// 127.0.0.1, which a phone can't resolve to the dev machine at all.
+const supabaseUrl = import.meta.env.DEV
+  ? `${window.location.origin}/supabase-api`
+  : readRequiredEnv("VITE_SUPABASE_URL");
+
 export const supabase = createClient(
-  readRequiredEnv("VITE_SUPABASE_URL"),
+  supabaseUrl,
   readRequiredEnv("VITE_SUPABASE_ANON_KEY"),
   {
     auth: {

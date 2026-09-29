@@ -25,3 +25,28 @@ declare const self: ServiceWorkerGlobalScope;
 self.skipWaiting();
 
 precacheAndRoute(self.__WB_MANIFEST);
+
+// N4.6 real-device validation surfaced that a push actually arriving at the
+// browser (confirmed by push-test's 201 from the push service) produced no
+// visible notification at all: nothing in this file ever called
+// `showNotification`, so the push event was received and silently dropped.
+// This is the minimal fix -- read the JSON `{ title, body }` push-test sends
+// (see supabase/functions/push-test/index.ts) and display it. Falling back
+// to plain text keeps this from throwing if a future caller ever sends a
+// non-JSON payload.
+self.addEventListener("push", (event) => {
+  let title = "Family Ledger";
+  let body = "";
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json() as { title?: string; body?: string };
+      title = parsed.title ?? title;
+      body = parsed.body ?? body;
+    } catch {
+      body = event.data.text();
+    }
+  }
+
+  event.waitUntil(self.registration.showNotification(title, { body }));
+});
