@@ -21,11 +21,34 @@ Branch: `feature/account-management` (off `main`).
 | AM4 | Add-member returns a set-password link | done | Verifier pass. `add-household-member` no longer returns a password. |
 | AM5 | Frontend: set-password page, change password, manage-members additions | done | Verifier pass, no blocking findings. 322 tests. Not viewed in a real browser yet. |
 | AM6 | Config + docs | done | config.toml: min password 8, link expiry 86400 (local stack needs restart to pick up); ADR-010 amended; runbook section 7a lists the hosted release steps. |
-| AM7 | End-to-end verification and merge | todo | Production promotion is the owner's call. |
+| AM7 | End-to-end verification and merge | done | Real-browser run on the local stack; merged to `main`. Production promotion needs the owner's hosted steps (runbook 7a). |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — AM7 done: end-to-end verified; merged to main
+
+Restarted the local stack (data kept) so 8-char passwords and 24h links are
+live locally, then drove a real browser against the local stack with
+throwaway users (all deleted afterwards; original 3 users / 1 household
+intact): Parent sees login emails; creates a set-password link (dialog shows
+the 24h / works-once / send-privately / cancels-older notes); opening the link
+while a Parent was signed in stripped the token from the address bar, a 5-char
+password was refused without using up the link, a valid password signed the
+Child in and landed on the Child dashboard; /account refused a wrong current
+password and changed the password on the right one (old password then fails,
+new works); archiving through the screen blocked the Child's login
+(`user_banned`), restore re-enabled it. Also: suite 003 made robust to dirty
+local data, new suite 011 (24 assertions, mutation-proofed); `npm run test:db`
+= 298 assertions across 11 files, all pass; 322 unit tests, typecheck, lint,
+build green.
+
+Not verified: layout on a phone (screenshots timed out in the browser pane),
+the real clipboard, role change and email change through the screen (covered by
+component tests and the 94-check HTTP smoke test only), and everything on the
+hosted project (nothing deployed). Production promotion is blocked on the
+owner running the hosted steps in `docs/DEPLOYMENT_RUNBOOK.md` section 7a.
 
 ### 2026-10-01 — AM6 done: config and docs
 
