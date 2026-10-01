@@ -120,7 +120,7 @@ sequential except where noted.
    dead-subscription status) can now be run against the live site. Phase 4
    is still not marked done.
 
-6. **Phase 5 — Reminder system** — status: `idea` — analysis: not yet written
+6. **Phase 5 — Reminder system** — status: `idea` — analysis: analysis/10-account-management.md
    Configurable reminder rules, scheduled processor (pg_cron → Edge
    Function), idempotent `notification_events` keyed to prevent duplicate
    sends, manual Parent reminder, dead-subscription cleanup. Depends on the
@@ -217,7 +217,7 @@ sequential except where noted.
    RLS suite is in place and there is real UI worth pinning down. Keep
    `npm run test` Docker-free.
 
-10. **Account management: change own password, Parent-managed accounts** — status: `ready` — analysis: not yet written
+10. **Account management: change own password, Parent-managed accounts** — status: `done on main, awaiting production deploy` — analysis: analysis/10-account-management.md
     Requested by the owner 2026-10-01, right after first deploy. Today a
     signed-in person cannot change their own password, and a Parent cannot
     reset anyone's password, change a member's role, change a login email,
@@ -228,3 +228,8 @@ sequential except where noted.
     reset path is part of the intended design, not new scope. Needs a design
     spec because it touches Auth Admin API (a second Edge Function) and the
     rule that archived members must not be able to sign in.
+
+    Tracking doc: `docs/proposals/account-management/PROGRESS.md` (branch
+    `feature/account-management`). All seven tasks done and verified locally;
+    merged into `main`. Not yet on `production`: the owner must first run the
+    hosted steps in `docs/DEPLOYMENT_RUNBOOK.md` section 7a.

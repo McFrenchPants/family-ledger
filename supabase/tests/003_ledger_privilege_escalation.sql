@@ -104,17 +104,20 @@ select throws_ok(
 -- Child's OWN count(*) is itself RLS-filtered to their own rows, which would
 -- make this assertion pass even if a stray row landed in another member's
 -- name. reset role (back to postgres) to see the true, unfiltered table
--- count, then switch back to the Child persona for the next case.
+-- count (scoped to this file's own fixture households so that committed
+-- leftover rows elsewhere in a dev database cannot affect the result), then switch back to the Child persona for the next case.
 reset role;
 
 select is(
-  (select count(*) from public.ledger_transactions),
+  (select count(*) from public.ledger_transactions
+    where household_id in ('10000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-00000000000b')),
   3::bigint,
   'Case 1: no new ledger_transactions row after the rejected Child record_payment'
 );
 
 select is(
-  (select count(*) from public.audit_log),
+  (select count(*) from public.audit_log
+    where household_id in ('10000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-00000000000b')),
   0::bigint,
   'Case 1: no new audit_log row after the rejected Child record_payment'
 );
@@ -136,13 +139,15 @@ select throws_ok(
 reset role;
 
 select is(
-  (select count(*) from public.ledger_transactions),
+  (select count(*) from public.ledger_transactions
+    where household_id in ('10000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-00000000000b')),
   3::bigint,
   'Case 2: no new ledger_transactions row after the rejected Child record_adjustment'
 );
 
 select is(
-  (select count(*) from public.audit_log),
+  (select count(*) from public.audit_log
+    where household_id in ('10000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-00000000000b')),
   0::bigint,
   'Case 2: no new audit_log row after the rejected Child record_adjustment'
 );
