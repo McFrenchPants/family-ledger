@@ -20,12 +20,20 @@ Branch: `feature/account-management` (off `main`).
 | AM3 | Edge Function(s): link, email change, archive/restore + ban | done | Verifier pass. One function `manage-household-member` (create_link, change_email, archive, restore, get_login_emails). |
 | AM4 | Add-member returns a set-password link | done | Verifier pass. `add-household-member` no longer returns a password. |
 | AM5 | Frontend: set-password page, change password, manage-members additions | done | Verifier pass, no blocking findings. 322 tests. Not viewed in a real browser yet. |
-| AM6 | Config + docs | todo | |
+| AM6 | Config + docs | done | config.toml: min password 8, link expiry 86400 (local stack needs restart to pick up); ADR-010 amended; runbook section 7a lists the hosted release steps. |
 | AM7 | End-to-end verification and merge | todo | Production promotion is the owner's call. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-01 — AM6 done: config and docs
+
+`supabase/config.toml` now has `minimum_password_length = 8` and
+`otp_expiry = 86400`. ADR-010 amended to describe the link-based design.
+`docs/DEPLOYMENT_RUNBOOK.md` gained section 7a: the exact ordered hosted steps
+(db push, `APP_BASE_URL` secret, functions deploy, dashboard OTP expiry 86400
+and min length 8) that must happen BEFORE promoting to production.
 
 ### 2026-10-01 — AM5 done: screens (stopped here: usage limit reached)
 
