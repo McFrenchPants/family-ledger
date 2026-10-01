@@ -37,6 +37,10 @@ framework.
   wrangler instead (see Testing below — `npm run preview` gives a false
   pass on routing).
 
+Owner-facing deploy/credentials guide: `docs/DEPLOYMENT_RUNBOOK.md` (keep it
+current whenever deployment steps, secrets, or hosting settings change).
+First-run data seeding for a fresh hosted project: `npm run bootstrap`.
+
 ## Project-specific standing rules
 
 These are the invariants a verifier checks against, and the things a future
