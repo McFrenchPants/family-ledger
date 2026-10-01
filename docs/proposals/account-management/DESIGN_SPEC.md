@@ -1,6 +1,6 @@
 # Design spec: Account management
 
-Status: **draft, awaiting owner sign-off.** No file/class-level detail on
+Status: **signed off by the owner 2026-10-01.** Open questions resolved: (1) a Parent MAY create a link for another Parent; (2) link lifetime 24 hours; (3) passwords 8+ characters, no other rules. No file/class-level detail on
 purpose; that belongs in the implementation plan.
 
 ## Goals
@@ -105,7 +105,7 @@ purpose; that belongs in the implementation plan.
 - A leaked link is as good as a password for its lifetime. Mitigations:
   short life, single use, Parent-only, audit trail, shown once.
 
-## Open questions for the owner
+## Open questions (resolved 2026-10-01)
 
 1. **May a Parent create a link for another Parent?** Recommended **yes**
    (two-parent households need it; every use is audited). The alternative is
