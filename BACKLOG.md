@@ -115,6 +115,11 @@ sequential except where noted.
    local-testing friction hit this session (see the PROGRESS.md session
    log for detail). Phase 4 is not yet marked done.
 
+   **Update 2026-10-01:** the app is now deployed (see root `PROGRESS.md`
+   and `docs/DEPLOYMENT_RUNBOOK.md`). The remaining Phase 4 checks (iPhone,
+   dead-subscription status) can now be run against the live site. Phase 4
+   is still not marked done.
+
 6. **Phase 5 — Reminder system** — status: `idea` — analysis: not yet written
    Configurable reminder rules, scheduled processor (pg_cron → Edge
    Function), idempotent `notification_events` keyed to prevent duplicate
@@ -211,3 +216,15 @@ sequential except where noted.
    this is deliberately *not* a blocker for Phase 1. Revisit once Phase 1's
    RLS suite is in place and there is real UI worth pinning down. Keep
    `npm run test` Docker-free.
+
+10. **Account management: change own password, Parent-managed accounts** — status: `ready` — analysis: not yet written
+    Requested by the owner 2026-10-01, right after first deploy. Today a
+    signed-in person cannot change their own password, and a Parent cannot
+    reset anyone's password, change a member's role, change a login email,
+    or fully disable/remove a login (Manage Members only does add, rename,
+    archive, restore — `docs/proposals/phase-6-member-management/DESIGN_SPEC.md`
+    deferred role changes and password reset as non-goals). ADR-010 already
+    commits to Parent-assisted reset (no email provider), so the Parent
+    reset path is part of the intended design, not new scope. Needs a design
+    spec because it touches Auth Admin API (a second Edge Function) and the
+    rule that archived members must not be able to sign in.

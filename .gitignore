@@ -10,6 +10,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.bootstrap.example
 
 # Wrangler local state (dev server cache, deploy dry-run output)
 .wrangler/

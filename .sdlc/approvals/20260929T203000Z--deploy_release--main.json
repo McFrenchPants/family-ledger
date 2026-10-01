@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "f1b56a3caef24dc0d344c385662544982ab2e2c2",
+  "approved_at": "2026-09-29T20:30:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "I am ready to get this thing deployed ... get everything merged in, committed, push to the remote, get it on the production branch",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-29T20:35:00Z",
+  "consumed_by": "orchestrator-session-2026-09-29",
+  "notes": "Preconditions: typecheck, lint, 282 unit tests and build all green on main at this SHA. Promotes main to production, which triggers the Cloudflare build."
+}
