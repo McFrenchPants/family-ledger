@@ -17,8 +17,8 @@ Branch: `feature/account-management` (off `main`).
 | --- | --- | --- | --- |
 | AM1 | Spike: link generation, ban, admin email change | done | Design works with small changes; see SPIKE_FINDINGS.md and the spec's refinements section. |
 | AM2 | Database: controlled role/status paths, invariants, pgTAP | done | Verifier pass, no blocking findings. 87 new pgTAP assertions, mutation-proofed. |
-| AM3 | Edge Function(s): link, email change, archive/restore + ban | todo | Verifier-routed. |
-| AM4 | Add-member returns a set-password link | todo | Verifier-routed. |
+| AM3 | Edge Function(s): link, email change, archive/restore + ban | done | Verifier pass. One function `manage-household-member` (create_link, change_email, archive, restore, get_login_emails). |
+| AM4 | Add-member returns a set-password link | done | Verifier pass. `add-household-member` no longer returns a password. |
 | AM5 | Frontend: set-password page, change password, manage-members additions | todo | |
 | AM6 | Config + docs | todo | |
 | AM7 | End-to-end verification and merge | todo | Production promotion is the owner's call. |
@@ -26,6 +26,30 @@ Branch: `feature/account-management` (off `main`).
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-01 — AM3 + AM4 done: server functions
+
+New `manage-household-member` function (actions: `create_link`, `change_email`,
+`archive`, `restore`, `get_login_emails`) and shared helpers in
+`supabase/functions/_shared/member-admin.ts`; `add-household-member` now
+returns `set_password_url` instead of an initial password (and keeps the
+member, with `set_password_url: null` and `set_password_link_failed: true`,
+if minting fails). Needs a new function secret `APP_BASE_URL` on the hosted
+project (the live app's address, https) - recorded for AM6/the runbook.
+Reproducible live test: `scripts/smoke-manage-member.mjs` (94 checks over real
+HTTP, all pass; cleans up after itself). Verifier: pass, no blocking findings.
+
+Non-blocking notes carried forward: compensation after a failed archive
+restores an originally-invited member as `active`; the same login linked to
+two households (only possible by manual data) would let one household's
+Parent affect the other (the app never creates this); issued access tokens
+survive a ban until expiry but data access is cut by database rules; link
+creation rate limit is count-then-insert (slight overshoot possible);
+`APP_BASE_URL` should be https in production; `get_login_emails` caps at 100
+members; the smoke script's cleanup deletes any `smoke-%` household / `smoke-*@example.test`
+user (localhost only). Local `otp_expiry` is still 3600 (AM6 sets 86400 with the
+hosted dashboard setting; until then the functions' "24 hours" is only true
+if both are changed).
 
 ### 2026-10-01 — AM2 done: database rules for role and status changes
 
