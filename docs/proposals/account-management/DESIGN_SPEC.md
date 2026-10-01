@@ -28,13 +28,17 @@ purpose; that belongs in the implementation plan.
 - Available to every active member (Parent or Child) from within the app.
 - Requires the current password; new password entered twice.
 - Minimum length raised to 8 (local config and hosted setting).
-- Other devices' sessions keep working until they expire (not forced out).
+- Changing a password signs the person's OTHER devices out (identity-provider
+  behavior, confirmed in the AM1 spike); the device that made the change stays
+  signed in. The form says so in plain words.
 
 ### R2. Set-password link
 - Only an active Parent of the member's household can create one, for any
   member of that household (including other Parents; see Open Q1).
 - The app shows the link once, with a copy button, a plain-words note on
   its lifetime, and a warning that anyone holding it can set the password.
+- Creating a new link for a person cancels any earlier unused link for them
+  (spike finding); the dialog says so.
 - Link is single-use and expires (target 24 hours; Supabase Free allows up
   to 24h, a hosted dashboard setting mirrored in `config.toml`). An
   expired or used link shows a clear "ask a Parent for a new link" page.
@@ -84,6 +88,23 @@ purpose; that belongs in the implementation plan.
   household exists.
 - Every create-link, role change, email change, archive, restore writes an
   audit row; audit_log stays unwritable by app roles.
+
+## Spike findings that refine this design (AM1, 2026-10-01)
+
+Full evidence: `SPIKE_FINDINGS.md`. The design works; changes folded in above
+and below:
+- The link we hand out is OUR page URL carrying the token's hash in the
+  fragment (`/set-password#token_hash=...`), consumed by an in-app
+  verify call. The identity provider's own `action_link` must NOT be given
+  out: a plain GET (chat link preview) consumes it.
+- A banned user's already-issued access token can still read through the
+  data API for up to the token lifetime (1 hour). Data access for an
+  archived member is therefore ALSO denied by the database rules (they
+  already require an active membership; the verifier must confirm this for
+  every table), not by the ban alone.
+- Admin email change returns a bare 500 on duplicate emails (also
+  different-case duplicates): the server function pre-checks and maps it to a
+  friendly message.
 
 ## Constraints
 
