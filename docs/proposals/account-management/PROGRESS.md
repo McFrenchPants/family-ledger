@@ -19,13 +19,31 @@ Branch: `feature/account-management` (off `main`).
 | AM2 | Database: controlled role/status paths, invariants, pgTAP | done | Verifier pass, no blocking findings. 87 new pgTAP assertions, mutation-proofed. |
 | AM3 | Edge Function(s): link, email change, archive/restore + ban | done | Verifier pass. One function `manage-household-member` (create_link, change_email, archive, restore, get_login_emails). |
 | AM4 | Add-member returns a set-password link | done | Verifier pass. `add-household-member` no longer returns a password. |
-| AM5 | Frontend: set-password page, change password, manage-members additions | todo | |
+| AM5 | Frontend: set-password page, change password, manage-members additions | done | Verifier pass, no blocking findings. 322 tests. Not viewed in a real browser yet. |
 | AM6 | Config + docs | todo | |
 | AM7 | End-to-end verification and merge | todo | Production promotion is the owner's call. |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-01 — AM5 done: screens (stopped here: usage limit reached)
+
+New `/set-password` page, `/account` "Change my password", and Manage Members
+additions (login emails, role change, email change, create set-password link
+dialog, add-member link, archive/restore via the function). 322 tests pass;
+typecheck, lint, build clean. Verifier: pass. Non-blocking notes: a
+leftover passwordless session if the password step fails after the link was
+used; wrong-password message also shown for rate-limit errors; Escape only
+closes the dialog while focus is inside it; local min password length still 6.
+Not viewed in a real browser (layout, phone button wrapping, real clipboard).
+
+Remaining: AM6 (config: otp_expiry 86400, min password 8, APP_BASE_URL secret,
+runbook, ADR-010 update) and AM7 (end-to-end in a real browser against the
+local stack, the queued AM2 follow-ups incl. fixing suite 003, merge to main).
+Production promotion needs the owner's go-ahead plus hosted steps: push the
+new migration, deploy both functions, set APP_BASE_URL secret, raise link
+expiry to 24h and min password to 8 in the Supabase dashboard.
 
 ### 2026-10-01 — AM3 + AM4 done: server functions
 

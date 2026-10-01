@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { RootLayout } from "./RootLayout";
 import { RequireRole } from "../features/auth/RequireRole";
+import { AccountPage } from "../pages/AccountPage";
 import { AddExpensePage } from "../pages/AddExpensePage";
 import { ChildDashboardPage } from "../pages/ChildDashboardPage";
 import { ExportPage } from "../pages/ExportPage";
@@ -13,6 +14,7 @@ import { NotFoundPage } from "../pages/NotFoundPage";
 import { ParentDashboardPage } from "../pages/ParentDashboardPage";
 import { PaymentPlanPage } from "../pages/PaymentPlanPage";
 import { RecordPaymentPage } from "../pages/RecordPaymentPage";
+import { SetPasswordPage } from "../pages/SetPasswordPage";
 import { SignInPage } from "../pages/SignInPage";
 
 export const router = createBrowserRouter([
@@ -74,6 +76,8 @@ export const router = createBrowserRouter([
       { path: "child/:memberId/history", element: <HistoryPage /> },
       { path: "child/:memberId/payment-plan", element: <PaymentPlanPage /> },
       { path: "sign-in", element: <SignInPage /> },
+      { path: "set-password", element: <SetPasswordPage /> },
+      { path: "account", element: <AccountPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
