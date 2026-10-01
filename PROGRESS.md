@@ -26,6 +26,34 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 _Newest entries on top._
 
+### 2026-10-01 — First production deploy; app live and sign-in working
+
+Live at https://family-ledger.mcfrench.workers.dev (Cloudflare Worker
+`family-ledger`, deploys from the `production` branch).
+
+Done this session: merged `feature/phase-4-push-spike` into `main`; promoted
+`main` to `production` (approval record
+`.sdlc/approvals/20260929T203000Z--deploy_release--main.json`, consumed);
+owner applied the 15 migrations to the hosted Supabase project and deployed
+both Edge Functions (`add-household-member`, `push-test`, both ACTIVE);
+push secrets set via `npx supabase secrets set --env-file ... --project-ref`;
+public sign-ups disabled in Supabase. Added `npm run bootstrap`
+(`scripts/bootstrap-first-household.mjs`) because no screen can create the
+very first household/Parent; owner ran it and signed in on the live site.
+
+Problems found and fixed on the way: the first Cloudflare build had no
+`VITE_*` variables (app could not start), then had the *local* demo anon key
+instead of the hosted one ("Invalid API key"). Both are build-time settings
+and a rebuild is required after changing them — now documented in
+`docs/DEPLOYMENT_RUNBOOK.md`, a new owner-facing guide (pieces, costs,
+credential locations, failure table).
+
+Not verified: the bootstrap script's success path was only exercised live by
+the owner, not in an automated test (its refuse-if-household-exists guard and
+missing-settings guard were tested locally). iPhone push and the
+dead-subscription check remain open. New backlog item 10 (account
+management) recorded.
+
 ### 2026-09-06 — Phase 6 accessibility-review slice complete and merged to `main`
 
 Full detail lives in
