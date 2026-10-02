@@ -21,7 +21,7 @@ for the design, `mockups/index.html` for the visual target.
 | UI2 | Tokens, dark mode, type scale, icons, primitives | done | Branch `feature/ui-redesign-p2-tokens`. Tokens in `src/styles/tokens.css` (contrast test mutation-proofed); primitives in `src/components/ui/`; theme helper `src/lib/theme.ts` (key `family-ledger.theme`). Old class names alias the new tokens, so old pages already follow dark mode. New radii are `rounded-panel` (16) / `rounded-control` (12); `rounded-card` stays 8 until pages migrate. Dev gallery at `/dev/components` (dev builds only). |
 | UI3 | App shell and route map | done | Branch `feature/ui-redesign-p3-app-shell`. `AppShell` replaces `RootLayout`; route table exported as `routes` from `router.tsx`; old-path redirects in `src/app/redirects.tsx`. Checked signed in as Parent and Child on the local stack (fixture `scripts/dev/seed-local-test-family.mjs`). Open for UI8: a Child still reaches their read-only plan page only via the old `/child/:id/payment-plan` address, and nothing links to it. Parent `/activity` with no child shows an interim chooser until UI7. |
 | UI4 | Child Home (playful overdue text, encouragement) | done | Branch `feature/ui-redesign-p4a-child-home`. Copy in `src/lib/messages.ts`; logic in `src/features/home/child-home.ts`; nudge rules in `src/features/push/device-nudge.ts` (reuse in UI5). Recent activity now reads `voided_at`. Browser-checked only the "due later", payment-received and empty states; overdue/due-soon/paid-off/satisfied covered by component tests only. Nudge not seen in browser (pane's notification permission is denied). |
-| UI5 | Parent Home | todo | |
+| UI5 | Parent Home | done | Branch `feature/ui-redesign-p4b-parent-home`. Logic in `src/features/home/parent-home.ts`; household recent activity hook `useHouseholdRecentActivity`. Add expense / Record payment accept `?child=` as the starting choice. Export, Categories, Presets kept as a quiet "Household tools" line on Home because Settings doesn't link them yet -- remove in UI9. Overdue/due-soon attention cards and the payment encouragement line covered by component tests only (fixture had nobody due; no real payment recorded). |
 | UI6 | Add expense and Record payment | todo | Child chooser unlocked for all roles. |
 | UI7 | Activity page | todo | |
 | UI8 | Family and child page | todo | |
@@ -31,6 +31,10 @@ for the design, `mockups/index.html` for the visual target.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — UI5 done
+
+Parent Home rewritten to the mockup: household-time greeting, Needs attention (overdue and due within 7 days, worst first, inline Record payment, no Remind) or "Everyone is up to date", family total with "due by" line, ordered child cards (status chip, progress, Expense/Payment buttons prefilled via `?child=`, name opens `/family/:id`), 4-row household recent activity with child names and voided rows marked, bottom device nudge hidden while anything needs attention. Each data source loads and fails independently with Retry; page waits for plan data covering every child to avoid a "No plan"/"up to date" flash. Record payment success panel gains a seeded encouragement line (payments only). Midnight-in-Los-Angeles case tested. typecheck, lint, 631 tests, build clean (orchestrator re-ran). Browser: Parent home checked with real local data at 375 px light/dark and desktop dark; fixture Child still sees Child Home with no payment/void/family links. No route changes. Next: UI6 (Add expense and Record payment).
 
 ### 2026-10-02 — UI4 done
 

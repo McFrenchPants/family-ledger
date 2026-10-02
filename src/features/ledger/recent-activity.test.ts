@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toRecentTransactions } from "./recent-activity";
+import { toHouseholdRecentTransactions, toRecentTransactions } from "./recent-activity";
 
 describe("toRecentTransactions", () => {
   it("maps raw ledger_transactions rows to the rendered shape, including the embedded category name", () => {
@@ -84,5 +84,37 @@ describe("toRecentTransactions voided rows", () => {
     ]);
     expect(voided?.isVoided).toBe(true);
     expect(live?.isVoided).toBeUndefined();
+  });
+});
+
+describe("toHouseholdRecentTransactions", () => {
+  it("keeps each row's member id and the voided flag", () => {
+    const [voided, live] = toHouseholdRecentTransactions([
+      {
+        id: "t1",
+        member_id: "kid-1",
+        description: "Payment",
+        amount_cents: -2500,
+        type: "payment",
+        occurred_on: "2026-10-01",
+        created_at: "2026-10-01T10:00:00Z",
+        voided_at: "2026-10-01T11:00:00Z",
+        category: null,
+      },
+      {
+        id: "t2",
+        member_id: "kid-2",
+        description: "Gas",
+        amount_cents: 4217,
+        type: "expense",
+        occurred_on: "2026-09-30",
+        created_at: "2026-09-30T10:00:00Z",
+        voided_at: null,
+        category: { name: "Gas" },
+      },
+    ]);
+    expect(voided).toMatchObject({ id: "t1", memberId: "kid-1", isVoided: true });
+    expect(live).toMatchObject({ id: "t2", memberId: "kid-2", categoryName: "Gas" });
+    expect(live).not.toHaveProperty("isVoided");
   });
 });

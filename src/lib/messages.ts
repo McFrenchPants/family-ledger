@@ -70,6 +70,21 @@ export const PAYMENT_RECEIVED_MESSAGES: readonly Template<{ amount: string }>[] 
   ({ amount }) => `Payment received: ${amount}. That's how it's done.`,
 ];
 
+/**
+ * Parent-side: the line under "Payment recorded". `name` is the child's
+ * name, `amount` the payment. Seeded per payment (its transaction id), so it
+ * stays put if the panel re-renders. About progress, never about shame.
+ */
+export const PAYMENT_RECORDED_MESSAGES: readonly Template<{ name: string; amount: string }>[] = [
+  ({ name, amount }) => `Nice. ${name} is ${amount} closer to zero.`,
+  ({ name, amount }) => `${amount} down. ${name}'s balance just got lighter.`,
+  ({ name, amount }) => `Logged. ${name} just chipped ${amount} off the total.`,
+  ({ name, amount }) => `${name} is ${amount} closer to debt-free. Somebody's learning.`,
+];
+
+/** Parent Home when nothing is overdue or due within the week. */
+export const EVERYONE_UP_TO_DATE = "Everyone is up to date";
+
 /** Owe-card copy when nothing is owed and nothing has happened yet. */
 export const ALL_CAUGHT_UP_HINT =
   "Nothing due right now. If a parent covers something for you, add it here so the balance stays right.";

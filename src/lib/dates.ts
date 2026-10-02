@@ -211,6 +211,22 @@ export function addDays(date: CalendarDate, days: number): CalendarDate {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Whole days from `from` to `to` (positive when `to` is later). Calendar
+ * labels only -- UTC arithmetic on zone-less dates, so no DST skew.
+ *
+ * @example daysBetween("2026-09-15", "2026-10-02") // 17
+ */
+export function daysBetween(from: CalendarDate, to: CalendarDate): number {
+  assertCalendarDate(from, "First date");
+  assertCalendarDate(to, "Second date");
+  const toUtc = (date: CalendarDate) => {
+    const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+    return Date.UTC(year, month - 1, day);
+  };
+  return Math.round((toUtc(to) - toUtc(from)) / 86_400_000);
+}
+
 /** True if `due` is today in the household's zone. */
 export function isDueToday(
   due: CalendarDate,

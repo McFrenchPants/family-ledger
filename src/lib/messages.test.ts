@@ -7,6 +7,7 @@ import {
   PAID_OFF_MESSAGES,
   PAID_ON_TIME_MESSAGES,
   PAYMENT_RECEIVED_MESSAGES,
+  PAYMENT_RECORDED_MESSAGES,
   daySeed,
   pick,
 } from "./messages";
@@ -62,6 +63,15 @@ describe("message copy", () => {
     }
     for (const template of PAID_ON_TIME_MESSAGES) {
       expect(template({ month: "October" })).toContain("October");
+    }
+  });
+
+  it("payment-recorded variants name the child and the amount, and never shame", () => {
+    for (const template of PAYMENT_RECORDED_MESSAGES) {
+      const text = template({ name: "Alex", amount: "$40.00" });
+      expect(text).toContain("Alex");
+      expect(text).toContain("$40.00");
+      expect(text).not.toMatch(/late|behind|shame|sibling|brother|sister/i);
     }
   });
 });
