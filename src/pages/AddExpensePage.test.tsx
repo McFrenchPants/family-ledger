@@ -198,3 +198,40 @@ describe("AddExpensePage quick-add presets", () => {
     expect(screen.queryByText("Quick add")).not.toBeInTheDocument();
   });
 });
+
+describe("AddExpensePage ?child= prefill", () => {
+  const twoChildren: QueryResult<{ id: string; name: string; role: string; status: string }[]> = {
+    data: [
+      { id: "m1", name: "Alex", role: "parent", status: "active" },
+      { id: "m2", name: "Sam", role: "child", status: "active" },
+      { id: "m3", name: "Jo", role: "child", status: "active" },
+    ],
+    error: null,
+  };
+
+  function renderAt(path: string) {
+    const original = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: string) =>
+      table === "household_members"
+        ? { select: vi.fn(() => makeSelectBuilder(twoChildren)) }
+        : original(table),
+    );
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <MembershipContext.Provider value={loadedParent}>
+          <AddExpensePage />
+        </MembershipContext.Provider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("selects the child named in the link", async () => {
+    renderAt("/new/expense?child=m3");
+    await waitFor(() => expect((screen.getByLabelText("For") as HTMLSelectElement).value).toBe("m3"));
+  });
+
+  it("ignores an id that is not one of the choices", async () => {
+    renderAt("/new/expense?child=m1");
+    await waitFor(() => expect((screen.getByLabelText("For") as HTMLSelectElement).value).toBe("m2"));
+  });
+});

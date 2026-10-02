@@ -1,27 +1,69 @@
+/**
+ * Colours come from CSS variables declared in src/styles/tokens.css (the one
+ * source of truth, light + dark). Each variable holds space-separated RGB
+ * channels, so `rgb(var(--x) / <alpha-value>)` keeps opacity modifiers
+ * (`bg-accent/50`) working.
+ */
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
-    // Deliberately small, muted token set. This is a household utility, not a
-    // themed product: one neutral ramp, one accent, one positive, one negative.
     extend: {
       colors: {
+        // Legacy names used across the existing pages. Kept as aliases onto
+        // the new tokens so those pages pick up dark mode automatically.
         ink: {
-          DEFAULT: "#1f2328",
-          muted: "#5b6470",
-          subtle: "#666e7a",
+          DEFAULT: token("ink"),
+          muted: token("muted"),
+          subtle: token("subtle"),
         },
         surface: {
-          DEFAULT: "#ffffff",
-          sunken: "#f4f5f7",
-          border: "#dfe2e6",
+          DEFAULT: token("surface"),
+          sunken: token("sunken"),
+          border: token("border"),
         },
         accent: {
-          DEFAULT: "#2f5d8a",
-          soft: "#e5edf5",
+          DEFAULT: token("accent"),
+          soft: token("accent-soft"),
+          text: token("accent-text"),
         },
-        owed: "#9a3d2f",
-        settled: "#2f6b45",
+        owed: token("danger"),
+        settled: token("ok"),
+
+        // New token names (design spec 6.x).
+        bg: token("bg"),
+        sunken: token("sunken"),
+        border: {
+          DEFAULT: token("border"),
+          strong: token("border-strong"),
+        },
+        muted: token("muted"),
+        subtle: token("subtle"),
+        danger: {
+          DEFAULT: token("danger"),
+          soft: token("danger-soft"),
+        },
+        warn: {
+          DEFAULT: token("warn"),
+          soft: token("warn-soft"),
+        },
+        ok: {
+          DEFAULT: token("ok"),
+          soft: token("ok-soft"),
+          btn: token("ok-btn"),
+        },
+        on: {
+          accent: token("on-accent"),
+          ok: token("on-ok"),
+          danger: token("on-danger"),
+        },
+      },
+      // A bare `border` (no colour class) would otherwise use Tailwind's
+      // fixed light grey, which glares in dark mode.
+      borderColor: {
+        DEFAULT: token("border"),
       },
       fontFamily: {
         sans: [
@@ -37,19 +79,56 @@ export default {
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
       fontSize: {
-        // Small type scale: label / body / title / amount.
-        label: ["0.8125rem", { lineHeight: "1.125rem" }],
+        // Type scale (design spec). Weights are defaults; an explicit
+        // font-* utility still wins because fontWeight is emitted later.
+        display: ["2.5rem", { lineHeight: "2.625rem", fontWeight: "700" }],
+        amount: ["1.75rem", { lineHeight: "2rem", fontWeight: "650" }],
+        title: ["1.375rem", { lineHeight: "1.75rem", fontWeight: "650" }],
+        head: ["1.0625rem", { lineHeight: "1.5rem", fontWeight: "600" }],
         body: ["1rem", { lineHeight: "1.5rem" }],
-        title: ["1.25rem", { lineHeight: "1.75rem" }],
-        amount: ["1.75rem", { lineHeight: "2rem" }],
+        label: ["0.875rem", { lineHeight: "1.25rem" }],
+        caption: ["0.75rem", { lineHeight: "1rem", letterSpacing: "0.02em" }],
       },
       spacing: {
-        // Phone-first 4px grid plus a one-handed minimum touch target.
+        // Phone-first 4px grid plus touch-target minimums.
         gutter: "1rem",
-        touch: "2.75rem",
+        touch: "2.75rem", // 44px: any tappable thing
+        "touch-lg": "3rem", // 48px: main buttons
+        "touch-xl": "3.5rem", // 56px: the screen's main action
       },
       borderRadius: {
+        // Legacy: what existing pages use for both buttons and boxes.
         card: "0.5rem",
+        // New shape scale: cards/sheets 16px, buttons/inputs 12px.
+        panel: "1rem",
+        control: "0.75rem",
+      },
+      boxShadow: {
+        card: "var(--shadow)",
+      },
+      transitionDuration: {
+        toggle: "150ms",
+        sheet: "200ms",
+        progress: "300ms",
+      },
+      keyframes: {
+        "sheet-in": {
+          from: { transform: "translateY(100%)" },
+          to: { transform: "translateY(0)" },
+        },
+        "dialog-in": {
+          from: { opacity: "0", transform: "translate(-50%, -48%) scale(0.98)" },
+          to: { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+      },
+      animation: {
+        "sheet-in": "sheet-in 200ms ease-out",
+        "dialog-in": "dialog-in 200ms ease-out",
+        "fade-in": "fade-in 200ms ease-out",
       },
     },
   },

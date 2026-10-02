@@ -60,7 +60,7 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Change my password" })).toHaveAttribute(
       "href",
-      "/account",
+      "/settings/account",
     );
     expect(screen.getByRole("heading", { name: "Advanced" })).toBeInTheDocument();
     expect(screen.getByText("test push control")).toBeInTheDocument();

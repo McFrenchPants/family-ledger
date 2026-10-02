@@ -45,7 +45,7 @@ export function useRecentActivity(memberId: string): RecentActivityState {
       try {
         const { data, error } = await supabase
           .from("ledger_transactions")
-          .select("id, description, amount_cents, type, occurred_on, created_at, category:categories(name)")
+          .select("id, description, amount_cents, type, occurred_on, created_at, voided_at, category:categories(name)")
           .eq("member_id", memberId)
           .order("occurred_on", { ascending: false })
           .order("created_at", { ascending: false })

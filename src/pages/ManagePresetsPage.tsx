@@ -275,7 +275,7 @@ function PresetRow({
             <button
               type="submit"
               disabled={busy}
-              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-white disabled:opacity-60"
+              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-on-accent disabled:opacity-60"
             >
               Save
             </button>
@@ -490,7 +490,7 @@ function AddPresetForm({
         <button
           type="submit"
           disabled={state.status === "submitting"}
-          className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
+          className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
         >
           {state.status === "submitting" ? "Adding…" : "Add preset"}
         </button>

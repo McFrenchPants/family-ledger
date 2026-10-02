@@ -211,6 +211,22 @@ export function addDays(date: CalendarDate, days: number): CalendarDate {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Whole days from `from` to `to` (positive when `to` is later). Calendar
+ * labels only -- UTC arithmetic on zone-less dates, so no DST skew.
+ *
+ * @example daysBetween("2026-09-15", "2026-10-02") // 17
+ */
+export function daysBetween(from: CalendarDate, to: CalendarDate): number {
+  assertCalendarDate(from, "First date");
+  assertCalendarDate(to, "Second date");
+  const toUtc = (date: CalendarDate) => {
+    const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+    return Date.UTC(year, month - 1, day);
+  };
+  return Math.round((toUtc(to) - toUtc(from)) / 86_400_000);
+}
+
 /** True if `due` is today in the household's zone. */
 export function isDueToday(
   due: CalendarDate,
@@ -232,4 +248,37 @@ export function isOverdue(
   now: Date = new Date(),
 ): boolean {
   return compareCalendarDates(due, todayInZone(timeZone, now)) < 0;
+}
+
+const displayFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * A calendar date as words for display: "Oct 15" (`"short"`), "October"
+ * (`"month"`), or "Friday, October 2" (`"long"`).
+ *
+ * A `YYYY-MM-DD` label carries no zone, so it is rendered as the UTC day it
+ * names -- this never consults the host's zone. To show *today*, pass
+ * `todayInZone(householdZone)`.
+ */
+export function formatCalendarDate(
+  date: CalendarDate,
+  style: "short" | "month" | "long" = "short",
+  locale = "en-US",
+): string {
+  assertCalendarDate(date, "Date");
+  const key = `${locale}|${style}`;
+  let formatter = displayFormatterCache.get(key);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      timeZone: "UTC",
+      ...(style === "short"
+        ? { month: "short", day: "numeric" }
+        : style === "month"
+          ? { month: "long" }
+          : { weekday: "long", month: "long", day: "numeric" }),
+    });
+    displayFormatterCache.set(key, formatter);
+  }
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  return formatter.format(new Date(Date.UTC(year, month - 1, day)));
 }

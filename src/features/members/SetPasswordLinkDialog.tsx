@@ -84,7 +84,7 @@ export function SetPasswordLinkDialog({
         <button
           type="button"
           onClick={() => void handleCopy()}
-          className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-white"
+          className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-on-accent"
         >
           Copy link
         </button>

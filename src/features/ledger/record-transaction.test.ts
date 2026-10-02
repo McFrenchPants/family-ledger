@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRecordMemberOptions, validateRecordForm, validateVoidReason } from "./record-transaction";
+import { PAYMENT_RECORDED_MESSAGES } from "../../lib/messages";
+import {
+  buildRecordMemberOptions,
+  paymentRecordedMessage,
+  validateRecordForm,
+  validateVoidReason,
+} from "./record-transaction";
 
 describe("buildRecordMemberOptions", () => {
   it("returns only active Children, excluding Parents", () => {
@@ -121,5 +127,21 @@ describe("validateVoidReason", () => {
       ok: true,
       reason: "entered twice by mistake",
     });
+  });
+});
+
+describe("paymentRecordedMessage", () => {
+  it("names the child and the positive amount, stable for one payment", () => {
+    const text = paymentRecordedMessage("payment", "Alex", -4000, "tx-1", "en-US");
+    expect(text).toContain("Alex");
+    expect(text).toContain("$40.00");
+    expect(text).not.toContain("-$");
+    expect(paymentRecordedMessage("payment", "Alex", -4000, "tx-1", "en-US")).toBe(text);
+    const all = PAYMENT_RECORDED_MESSAGES.map((t) => t({ name: "Alex", amount: "$40.00" }));
+    expect(all).toContain(text);
+  });
+
+  it("says nothing for an adjustment", () => {
+    expect(paymentRecordedMessage("adjustment", "Alex", -4000, "tx-1", "en-US")).toBeNull();
   });
 });

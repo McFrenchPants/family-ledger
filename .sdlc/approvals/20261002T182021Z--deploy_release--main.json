@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "2283b5810ed7ab5f968051232c1622d3cb5866c3",
+  "approved_at": "2026-10-02T18:20:21Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "promote main to production and give me the list of steps I need to perform to support that deployment",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-02T18:21:50Z",
+  "consumed_by": "supervisor-agent-2026-10-02",
+  "notes": "Promotes UI redesign docs/mockups and UI1 (front-end only: Settings page, role-aware menu, role redirect). No migrations, Edge Function changes, or secrets. Preconditions: typecheck, lint, 337 tests, build, wrangler deploy --dry-run all green on main at this SHA. Ran: git checkout production; git merge --no-ff main (production 7bc91da -> 94cf465); git push origin production. No wrangler deploy (Cloudflare builds from production). Hosted migration 20260908100000 status not checked (project deliberately not linked); no live curl verification done."
+}

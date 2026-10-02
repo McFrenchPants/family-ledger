@@ -5,6 +5,8 @@ import {
   addDays,
   calendarDateInZone,
   compareCalendarDates,
+  daysBetween,
+  formatCalendarDate,
   isDueToday,
   isOverdue,
   isValidCalendarDate,
@@ -176,6 +178,23 @@ describe("compareCalendarDates", () => {
   });
 });
 
+describe("daysBetween", () => {
+  it.each([
+    ["2026-09-15", "2026-10-02", 17],
+    ["2026-10-02", "2026-10-02", 0],
+    ["2026-10-05", "2026-10-02", -3],
+    ["2026-12-31", "2027-01-01", 1],
+    ["2024-02-28", "2024-03-01", 2], // leap year
+    ["2026-03-07", "2026-03-09", 2], // across a US DST change: still whole days
+  ])("daysBetween(%s, %s) === %i", (from, to, expected) => {
+    expect(daysBetween(from, to)).toBe(expected);
+  });
+
+  it("rejects invalid dates", () => {
+    expect(() => daysBetween("2026-02-30", "2026-03-01")).toThrow(RangeError);
+  });
+});
+
 describe("addDays", () => {
   it.each([
     ["2026-01-01", 1, "2026-01-02"],
@@ -238,5 +257,20 @@ describe("isDueToday / isOverdue — evaluated in the household zone", () => {
     for (const zone of ["Europe/Paris", "America/Los_Angeles", "UTC", "Pacific/Auckland"]) {
       expect(isOverdue("2099-01-01", zone, instant)).toBe(false);
     }
+  });
+});
+
+describe("formatCalendarDate", () => {
+  it("renders the labelled day, independent of any zone", () => {
+    expect(formatCalendarDate("2026-10-15")).toBe("Oct 15");
+    expect(formatCalendarDate("2026-10-15", "month")).toBe("October");
+    expect(formatCalendarDate("2026-10-02", "long")).toBe("Friday, October 2");
+    // Year boundaries do not drift a day.
+    expect(formatCalendarDate("2026-01-01")).toBe("Jan 1");
+    expect(formatCalendarDate("2025-12-31")).toBe("Dec 31");
+  });
+
+  it("rejects an invalid date", () => {
+    expect(() => formatCalendarDate("2026-02-30")).toThrow(RangeError);
   });
 });

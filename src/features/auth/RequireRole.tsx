@@ -9,7 +9,7 @@ import type { MembershipRole } from "./membership-context";
  * `household_members` row (from MembershipProvider) has the given role.
  *
  * This is routing convenience, not a security control -- a Child who
- * tampers with the client and lands on `/parent` anyway gains nothing,
+ * tampers with the client and lands on a Parent route anyway gains nothing,
  * because every balance-affecting read/write is independently checked by
  * Postgres RLS / security-definer functions regardless of which route
  * rendered. This component only decides which placeholder page a browser
@@ -55,7 +55,7 @@ export function RequireRole({ role, children }: { role: MembershipRole; children
 
     case "loaded":
       if (membership.membership.role !== role) {
-        return <Navigate to={membership.membership.role === "parent" ? "/parent" : "/child"} replace />;
+        return <Navigate to="/home" replace />;
       }
 
       return <>{children}</>;

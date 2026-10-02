@@ -22,8 +22,7 @@ function renderGuarded(state: MembershipState, role: "parent" | "child" = "paren
             element={<RequireRole role={role}>protected content</RequireRole>}
           />
           <Route path="/sign-in" element={<p>sign-in page</p>} />
-          <Route path="/parent" element={<p>parent page</p>} />
-          <Route path="/child" element={<p>child page</p>} />
+          <Route path="/home" element={<p>home page</p>} />
         </Routes>
       </MemoryRouter>
     </MembershipContext.Provider>,
@@ -81,7 +80,7 @@ describe("RequireRole", () => {
     expect(screen.getByText("protected content")).toBeInTheDocument();
   });
 
-  it("redirects a child away from a parent-only route", () => {
+  it("redirects a child away from a parent-only route to /home", () => {
     renderGuarded(
       {
         status: "loaded",
@@ -96,10 +95,10 @@ describe("RequireRole", () => {
       "parent",
     );
 
-    expect(screen.getByText("child page")).toBeInTheDocument();
+    expect(screen.getByText("home page")).toBeInTheDocument();
   });
 
-  it("redirects a parent away from a child-only route", () => {
+  it("redirects a parent away from a child-only route to /home", () => {
     renderGuarded(
       {
         status: "loaded",
@@ -114,6 +113,6 @@ describe("RequireRole", () => {
       "child",
     );
 
-    expect(screen.getByText("parent page")).toBeInTheDocument();
+    expect(screen.getByText("home page")).toBeInTheDocument();
   });
 });

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   buildRecordMemberOptions,
+  paymentRecordedMessage,
   validateRecordForm,
 } from "../features/ledger/record-transaction";
 import type { RecordFormErrors, RecordTransactionType } from "../features/ledger/record-transaction";
+import { Icon } from "../components/ui/Icon";
 import { useAddExpenseFormData } from "../features/ledger/useAddExpenseFormData";
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership } from "../features/auth/membership-context";
@@ -106,6 +108,8 @@ type SubmitState =
        * confirmation, unchanged from Phase 1.
        */
       periodEffect: PeriodEffect | null;
+      /** A light "nice one" line; payments only, null for an adjustment. */
+      encouragement: string | null;
     };
 
 const PERIOD_STATUS_LABELS: Record<PaymentPeriodStatus, string> = {
@@ -180,6 +184,10 @@ const TYPE_COPY: Record<
 function RecordForm({ membership }: { membership: Membership }) {
   const formData = useAddExpenseFormData(membership.householdId);
   const navigate = useNavigate();
+  // `?child=<memberId>` (from Parent Home) picks the initial child, only if
+  // it is in the roster this form already loaded; otherwise ignored.
+  const [searchParams] = useSearchParams();
+  const requestedChild = searchParams.get("child");
 
   const [type, setType] = useState<RecordTransactionType>("payment");
   const [memberId, setMemberId] = useState("");
@@ -202,7 +210,10 @@ function RecordForm({ membership }: { membership: Membership }) {
 
     if (memberId === "") {
       const options = buildRecordMemberOptions(formData.activeMembers);
-      if (options[0]) {
+      const requested = options.find((option) => option.id === requestedChild);
+      if (requested) {
+        setMemberId(requested.id);
+      } else if (options[0]) {
         setMemberId(options[0].id);
       }
     }
@@ -249,6 +260,17 @@ function RecordForm({ membership }: { membership: Membership }) {
           Recorded a {formatCents(Math.abs(submitState.amountCents))}{" "}
           {TYPE_COPY[submitState.type].verb}.
         </p>
+        {submitState.encouragement && (
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="payment-encouragement"
+            className="flex items-center gap-2 text-body font-semibold text-settled"
+          >
+            <Icon name="checkc" />
+            {submitState.encouragement}
+          </p>
+        )}
         <p className="text-body font-medium">
           New balance:{" "}
           {submitState.balanceCents === null ? "unavailable" : formatCents(submitState.balanceCents)}
@@ -270,8 +292,8 @@ function RecordForm({ membership }: { membership: Membership }) {
         )}
         <button
           type="button"
-          onClick={() => navigate("/parent")}
-          className="inline-flex min-h-touch items-center justify-center rounded-card bg-settled px-4 text-body font-medium text-white"
+          onClick={() => navigate("/home")}
+          className="inline-flex min-h-touch items-center justify-center rounded-card bg-settled px-4 text-body font-medium text-on-ok"
         >
           Done
         </button>
@@ -293,7 +315,7 @@ function RecordForm({ membership }: { membership: Membership }) {
     const rpcName = type === "payment" ? "record_payment" : "record_adjustment";
 
     try {
-      const { error } = await supabase.rpc(rpcName, {
+      const { data: recorded, error } = await supabase.rpc(rpcName, {
         p_member_id: memberId,
         p_amount_cents: result.amountCents,
         p_description: description.trim(),
@@ -381,12 +403,25 @@ function RecordForm({ membership }: { membership: Membership }) {
         }
       }
 
+      // The RPC returns the new ledger row; its id seeds the line so it stays
+      // put for this payment. Without one, the amount and child still give a
+      // stable seed for this panel.
+      const recordedId = (recorded as { id?: string } | null)?.id;
+      const childName = options.find((option) => option.id === memberId)?.name ?? "Your child";
+      const encouragement = paymentRecordedMessage(
+        type,
+        childName,
+        result.amountCents,
+        recordedId ?? `${memberId}:${result.amountCents}:${occurredOn}`,
+      );
+
       setSubmitState({
         status: "done",
         type,
         amountCents: result.amountCents,
         balanceCents: balanceRow?.balance_cents ?? null,
         periodEffect,
+        encouragement,
       });
     } catch (caught) {
       setSubmitState({
@@ -414,7 +449,7 @@ function RecordForm({ membership }: { membership: Membership }) {
             onClick={() => setType(option)}
             aria-pressed={type === option}
             className={`min-h-touch flex-1 rounded-card px-3 text-body font-medium ${
-              type === option ? "bg-settled text-white" : "text-ink-muted"
+              type === option ? "bg-settled text-on-ok" : "text-ink-muted"
             }`}
           >
             {TYPE_COPY[option].label}
@@ -538,7 +573,7 @@ function RecordForm({ membership }: { membership: Membership }) {
         <button
           type="submit"
           disabled={submitState.status === "submitting"}
-          className="inline-flex min-h-touch items-center justify-center gap-2 rounded-card bg-settled px-4 text-body font-medium text-white disabled:opacity-60"
+          className="inline-flex min-h-touch items-center justify-center gap-2 rounded-card bg-settled px-4 text-body font-medium text-on-ok disabled:opacity-60"
         >
           <span aria-hidden="true">✓</span>
           {submitState.status === "submitting" ? "Saving…" : `Save ${copy.label}`}

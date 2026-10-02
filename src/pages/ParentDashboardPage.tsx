@@ -1,257 +1,599 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { AmountText } from "../components/ui/AmountText";
+import { Avatar } from "../components/ui/Avatar";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { cx } from "../components/ui/cx";
+import { EmptyState } from "../components/ui/EmptyState";
+import { Icon } from "../components/ui/Icon";
+import type { IconName } from "../components/ui/icon-paths";
+import { ProgressBar } from "../components/ui/ProgressBar";
+import { StatusChip } from "../components/ui/StatusChip";
 import { useMembership } from "../features/auth/membership-context";
-import { useHouseholdBalances } from "../features/ledger/useHouseholdBalances";
-import type {
-  ChildPaymentProgress,
-  PaymentPeriodStatus,
-} from "../features/payment-plans/useChildPaymentProgress";
-import { useHouseholdPaymentProgress } from "../features/payment-plans/useHouseholdPaymentProgress";
-import { formatCents } from "../lib/currency";
+import {
+  childCardView,
+  greeting,
+  householdTotal,
+  needsAttention,
+  orderChildren,
+  type AttentionItem,
+} from "../features/home/parent-home";
+import type { ChildBalance } from "../features/ledger/household-balances";
+import type { HouseholdRecentTransaction } from "../features/ledger/recent-activity";
+import {
+  useHouseholdBalances,
+  type HouseholdBalancesState,
+} from "../features/ledger/useHouseholdBalances";
+import {
+  useHouseholdRecentActivity,
+  type HouseholdRecentActivityState,
+} from "../features/ledger/useHouseholdRecentActivity";
+import {
+  useHouseholdTimezone,
+  type HouseholdTimezoneState,
+} from "../features/ledger/useHouseholdTimezone";
+import type { ChildPaymentProgress } from "../features/payment-plans/useChildPaymentProgress";
+import {
+  useHouseholdPaymentProgress,
+  type HouseholdPaymentProgressState,
+} from "../features/payment-plans/useHouseholdPaymentProgress";
+import { DeviceNudge } from "../features/push/DeviceNudge";
+import { formatCalendarDate, todayInZone, type CalendarDate } from "../lib/dates";
+import { EVERYONE_UP_TO_DATE, NO_ACTIVITY_TITLE } from "../lib/messages";
 
 /**
- * `RequireRole` guarantees `useMembership()` is `{status: "loaded", ...,
- * role: "parent"}` by the time this page renders (see RequireRole.tsx) --
- * only the household id is needed here.
+ * `/home` for a Parent. `HomePage` (via `MembershipGate`) guarantees the
+ * membership is loaded by the time this renders.
+ *
+ * Every number here comes from a server read already scoped by RLS
+ * (balances, plan status, recent rows); this page only arranges them. The
+ * links it shows (Record payment, Expense, Payment) lead to pages whose
+ * writes are independently re-checked server-side -- a link is never the
+ * control.
  */
 export function ParentDashboardPage() {
   const membership = useMembership();
 
   if (membership.status !== "loaded") {
-    // Unreachable under RequireRole; satisfies the type checker without
-    // duplicating RequireRole's loading/error UI.
+    // Unreachable under HomePage; satisfies the type checker.
     return null;
   }
 
-  return <HouseholdOverview householdId={membership.membership.householdId} />;
+  const { householdId, name } = membership.membership;
+  return <ParentHome householdId={householdId} name={name} />;
 }
 
-function HouseholdOverview({ householdId }: { householdId: string }) {
-  const balances = useHouseholdBalances(householdId);
+type ProgressMap = ReadonlyMap<string, ChildPaymentProgress | null>;
 
-  // `useHouseholdPaymentProgress` needs the roster's member ids, which only
-  // exist once `balances` has loaded -- but hooks must run unconditionally,
-  // so an empty list is passed until then (the hook itself treats an empty
-  // list as an immediate, harmless "loaded, nothing to show" state).
+function ParentHome({ householdId, name }: { householdId: string; name: string }) {
+  const balances = useHouseholdBalances(householdId);
+  const zone = useHouseholdTimezone(householdId);
+  const activity = useHouseholdRecentActivity(householdId);
+
+  // Plan progress needs the roster's ids, which exist only once balances
+  // have loaded; the hook treats an empty list as "loaded, nothing to show".
   const memberIds =
     balances.status === "loaded" ? balances.children.map((child) => child.memberId) : [];
   const progress = useHouseholdPaymentProgress(householdId, memberIds);
 
+  // "Today" and the time of day are the household's, never the browser's.
+  const timezone = zone.status === "loaded" ? zone.timezone : null;
+  const today: CalendarDate | null = timezone ? todayInZone(timezone) : null;
+
+  const children = balances.status === "loaded" ? balances.children : null;
+  // The progress hook answers "loaded, empty" for the empty pre-roster id
+  // list, and keeps that answer for one render after the roster arrives;
+  // only a map covering every child counts, so nobody flashes as "No plan".
+  const progressMap: ProgressMap | null =
+    progress.status === "loaded" &&
+    children !== null &&
+    children.every((child) => progress.progressByMemberId.has(child.memberId))
+      ? progress.progressByMemberId
+      : null;
+
+  const attention: AttentionItem[] | null =
+    children && progressMap && today ? needsAttention(children, progressMap, today) : null;
+
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-title font-semibold">Family Ledger</h2>
-      </div>
-
-      {balances.status === "loading" && (
-        <p role="status" className="text-label text-ink-subtle">
-          Loading balances…
-        </p>
-      )}
-
-      {balances.status === "error" && (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-owed">Could not load balances: {balances.message}</p>
-          <button
-            type="button"
-            onClick={balances.retry}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {balances.status === "loaded" && (
-        <>
-          {balances.children.length === 0 ? (
-            <p className="text-label text-ink-subtle">No active children in this household yet.</p>
-          ) : (
-            <>
-              {progress.status === "error" && (
-                <div role="alert" className="flex flex-col items-start gap-2">
-                  <p className="text-label text-owed">
-                    Could not load payment plan status: {progress.message}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={progress.retry}
-                    className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-
-              <ul className="flex flex-col gap-2">
-                {balances.children.map((child) => {
-                  const childProgress =
-                    progress.status === "loaded"
-                      ? (progress.progressByMemberId.get(child.memberId) ?? null)
-                      : undefined;
-
-                  return (
-                    <li key={child.memberId}>
-                      <Link
-                        to={`/child/${child.memberId}/history`}
-                        className="flex items-center justify-between rounded-card border border-surface-border px-4 py-3 hover:bg-surface-sunken"
-                      >
-                        <span className="flex flex-col gap-1">
-                          <span className="text-body font-medium">{child.name}</span>
-                          <PlanStatusChip progress={childProgress} />
-                        </span>
-                        <span className="text-body text-ink-muted">
-                          {formatCents(child.balanceCents)} owed
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
+    <div className="flex flex-col gap-4">
+      <header className="flex items-center justify-between gap-3">
+        <div className="flex flex-col">
+          {today && (
+            <span className="text-label text-subtle">{formatCalendarDate(today, "long")}</span>
           )}
-        </>
-      )}
+          <h1 className="text-title">{greeting(name, timezone)}</h1>
+        </div>
+        <Avatar name={name} />
+      </header>
 
-      <div className="flex gap-2">
-        <Link
-          to="/add-expense"
-          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white"
-        >
-          + Expense
-        </Link>
-        <Link
-          to="/record-payment"
-          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card border border-surface-border px-4 text-body font-medium text-ink"
-        >
-          Record Payment
-        </Link>
+      <div
+        className={cx(
+          "flex flex-col gap-4",
+          "min-[900px]:grid min-[900px]:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] min-[900px]:items-start min-[900px]:gap-6",
+          "min-[900px]:[grid-template-areas:'total_total'_'attention_recent'_'children_recent']",
+        )}
+      >
+        <div className="min-[900px]:[grid-area:attention]">
+          <NeedsAttention
+            hasChildren={children !== null && children.length > 0}
+            attention={attention}
+            progress={progress}
+            zone={zone}
+          />
+        </div>
+
+        {children && children.length > 0 && (
+          <div className="min-[900px]:[grid-area:total]">
+            <TotalCard roster={children} progressMap={progressMap} />
+          </div>
+        )}
+
+        <div className="min-[900px]:[grid-area:children]">
+          <ChildrenSection balances={balances} progressMap={progressMap} today={today} />
+        </div>
+
+        <div className="flex flex-col gap-3 min-[900px]:[grid-area:recent]">
+          <RecentActivityCard activity={activity} roster={children} />
+          <HouseholdTools />
+        </div>
       </div>
 
-      {/*
-        S6.1: a Parent-only CSV export of the whole household's ledger.
-        Placed here (not the top nav, which only carries role-dashboard/
-        sign-in links) so it sits alongside this dashboard's other
-        Parent-only actions -- discoverable the same way "Manage payment
-        plan" is on HistoryPage, and gated the same way: `/export` itself is
-        wrapped in `RequireRole role="parent"` in router.tsx, this link is
-        just where a Parent finds it.
-      */}
-      <div className="flex flex-wrap gap-2">
-        <Link
-          to="/export"
-          className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
-        >
-          Export ledger (CSV)
-        </Link>
-        {/*
-          M6.4: a Parent-only "Manage members" page (add/archive/restore/
-          rename household_members rows). Linked here for the same reason as
-          "Export ledger" just above -- `/members` itself is wrapped in
-          `RequireRole role="parent"` in router.tsx, this link is just where
-          a Parent finds it.
-        */}
-        <Link
-          to="/members"
-          className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
-        >
-          Manage members
-        </Link>
-        {/*
-          C1: a Parent-only "Manage categories" page (add/rename/deactivate/
-          reactivate `categories` rows). Linked here for the same reason as
-          "Manage members" just above -- `/parent/categories` itself is
-          wrapped in `RequireRole role="parent"` in router.tsx, this link is
-          just where a Parent finds it.
-        */}
-        <Link
-          to="/parent/categories"
-          className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
-        >
-          Manage categories
-        </Link>
-        {/*
-          C3: a Parent-only "Manage presets" page (add/edit/deactivate/
-          reactivate `expense_presets` rows). Linked here for the same reason
-          as "Manage categories" just above -- `/parent/presets` itself is
-          wrapped in `RequireRole role="parent"` in router.tsx, this link is
-          just where a Parent finds it.
-        */}
-        <Link
-          to="/parent/presets"
-          className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
-        >
-          Manage presets
-        </Link>
-      </div>
-    </section>
+      <DeviceNudge needsAttention={attention === null || attention.length > 0} />
+    </div>
   );
 }
 
-/**
- * Per-status chip styling/labels, matching `ChildDashboardPage.tsx`'s
- * `STATUS_CHIP_CLASSES`/`STATUS_LABELS` exactly (same label text, same
- * status->color mapping) so a Parent and a Child use the same status
- * vocabulary. Kept as a sibling copy here rather than an import -- page
- * files aren't meant to export UI-internals to one another.
- */
-const STATUS_CHIP_CLASSES: Record<PaymentPeriodStatus, string> = {
-  upcoming: "bg-surface-sunken text-ink-muted",
-  due: "bg-accent/10 text-accent",
-  partially_paid: "bg-accent/10 text-accent",
-  satisfied: "bg-settled/10 text-settled",
-  overdue: "bg-owed/10 text-owed",
-  waived: "bg-surface-sunken text-ink-muted",
-};
+/* ------------------------------------------------------------------ */
+/* Shared bits                                                          */
+/* ------------------------------------------------------------------ */
 
-const STATUS_LABELS: Record<PaymentPeriodStatus, string> = {
-  upcoming: "Upcoming",
-  due: "Due",
-  partially_paid: "Partially Paid",
-  satisfied: "Satisfied",
-  overdue: "Overdue",
-  waived: "Waived",
-};
+function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="flex flex-col items-start gap-2">
+      <p className="text-label text-danger">{message}</p>
+      <Button size="sm" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}
 
-/** Neutral chip for a child with no active payment plan at all. Distinct
- * both visually and textually from `satisfied` -- "No active plan" never
- * reads as "all caught up", per S3.3's acceptance criteria. */
-const NO_PLAN_CHIP_CLASSES = "bg-surface-sunken text-ink-subtle";
-
-/**
- * Renders a child's plan-status chip + due date within their dashboard row.
- *
- * `progress === undefined` means `useHouseholdPaymentProgress` hasn't
- * resolved yet (independent of whether balances have loaded) -- a
- * lightweight per-row loading label, so the balance list is never blocked
- * on plan status. `progress === null` means "loaded, no active plan" -- a
- * distinct neutral state from any real status, including `satisfied`.
- */
-function PlanStatusChip({
-  progress,
+/** A link styled like a small Button (Button itself renders a <button>). */
+function LinkButton({
+  to,
+  icon,
+  variant = "secondary",
+  children,
 }: {
-  progress: ChildPaymentProgress | null | undefined;
+  to: string;
+  icon: IconName;
+  variant?: "secondary" | "ok";
+  children: ReactNode;
 }) {
-  if (progress === undefined) {
-    return <span className="text-label text-ink-subtle">Loading plan status…</span>;
-  }
+  return (
+    <Link
+      to={to}
+      className={cx(
+        "inline-flex min-h-touch flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-control border px-3.5 text-label font-semibold",
+        "transition-colors duration-toggle motion-reduce:transition-none",
+        variant === "ok"
+          ? "border-ok-btn bg-ok-btn text-on-ok"
+          : "border-border-strong bg-surface text-ink hover:bg-sunken",
+      )}
+    >
+      <Icon name={icon} />
+      {children}
+    </Link>
+  );
+}
 
-  if (progress === null) {
+const childParam = (memberId: string) => `?child=${encodeURIComponent(memberId)}`;
+
+/* ------------------------------------------------------------------ */
+/* Needs attention                                                      */
+/* ------------------------------------------------------------------ */
+
+function NeedsAttention({
+  hasChildren,
+  attention,
+  progress,
+  zone,
+}: {
+  hasChildren: boolean;
+  attention: AttentionItem[] | null;
+  progress: HouseholdPaymentProgressState;
+  zone: HouseholdTimezoneState;
+}) {
+  // Each read fails on its own: a plan or settings error shows here, while
+  // the balances and children below still render.
+  if (progress.status === "error") {
     return (
-      <span className={`inline-flex w-fit rounded-card px-2 py-0.5 text-label font-medium ${NO_PLAN_CHIP_CLASSES}`}>
-        No active plan
-      </span>
+      <LoadError
+        message={`Could not load payment plans: ${progress.message}`}
+        onRetry={progress.retry}
+      />
+    );
+  }
+  if (zone.status === "error") {
+    return (
+      <LoadError
+        message={`Could not load your household settings: ${zone.message}`}
+        onRetry={zone.retry}
+      />
+    );
+  }
+  if (!hasChildren) return null;
+  if (attention === null) {
+    return (
+      <p role="status" className="text-label text-subtle">
+        Checking payment plans…
+      </p>
+    );
+  }
+  if (attention.length === 0) {
+    return (
+      <p data-testid="all-clear" className="flex items-center gap-2 text-body text-ok">
+        <Icon name="checkc" />
+        {EVERYONE_UP_TO_DATE}
+      </p>
     );
   }
 
   return (
-    <span className="flex items-center gap-2">
-      <span
-        className={`inline-flex w-fit rounded-card px-2 py-0.5 text-label font-medium ${STATUS_CHIP_CLASSES[progress.periodStatus]}`}
-      >
-        {STATUS_LABELS[progress.periodStatus]}
+    <section aria-labelledby="attention-heading">
+      <h2 id="attention-heading" className="mb-2 flex items-center gap-2 text-head">
+        Needs attention
+        <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-danger-soft px-2 py-0.5 text-label font-semibold text-danger">
+          {attention.length}
+          <span className="sr-only"> {attention.length === 1 ? "child" : "children"}</span>
+        </span>
+      </h2>
+      <ul className="flex flex-col gap-2.5">
+        {attention.map((item) => (
+          <AttentionCard key={item.memberId} item={item} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AttentionCard({ item }: { item: AttentionItem }) {
+  const overdue = item.kind === "overdue";
+  return (
+    <Card
+      as="li"
+      data-attention={item.kind}
+      className={cx(
+        "flex flex-col gap-2.5 border-l-4 px-3.5 py-3",
+        overdue ? "border-l-danger" : "border-l-warn",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 grow">
+          <p className="text-body font-semibold">{item.headline}</p>
+          <p className="text-label text-muted">{item.detail}</p>
+        </div>
+        <StatusChip kind={overdue ? "overdue" : "due"} label={item.chipLabel} />
+      </div>
+      <div className="flex">
+        <LinkButton to={`/new/payment${childParam(item.memberId)}`} icon="check">
+          Record payment<span className="sr-only"> for {item.name}</span>
+        </LinkButton>
+      </div>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Owed to the family                                                   */
+/* ------------------------------------------------------------------ */
+
+function TotalCard({
+  roster,
+  progressMap,
+}: {
+  roster: readonly ChildBalance[];
+  progressMap: ProgressMap | null;
+}) {
+  const total = householdTotal(roster, progressMap);
+  return (
+    <Card as="section" aria-labelledby="total-label">
+      <p id="total-label" className="text-label text-subtle">
+        Owed to the family
+      </p>
+      <div className="mt-1">
+        <AmountText cents={total.totalCents} variant="hero" srContext="owed to the family" />
+      </div>
+      <p className="mt-0.5 text-label text-muted">{total.summary}</p>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Children                                                             */
+/* ------------------------------------------------------------------ */
+
+function ChildrenSection({
+  balances,
+  progressMap,
+  today,
+}: {
+  balances: HouseholdBalancesState;
+  progressMap: ProgressMap | null;
+  today: CalendarDate | null;
+}) {
+  let body: ReactNode;
+  if (balances.status === "loading") {
+    body = (
+      <p role="status" className="text-label text-subtle">
+        Loading balances…
+      </p>
+    );
+  } else if (balances.status === "error") {
+    body = (
+      <LoadError message={`Could not load balances: ${balances.message}`} onRetry={balances.retry} />
+    );
+  } else if (balances.children.length === 0) {
+    body = (
+      <Card>
+        <EmptyState
+          icon="users"
+          title="No children yet"
+          action={
+            <Link
+              to="/family"
+              className="inline-flex min-h-touch items-center rounded-control px-2 text-label font-semibold text-accent-text"
+            >
+              Add a child in Family
+            </Link>
+          }
+        >
+          Once a child is added, their balance and plan show up here.
+        </EmptyState>
+      </Card>
+    );
+  } else {
+    body = (
+      <ul className="flex flex-col gap-3">
+        {orderChildren(balances.children, progressMap).map((child) => (
+          <ChildCard
+            key={child.memberId}
+            child={child}
+            progress={progressMap ? (progressMap.get(child.memberId) ?? null) : undefined}
+            today={today}
+          />
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <section aria-labelledby="children-heading">
+      <div className="mb-1 flex items-center justify-between">
+        <h2 id="children-heading" className="text-head">
+          Children
+        </h2>
+        <Link
+          to="/family"
+          className="inline-flex min-h-touch items-center rounded-control px-1 text-label font-semibold text-accent-text"
+        >
+          Manage
+        </Link>
+      </div>
+      {body}
+    </section>
+  );
+}
+
+function ChildCard({
+  child,
+  progress,
+  today,
+}: {
+  child: ChildBalance;
+  progress: ChildPaymentProgress | null | undefined;
+  today: CalendarDate | null;
+}) {
+  const view = childCardView(child.balanceCents, progress, today);
+  return (
+    <Card as="li" aria-label={child.name} data-testid="child-card">
+      <div className="flex items-center gap-3">
+        <Avatar name={child.name} />
+        <div className="min-w-0 grow">
+          <Link
+            to={`/family/${encodeURIComponent(child.memberId)}`}
+            className="inline-flex min-h-touch items-center text-head text-ink hover:underline"
+          >
+            {child.name}
+          </Link>
+          {view.chip && (
+            <div>
+              <StatusChip kind={view.chip.kind} label={view.chip.label} />
+            </div>
+          )}
+        </div>
+        <div className="text-right">
+          <AmountText
+            cents={child.balanceCents}
+            variant="hero"
+            srContext="owed"
+            className="!text-amount"
+          />
+          <p className="text-caption text-subtle" aria-hidden="true">
+            owed
+          </p>
+        </div>
+      </div>
+
+      {view.progress && (
+        <div className="mt-3">
+          <div className="flex items-baseline justify-between gap-2 text-label">
+            <span>{view.progress.text}</span>
+            <span className="text-subtle">{view.progress.dueLabel}</span>
+          </div>
+          <ProgressBar
+            className="mt-1.5"
+            value={view.progress.paidCents}
+            max={view.progress.minimumCents}
+            label={`${child.name}: paid this month`}
+            valueText={view.progress.text}
+            tone={view.progress.tone}
+          />
+        </div>
+      )}
+
+      <div className="mt-3 flex gap-2">
+        <LinkButton to={`/new/expense${childParam(child.memberId)}`} icon="plus">
+          Expense<span className="sr-only"> for {child.name}</span>
+        </LinkButton>
+        <LinkButton
+          to={`/new/payment${childParam(child.memberId)}`}
+          icon="check"
+          variant={progress?.periodStatus === "overdue" && child.balanceCents > 0 ? "ok" : "secondary"}
+        >
+          Payment<span className="sr-only"> from {child.name}</span>
+        </LinkButton>
+      </div>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Recent activity                                                      */
+/* ------------------------------------------------------------------ */
+
+function RecentActivityCard({
+  activity,
+  roster,
+}: {
+  activity: HouseholdRecentActivityState;
+  roster: readonly ChildBalance[] | null;
+}) {
+  const nameOf = new Map((roster ?? []).map((child) => [child.memberId, child.name]));
+
+  return (
+    <Card as="section" aria-labelledby="recent-activity-heading">
+      <div className="flex items-center justify-between">
+        <h2 id="recent-activity-heading" className="text-head">
+          Recent activity
+        </h2>
+        <Link
+          to="/activity"
+          className="inline-flex min-h-touch items-center rounded-control px-1 text-label font-semibold text-accent-text"
+        >
+          See all
+        </Link>
+      </div>
+
+      {activity.status === "loading" && (
+        <p role="status" className="mt-2 text-label text-subtle">
+          Loading recent activity…
+        </p>
+      )}
+
+      {activity.status === "error" && (
+        <div className="mt-2">
+          <LoadError
+            message={`Could not load recent activity: ${activity.message}`}
+            onRetry={activity.retry}
+          />
+        </div>
+      )}
+
+      {activity.status === "loaded" && activity.transactions.length === 0 && (
+        <p className="mt-2 text-label text-muted">{NO_ACTIVITY_TITLE}</p>
+      )}
+
+      {activity.status === "loaded" && activity.transactions.length > 0 && (
+        <ul className="mt-1">
+          {activity.transactions.map((transaction) => (
+            <ActivityRow
+              key={transaction.id}
+              transaction={transaction}
+              childName={nameOf.get(transaction.memberId) ?? null}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+const TYPE_LOOK: Record<string, { icon: IconName; box: string; label: string }> = {
+  payment: { icon: "dollar", box: "bg-ok-soft text-ok", label: "Payment" },
+  adjustment: { icon: "edit", box: "bg-accent-soft text-accent-text", label: "Adjustment" },
+  expense: { icon: "tag", box: "bg-sunken text-muted", label: "Expense" },
+};
+
+function ActivityRow({
+  transaction,
+  childName,
+}: {
+  transaction: HouseholdRecentTransaction;
+  childName: string | null;
+}) {
+  const look = TYPE_LOOK[transaction.type] ?? TYPE_LOOK.expense!;
+  const detail = transaction.type === "expense" ? transaction.categoryName : look.label;
+  const subline = [
+    formatCalendarDate(transaction.occurredOn, "short"),
+    detail,
+    childName,
+    transaction.isVoided ? "Voided" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <li
+      data-voided={transaction.isVoided ? "true" : undefined}
+      className="flex min-h-[60px] items-center gap-3 border-t border-border py-2.5 first:border-t-0"
+    >
+      <span className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-control", look.box)}>
+        <Icon name={look.icon} />
       </span>
-      <span className="text-label text-ink-subtle">Due {progress.dueDate}</span>
-    </span>
+      <span className="min-w-0 grow">
+        <span className="block truncate font-semibold">{transaction.description}</span>
+        <span className="block text-label text-subtle">{subline}</span>
+      </span>
+      <AmountText
+        cents={transaction.amountCents}
+        kind={transaction.amountCents > 0 ? "expense" : "payment"}
+        tone={transaction.isVoided ? "inherit" : transaction.type === "payment" ? "ok" : "ink"}
+        srContext={transaction.isVoided ? "voided" : undefined}
+        className={cx(transaction.isVoided && "text-subtle line-through")}
+      />
+    </li>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Household tools                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Export, categories and presets have no other way in yet (Settings does not
+ * link them), so they stay reachable here as one quiet line. Each route is
+ * Parent-only in the router and server-side regardless of this link.
+ */
+function HouseholdTools() {
+  const links = [
+    { to: "/settings/export", label: "Export ledger" },
+    { to: "/settings/categories", label: "Categories" },
+    { to: "/settings/presets", label: "Presets" },
+  ];
+  return (
+    <nav aria-label="Household tools" className="flex flex-wrap items-center gap-x-1 text-label text-muted">
+      {links.map((link) => (
+        <Link
+          key={link.to}
+          to={link.to}
+          className="inline-flex min-h-touch items-center rounded-control px-2 font-semibold text-accent-text"
+        >
+          {link.label}
+        </Link>
+      ))}
+    </nav>
   );
 }

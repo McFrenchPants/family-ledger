@@ -45,8 +45,7 @@ export function RoleHomeRedirect() {
       );
 
     case "loaded":
-      return (
-        <Navigate to={membership.membership.role === "parent" ? "/parent" : "/child"} replace />
-      );
+      // Both roles share one home address; `/home` picks the dashboard.
+      return <Navigate to="/home" replace />;
   }
 }

@@ -14,8 +14,7 @@ function renderHome(state: MembershipState) {
         <Routes>
           <Route path="/" element={<RoleHomeRedirect />} />
           <Route path="/sign-in" element={<p>sign-in page</p>} />
-          <Route path="/parent" element={<p>parent page</p>} />
-          <Route path="/child" element={<p>child page</p>} />
+          <Route path="/home" element={<p>home page</p>} />
         </Routes>
       </MemoryRouter>
     </MembershipContext.Provider>,
@@ -28,14 +27,14 @@ const member = (role: "parent" | "child"): MembershipState => ({
 });
 
 describe("RoleHomeRedirect", () => {
-  it("sends a parent to /parent", () => {
+  it("sends a parent to /home", () => {
     renderHome(member("parent"));
-    expect(screen.getByText("parent page")).toBeInTheDocument();
+    expect(screen.getByText("home page")).toBeInTheDocument();
   });
 
-  it("sends a child to /child", () => {
+  it("sends a child to /home", () => {
     renderHome(member("child"));
-    expect(screen.getByText("child page")).toBeInTheDocument();
+    expect(screen.getByText("home page")).toBeInTheDocument();
   });
 
   it("sends a signed-out visitor to /sign-in", () => {

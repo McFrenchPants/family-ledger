@@ -54,7 +54,7 @@ export function SettingsPage() {
       <Section title="Account">
         <SessionStatus />
         <Link
-          to="/account"
+          to="/settings/account"
           className="inline-flex min-h-touch items-center self-start text-label text-accent underline"
         >
           Change my password

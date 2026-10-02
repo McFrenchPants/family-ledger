@@ -357,7 +357,7 @@ function MemberRow({
             <button
               type="submit"
               disabled={busy}
-              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-white disabled:opacity-60"
+              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-on-accent disabled:opacity-60"
             >
               Save
             </button>
@@ -450,7 +450,7 @@ function MemberRow({
                   type="button"
                   disabled={busy}
                   onClick={() => void runStatusChange("archive")}
-                  className="min-h-touch rounded-card bg-owed px-3 text-label font-medium text-white disabled:opacity-60"
+                  className="min-h-touch rounded-card bg-owed px-3 text-label font-medium text-on-danger disabled:opacity-60"
                 >
                   Confirm archive
                 </button>
@@ -494,7 +494,7 @@ function MemberRow({
               type="button"
               disabled={busy}
               onClick={() => void handleRoleConfirmed()}
-              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-white disabled:opacity-60"
+              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-on-accent disabled:opacity-60"
             >
               Confirm role change
             </button>
@@ -528,7 +528,7 @@ function MemberRow({
             <button
               type="submit"
               disabled={busy}
-              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-white disabled:opacity-60"
+              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-on-accent disabled:opacity-60"
             >
               Save email
             </button>
@@ -691,7 +691,7 @@ function AddMemberForm({
           <button
             type="submit"
             disabled={state.status === "submitting"}
-            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
+            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
           >
             {state.status === "submitting" ? "Adding…" : "Add member"}
           </button>

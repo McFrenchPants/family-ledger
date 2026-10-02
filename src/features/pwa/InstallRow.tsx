@@ -64,7 +64,7 @@ export function InstallRow() {
           <button
             type="button"
             onClick={() => void handleInstallClick()}
-            className="inline-flex min-h-touch items-center justify-center self-start rounded-card bg-accent px-4 text-body font-medium text-white"
+            className="inline-flex min-h-touch items-center justify-center self-start rounded-card bg-accent px-4 text-body font-medium text-on-accent"
           >
             Install
           </button>
