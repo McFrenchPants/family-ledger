@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 
+import { useSession } from "../features/auth/session-context";
 import { SessionStatus } from "../features/auth/SessionStatus";
 import { InstallBanner } from "../features/pwa/InstallBanner";
 import { PushSubscribeButton } from "../features/push/PushSubscribeButton";
@@ -14,11 +15,13 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   ].join(" ");
 
 export function RootLayout() {
+  const { session } = useSession();
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-screen-sm flex-col bg-surface">
       <header className="border-b border-surface-border px-gutter py-3">
         <h1 className="text-title font-semibold">Family Ledger</h1>
-        <nav aria-label="Main" className="mt-2 flex gap-2">
+        <nav aria-label="Main" className="mt-2 flex flex-wrap gap-2">
           <NavLink to="/parent" className={navLinkClass}>
             Parent
           </NavLink>
@@ -28,6 +31,11 @@ export function RootLayout() {
           <NavLink to="/sign-in" className={navLinkClass}>
             Sign in
           </NavLink>
+          {session && (
+            <NavLink to="/account" className={navLinkClass}>
+              Change my password
+            </NavLink>
+          )}
         </nav>
 
         <div className="mt-2">

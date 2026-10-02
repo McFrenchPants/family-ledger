@@ -22,14 +22,14 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path to extensions, public, pg_catalog;
 
-select plan(18);
+select plan(25);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures
 -- ---------------------------------------------------------------------------
 --
 -- Household A: Parent (PA), three Children (CA1, CA2, CA3 -- CA3 never gets
--- a subscription, used to prove household_member_push_status reports an
+-- a subscription, used to prove household_member_push_status() reports an
 -- accurate `false`).
 -- Household B: Parent (PB) -- used for the cross-household rejection case.
 --
@@ -201,7 +201,7 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Criterion 7: a Parent can query household_member_push_status for their own
+-- Criterion 7: a Parent can call household_member_push_status() for their own
 -- household's members and see accurate existence info.
 -- ---------------------------------------------------------------------------
 
@@ -209,41 +209,43 @@ set local role authenticated;
 set local request.jwt.claims to '{"sub":"a1000000-0000-0000-0000-00000000a001","role":"authenticated"}';
 
 select is(
-  (select has_subscription from public.household_member_push_status
+  (select has_subscription from public.household_member_push_status('a0000000-0000-0000-0000-0000000000a1')
     where household_member_id = 'a2000000-0000-0000-0000-00000000a002'),
   true,
   'Criterion 7a: Parent sees has_subscription = true for a child with a subscription'
 );
 
 select is(
-  (select has_subscription from public.household_member_push_status
+  (select has_subscription from public.household_member_push_status('a0000000-0000-0000-0000-0000000000a1')
     where household_member_id = 'a2000000-0000-0000-0000-00000000a003'),
   true,
   'Criterion 7b: Parent sees has_subscription = true for a child with a (surviving) subscription'
 );
 
 select is(
-  (select has_subscription from public.household_member_push_status
+  (select has_subscription from public.household_member_push_status('a0000000-0000-0000-0000-0000000000a1')
     where household_member_id = 'a2000000-0000-0000-0000-00000000a004'),
   false,
   'Criterion 7c: Parent sees has_subscription = false for a child with no subscription'
 );
 
+select is(
+  (select count(*) from public.household_member_push_status('a0000000-0000-0000-0000-0000000000a1')),
+  4::bigint,
+  'Criterion 7d: Parent sees every active member of their own household (Parent + 3 children)'
+);
+
 -- ---------------------------------------------------------------------------
 -- Criterion 8: querying/selecting raw p256dh/auth values for another member
--- is rejected, both via the view (which never exposes them) and via direct
+-- is rejected, both via the function (which never returns them) and via direct
 -- table access.
 -- ---------------------------------------------------------------------------
 
-select isnt(
-  exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'household_member_push_status'
-      and column_name in ('p256dh', 'auth')
-  ),
-  true,
-  'Criterion 8a: household_member_push_status does not expose p256dh/auth columns at all'
+select is(
+  (select pg_catalog.pg_get_function_result(
+     'public.household_member_push_status(uuid)'::regprocedure)),
+  'TABLE(household_member_id uuid, has_subscription boolean)',
+  'Criterion 8a: household_member_push_status() returns only household_member_id + has_subscription (no p256dh/auth)'
 );
 
 select is(
@@ -257,24 +259,79 @@ reset role;
 
 -- ---------------------------------------------------------------------------
 -- Criterion 9: a Parent of household B cannot see household A's members'
--- push status via the view.
+-- push status via the function, even by passing household A's id.
 -- ---------------------------------------------------------------------------
 
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"a1000000-0000-0000-0000-00000000b001","role":"authenticated"}';
 
 select is(
-  (select count(*) from public.household_member_push_status
-    where household_member_id in (
-      'a2000000-0000-0000-0000-00000000a002',
-      'a2000000-0000-0000-0000-00000000a003',
-      'a2000000-0000-0000-0000-00000000a004'
-    )),
+  (select count(*) from public.household_member_push_status('a0000000-0000-0000-0000-0000000000a1')),
   0::bigint,
-  'Criterion 9: a Parent of a different household sees zero rows for another household''s members via the view'
+  'Criterion 9: a Parent of a different household passing household A''s id gets zero rows'
+);
+
+select is(
+  (select count(*) from public.household_member_push_status('a0000000-0000-0000-0000-0000000000b1')),
+  1::bigint,
+  'Criterion 9b: that same Parent still sees their own household (just themselves)'
 );
 
 reset role;
+
+-- Child sees only their own row.
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"a1000000-0000-0000-0000-00000000a002","role":"authenticated"}';
+
+select results_eq(
+  $$ select household_member_id from public.household_member_push_status('a0000000-0000-0000-0000-0000000000a1') $$,
+  $$ values ('a2000000-0000-0000-0000-00000000a002'::uuid) $$,
+  'Criterion 9c: a Child sees only their own row'
+);
+
+reset role;
+
+-- An archived member gets nothing (current_household_member_id requires active).
+update public.household_members set status = 'archived'
+  where id = 'a2000000-0000-0000-0000-00000000a002';
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"a1000000-0000-0000-0000-00000000a002","role":"authenticated"}';
+
+select is(
+  (select count(*) from public.household_member_push_status('a0000000-0000-0000-0000-0000000000a1')),
+  0::bigint,
+  'Criterion 9d: an archived member gets zero rows'
+);
+
+reset role;
+
+-- ...and a Parent no longer sees the archived member (status = 'active' filter).
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"a1000000-0000-0000-0000-00000000a001","role":"authenticated"}';
+
+select is(
+  (select count(*) from public.household_member_push_status('a0000000-0000-0000-0000-0000000000a1')
+    where household_member_id = 'a2000000-0000-0000-0000-00000000a002'),
+  0::bigint,
+  'Criterion 9d2: a Parent does not see an archived member'
+);
+
+reset role;
+
+-- Privileges / shape.
+select ok(
+  not has_function_privilege('anon', 'public.household_member_push_status(uuid)', 'execute')
+  and not has_function_privilege('public', 'public.household_member_push_status(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.household_member_push_status(uuid)', 'execute'),
+  'Criterion 9e: anon/public cannot execute household_member_push_status(); authenticated can'
+);
+
+select is(
+  to_regclass('public.household_member_push_status'),
+  null,
+  'Criterion 9f: the old household_member_push_status view no longer exists'
+);
 
 -- ---------------------------------------------------------------------------
 -- Criterion 10: no audit_log row appears after a subscribe/unsubscribe

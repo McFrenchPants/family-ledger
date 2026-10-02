@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "fd39ca5e4e004a3c9f7f2b21a361e49e0f4ddd90",
+  "approved_at": "2026-10-01T18:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Go ahead and do whatever checks you need, and update documentation, etc. Merge and promote when ready.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-01T18:05:00Z",
+  "consumed_by": "orchestrator-session-2026-10-01",
+  "notes": "Preconditions: typecheck, lint, tests, build green on main at this SHA. Changes since last promotion: bootstrap script, runbook, docs only; no app-code change."
+}

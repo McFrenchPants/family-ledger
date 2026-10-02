@@ -119,6 +119,35 @@ Parent is required to add anyone else.
   Use the app's own **Export → full backup** regularly (monthly is sensible)
   and keep the file somewhere safe.
 
+## 7a. Releasing account management (one-time hosted steps)
+
+The account-management release (set-password links, change password, role/email
+changes, archive-blocks-login) needs these in addition to the normal deploy.
+Do them in this order, **before** promoting to `production` (otherwise the new
+screens will call things that do not exist yet):
+
+1. Apply the new database migration (`20260908090000_...`):
+   ```bash
+   npx supabase db push --linked
+   ```
+2. Tell the functions the app's address (an https address, no trailing slash):
+   ```bash
+   npx supabase secrets set APP_BASE_URL=https://family-ledger.mcfrench.workers.dev --project-ref fsszkclgeekdyyspgrhg
+   ```
+3. Deploy both functions (one is new, one changed):
+   ```bash
+   npx supabase functions deploy --project-ref fsszkclgeekdyyspgrhg
+   ```
+4. Supabase dashboard, **Authentication → Providers → Email**: set
+   **Email OTP Expiration** to `86400` (24 hours, the Free maximum) and
+   **Minimum password length** to `8`. (The set-password links last exactly
+   as long as this setting; the app tells people 24 hours.)
+5. Then ask the agent to promote `main` to `production`.
+
+Until step 1 is done the old Manage Members page's Archive/Restore buttons
+stop working (the database no longer allows direct status edits), so do not
+promote first.
+
 ## 8. Costs
 
 All three services are on free plans, so the running cost is **$0/month**.
@@ -145,7 +174,6 @@ Things that could change that:
 
 ## 10. Known gaps (as of 2026-10-01)
 
-- There is no "change my own password" screen yet, and the first login uses a
-  placeholder password. Ask the agent to add the screen (or to reset it for
-  you) before anyone else uses the app.
+- The first login was created with a placeholder password. Once account
+  management is released, change it at **Change my password** (`/account`).
 - iPhone push validation still needs doing against the live site.

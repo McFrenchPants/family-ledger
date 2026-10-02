@@ -28,22 +28,37 @@
 //      real server-side re-derivation, not trust in anything the client
 //      claims about itself.
 //   3. Create the auth.users row via the Admin API, with a server-generated
-//      password (never a client-chosen one -- see the header comment in the
-//      SQL migration for why: simpler, avoids weak-password client input
-//      entirely) and email_confirm: true (no email provider in this
+//      unguessable password that NOBODY sees (never returned, never logged,
+//      never client-chosen) and email_confirm: true (no email provider in this
 //      project's cost guardrail, so there is no confirmation flow to run).
 //   4. Call add_household_member() with the caller's own JWT.
 //   5. If step 4 fails, best-effort delete the auth.users row created in
 //      step 3 so a rejected request never leaves an orphaned, credentialed
 //      account with no household link. Cleanup failure is logged but does
 //      not mask the original error.
+//   6. Mint a one-time set-password link (shared helper, same as the
+//      manage-household-member create_link action) and return it INSTEAD of a
+//      password. The person chooses their own password from that link. If
+//      minting fails the member is NOT rolled back: the response still
+//      succeeds with set_password_url: null and set_password_link_failed:
+//      true, and the Parent can create a link later.
 //
 // Authorization failures are intentionally generic ("not authorized to add a
 // member to this household") and never distinguish "household does not
 // exist" from "you are not a Parent of it" -- mirroring
 // add_household_member()'s own error semantics.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  errorResponse,
+  getAppBaseUrl,
+  jsonResponse,
+  LINK_EXPIRY_HOURS,
+  makeAdminClient,
+  makeCallerClient,
+  mintSetPasswordLink,
+  preflightResponse,
+  recordLinkCreated,
+} from "../_shared/member-admin.ts";
 
 type Role = "parent" | "child";
 
@@ -54,25 +69,8 @@ interface AddMemberRequest {
   email?: unknown;
 }
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function errorResponse(message: string, status: number): Response {
-  // Deliberately just { error }: no stack traces, no internal exception
-  // shapes, no hint about which internal step failed.
-  return jsonResponse({ error: message }, status);
-}
-
-/** A URL-safe, high-entropy initial password. Never persisted beyond Auth's own hash. */
-function generateInitialPassword(): string {
+/** A URL-safe, high-entropy placeholder password nobody ever sees. Never returned or logged. */
+function generateUnseenPassword(): string {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
   // base64url, no padding -- 24 random bytes -> 32 chars, well past this
@@ -84,6 +82,7 @@ function generateInitialPassword(): string {
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return preflightResponse();
   if (req.method !== "POST") {
     return errorResponse("method not allowed", 405);
   }
@@ -124,10 +123,7 @@ Deno.serve(async (req: Request) => {
   // A client anchored to the caller's own session. Used for auth.getUser(),
   // the Parent-check read (RLS-scoped), and the eventual
   // add_household_member() call -- never for the Admin API.
-  const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const callerClient = makeCallerClient(authHeader);
 
   const {
     data: { user: caller },
@@ -170,15 +166,21 @@ Deno.serve(async (req: Request) => {
   // --- Create the auth.users row (Admin API, service_role) -------------
   // A separate client, built only from the Edge Function's own environment
   // (never from the request), used ONLY for the Admin API calls below.
-  const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const adminClient = makeAdminClient();
 
-  const initialPassword = generateInitialPassword();
+  // Fail closed BEFORE creating anything if links cannot be minted: a Parent
+  // would otherwise get a login nobody can ever set a password for.
+  const appBaseUrl = getAppBaseUrl();
+  if (!appBaseUrl) {
+    console.error("add-household-member: APP_BASE_URL is not set or invalid; refusing to add members");
+    return errorResponse("adding members is not configured", 500);
+  }
+
+  const unseenPassword = generateUnseenPassword();
 
   const { data: createdUser, error: createUserError } = await adminClient.auth.admin.createUser({
-    email,
-    password: initialPassword,
+    email: email.trim(),
+    password: unseenPassword,
     email_confirm: true, // no email provider in this project -- nothing to confirm
   });
 
@@ -216,11 +218,31 @@ Deno.serve(async (req: Request) => {
     return errorResponse("unable to add the household member", 400);
   }
 
+  const memberId = (newMember as { id: string } | null)?.id ?? null;
+
+  // --- Mint the set-password link ---------------------------------------
+  // The member now exists; a failure here must not undo that silently. The
+  // Parent can create a link later via manage-household-member.
+  let setPasswordUrl: string | null = null;
+  const url = await mintSetPasswordLink(adminClient, email.trim(), appBaseUrl);
+  if (url && memberId) {
+    const audited = await recordLinkCreated(adminClient, {
+      householdId,
+      actorId: caller.id,
+      memberId,
+    });
+    // No audit row -> the link is not handed out (it is cancelled by the next
+    // one minted).
+    if (audited) setPasswordUrl = url;
+  }
+
   return jsonResponse(
     {
-      id: (newMember as { id: string } | null)?.id ?? null,
+      id: memberId,
       user_id: newUserId,
-      initial_password: initialPassword,
+      set_password_url: setPasswordUrl,
+      expires_in_hours: LINK_EXPIRY_HOURS,
+      ...(setPasswordUrl ? {} : { set_password_link_failed: true }),
     },
     201,
   );

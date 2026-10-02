@@ -3,12 +3,21 @@ import type { FormEvent } from "react";
 
 import { useMembership } from "../features/auth/membership-context";
 import type { MembershipRole } from "../features/auth/membership-context";
+import { invokeFunction, sentence } from "../features/members/function-errors";
+import type { FunctionResult } from "../features/members/function-errors";
 import {
-  isLastActiveParentArchiveError,
+  describeRoleChangeError,
+  EMAIL_REFUSED_MESSAGE,
   LAST_ACTIVE_PARENT_ARCHIVE_MESSAGE,
+  LINK_RATE_LIMIT_MESSAGE,
+  NETWORK_MESSAGE,
+  TRY_AGAIN_MESSAGE,
 } from "../features/members/member-errors";
+import { SetPasswordLinkDialog } from "../features/members/SetPasswordLinkDialog";
+import type { SetPasswordLink } from "../features/members/SetPasswordLinkDialog";
 import { useHouseholdMembers } from "../features/members/useHouseholdMembers";
 import type { HouseholdMemberRow } from "../features/members/useHouseholdMembers";
+import { useLoginEmails } from "../features/members/useLoginEmails";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -17,7 +26,8 @@ import { supabase } from "../lib/supabase";
  * `useMembership()` is already `{status: "loaded", ..., role: "parent"}` --
  * see `ExportPage`'s identical assumption and header comment for why that
  * guard is routing convenience, not the security control. Every write this
- * page makes (add via the Edge Function, archive/restore/rename via the
+ * page makes (add / archive / restore / link / email change via Edge
+ * Functions, role change via a security-definer function, rename via the
  * normal RLS-scoped client) is independently re-checked server-side: the
  * Edge Function re-derives Parent-ness from the caller's own JWT, and
  * `household_members`'s RLS policies + M6.1's archive-guard trigger enforce
@@ -39,14 +49,33 @@ type AddMemberState =
   | { status: "idle" }
   | { status: "submitting" }
   | { status: "error"; message: string }
-  | { status: "done"; name: string; email: string; initialPassword: string };
+  | { status: "done"; name: string; linkFailed: boolean };
+
+const MANAGE = "manage-household-member";
+const NOT_ARCHIVED_LAST_PARENT = /only active Parent/i;
+
+/** Plain words for a failed Edge Function call; never shows raw internals. */
+function describeFailure(result: Extract<FunctionResult<unknown>, { ok: false }>): string {
+  if (result.status === 429) {
+    return LINK_RATE_LIMIT_MESSAGE;
+  }
+  if (result.message) {
+    return sentence(result.message);
+  }
+  return result.status === null ? NETWORK_MESSAGE : TRY_AGAIN_MESSAGE;
+}
 
 function ManageMembers({ householdId }: { householdId: string }) {
   const membersState = useHouseholdMembers(householdId);
+  const { emails, refetch: refetchEmails } = useLoginEmails(householdId);
+  // The one-time link lives only here, while its dialog is open.
+  const [link, setLink] = useState<SetPasswordLink | null>(null);
 
   return (
     <section className="flex flex-col gap-6">
       <h2 className="text-title font-semibold">Manage Members</h2>
+
+      {link && <SetPasswordLinkDialog link={link} onClose={() => setLink(null)} />}
 
       {membersState.status === "loading" && (
         <p role="status" className="text-label text-ink-subtle">
@@ -68,12 +97,26 @@ function ManageMembers({ householdId }: { householdId: string }) {
       )}
 
       {membersState.status === "loaded" && (
-        <MemberList members={membersState.members} refetch={membersState.refetch} />
+        <MemberList
+          members={membersState.members}
+          emails={emails}
+          refetch={membersState.refetch}
+          refetchEmails={refetchEmails}
+          onLink={setLink}
+        />
       )}
 
       <AddMemberForm
         householdId={householdId}
-        onAdded={() => {
+        onAdded={(added) => {
+          if (added.url) {
+            setLink({
+              url: added.url,
+              heading: `${added.name} was added`,
+              intro: `Send this link to ${added.name} so they can choose their password.`,
+            });
+          }
+          refetchEmails();
           if (membersState.status === "loaded") {
             membersState.refetch();
           }
@@ -90,10 +133,16 @@ const ROLE_LABELS: Record<MembershipRole, string> = {
 
 function MemberList({
   members,
+  emails,
   refetch,
+  refetchEmails,
+  onLink,
 }: {
   members: HouseholdMemberRow[];
+  emails: Record<string, string | null>;
   refetch: () => void;
+  refetchEmails: () => void;
+  onLink: (link: SetPasswordLink) => void;
 }) {
   if (members.length === 0) {
     return <p className="text-label text-ink-subtle">No members yet.</p>;
@@ -102,63 +151,162 @@ function MemberList({
   return (
     <ul className="flex flex-col gap-2">
       {members.map((member) => (
-        <MemberRow key={member.id} member={member} refetch={refetch} />
+        <MemberRow
+          key={member.id}
+          member={member}
+          email={emails[member.id] ?? null}
+          refetch={refetch}
+          refetchEmails={refetchEmails}
+          onLink={onLink}
+        />
       ))}
     </ul>
   );
 }
 
-type RowAction = { kind: "none" } | { kind: "confirm-archive" } | { kind: "rename"; draftName: string };
+type RowAction =
+  | { kind: "none" }
+  | { kind: "confirm-archive" }
+  | { kind: "rename"; draftName: string }
+  | { kind: "confirm-role" }
+  | { kind: "change-email"; draftEmail: string };
 
-function MemberRow({ member, refetch }: { member: HouseholdMemberRow; refetch: () => void }) {
+const smallButton =
+  "min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted disabled:opacity-60";
+
+function MemberRow({
+  member,
+  email,
+  refetch,
+  refetchEmails,
+  onLink,
+}: {
+  member: HouseholdMemberRow;
+  email: string | null;
+  refetch: () => void;
+  refetchEmails: () => void;
+  onLink: (link: SetPasswordLink) => void;
+}) {
   const [action, setAction] = useState<RowAction>({ kind: "none" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const isArchived = member.status === "archived";
+  const otherRole: MembershipRole = member.role === "parent" ? "child" : "parent";
 
-  async function handleArchiveConfirmed() {
+  function begin() {
     setBusy(true);
     setError(null);
+    setNotice(null);
+  }
 
-    const { error: updateError } = await supabase
-      .from("household_members")
-      .update({ status: "archived", archived_at: new Date().toISOString() })
-      .eq("id", member.id);
+  async function runStatusChange(kind: "archive" | "restore") {
+    begin();
+    const result = await invokeFunction(MANAGE, { action: kind, member_id: member.id });
+    setBusy(false);
+    setAction({ kind: "none" });
+
+    if (!result.ok) {
+      setError(
+        result.message && NOT_ARCHIVED_LAST_PARENT.test(result.message)
+          ? LAST_ACTIVE_PARENT_ARCHIVE_MESSAGE
+          : describeFailure(result),
+      );
+      return;
+    }
+
+    refetch();
+  }
+
+  async function handleRoleConfirmed() {
+    begin();
+
+    let failure: string | null = null;
+    try {
+      const { error: rpcError } = await supabase.rpc("change_household_member_role", {
+        p_member_id: member.id,
+        p_new_role: otherRole,
+      });
+      if (rpcError) {
+        failure = describeRoleChangeError(rpcError);
+      }
+    } catch {
+      failure = NETWORK_MESSAGE;
+    }
 
     setBusy(false);
+    setAction({ kind: "none" });
 
-    if (updateError) {
+    if (failure) {
+      setError(failure);
+      return;
+    }
+
+    refetch();
+  }
+
+  async function handleEmailSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (action.kind !== "change-email") {
+      return;
+    }
+
+    const newEmail = action.draftEmail.trim();
+    if (newEmail.length === 0) {
+      setError("Enter the new email address.");
+      return;
+    }
+
+    begin();
+    const result = await invokeFunction<{ email?: string }>(MANAGE, {
+      action: "change_email",
+      member_id: member.id,
+      email: newEmail,
+    });
+    setBusy(false);
+
+    if (!result.ok) {
+      // The function deliberately answers one generic way for a taken or
+      // unusable address; say that plainly rather than guessing why.
       setError(
-        isLastActiveParentArchiveError(updateError)
-          ? LAST_ACTIVE_PARENT_ARCHIVE_MESSAGE
-          : updateError.message,
+        result.message && /can't be used/i.test(result.message)
+          ? EMAIL_REFUSED_MESSAGE
+          : describeFailure(result),
       );
-      setAction({ kind: "none" });
       return;
     }
 
     setAction({ kind: "none" });
-    refetch();
+    setNotice(
+      `Login email changed to ${result.data?.email ?? newEmail}. ${member.name} must sign in with the new email from now on.`,
+    );
+    refetchEmails();
   }
 
-  async function handleRestore() {
-    setBusy(true);
-    setError(null);
-
-    const { error: updateError } = await supabase
-      .from("household_members")
-      .update({ status: "active", archived_at: null })
-      .eq("id", member.id);
-
+  async function handleCreateLink() {
+    begin();
+    const result = await invokeFunction<{ url?: string }>(MANAGE, {
+      action: "create_link",
+      member_id: member.id,
+    });
     setBusy(false);
 
-    if (updateError) {
-      setError(updateError.message);
+    if (!result.ok) {
+      setError(describeFailure(result));
       return;
     }
 
-    refetch();
+    if (!result.data?.url) {
+      setError(TRY_AGAIN_MESSAGE);
+      return;
+    }
+
+    onLink({
+      url: result.data.url,
+      heading: `Set-password link for ${member.name}`,
+      intro: `Send this link to ${member.name} so they can choose a new password.`,
+    });
   }
 
   async function handleRenameSubmit(event: FormEvent) {
@@ -173,8 +321,7 @@ function MemberRow({ member, refetch }: { member: HouseholdMemberRow; refetch: (
       return;
     }
 
-    setBusy(true);
-    setError(null);
+    begin();
 
     const { error: updateError } = await supabase
       .from("household_members")
@@ -194,7 +341,7 @@ function MemberRow({ member, refetch }: { member: HouseholdMemberRow; refetch: (
 
   return (
     <li className="flex flex-col gap-2 rounded-card border border-surface-border px-4 py-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         {action.kind === "rename" ? (
           <form className="flex flex-1 items-center gap-2" onSubmit={(event) => void handleRenameSubmit(event)}>
             <label htmlFor={`rename-${member.id}`} className="sr-only">
@@ -214,17 +361,14 @@ function MemberRow({ member, refetch }: { member: HouseholdMemberRow; refetch: (
             >
               Save
             </button>
-            <button
-              type="button"
-              onClick={() => setAction({ kind: "none" })}
-              className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-            >
+            <button type="button" onClick={() => setAction({ kind: "none" })} className={smallButton}>
               Cancel
             </button>
           </form>
         ) : (
           <span className="flex flex-col gap-1">
             <span className="text-body font-medium">{member.name}</span>
+            {email && <span className="break-all text-label text-ink-subtle">{email}</span>}
             <span className="flex items-center gap-2 text-label text-ink-subtle">
               <span>{ROLE_LABELS[member.role]}</span>
               {/*
@@ -247,23 +391,55 @@ function MemberRow({ member, refetch }: { member: HouseholdMemberRow; refetch: (
         )}
 
         {action.kind !== "rename" && (
-          <div className="flex shrink-0 gap-2">
+          <div className="flex flex-wrap gap-2">
+            {/*
+              Hiding actions that make no sense (an archived member can only
+              be restored) is convenience. The server refuses them anyway.
+            */}
             {!isArchived && (
-              <button
-                type="button"
-                onClick={() => setAction({ kind: "rename", draftName: member.name })}
-                className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-              >
-                Rename
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setAction({ kind: "rename", draftName: member.name })}
+                  className={smallButton}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setAction({ kind: "confirm-role" })}
+                  className={smallButton}
+                >
+                  Change role
+                </button>
+                {email && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setAction({ kind: "change-email", draftEmail: "" })}
+                    className={smallButton}
+                  >
+                    Change email
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handleCreateLink()}
+                  className={smallButton}
+                >
+                  Create set-password link
+                </button>
+              </>
             )}
 
             {isArchived ? (
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void handleRestore()}
-                className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted disabled:opacity-60"
+                onClick={() => void runStatusChange("restore")}
+                className={smallButton}
               >
                 Restore
               </button>
@@ -273,16 +449,12 @@ function MemberRow({ member, refetch }: { member: HouseholdMemberRow; refetch: (
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => void handleArchiveConfirmed()}
+                  onClick={() => void runStatusChange("archive")}
                   className="min-h-touch rounded-card bg-owed px-3 text-label font-medium text-white disabled:opacity-60"
                 >
                   Confirm archive
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAction({ kind: "none" })}
-                  className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-                >
+                <button type="button" onClick={() => setAction({ kind: "none" })} className={smallButton}>
                   Cancel
                 </button>
               </span>
@@ -290,7 +462,7 @@ function MemberRow({ member, refetch }: { member: HouseholdMemberRow; refetch: (
               <button
                 type="button"
                 onClick={() => setAction({ kind: "confirm-archive" })}
-                className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
+                className={smallButton}
               >
                 Archive
               </button>
@@ -307,6 +479,69 @@ function MemberRow({ member, refetch }: { member: HouseholdMemberRow; refetch: (
       {action.kind === "confirm-archive" && (
         <p className="text-label text-ink-subtle">
           Archived members can be restored at any time. This does not delete their history.
+          Archiving also stops them signing in.
+        </p>
+      )}
+
+      {action.kind === "confirm-role" && (
+        <div className="flex flex-col gap-2 rounded-card bg-surface-sunken p-3">
+          <p className="text-label text-ink">
+            Make {member.name} a {ROLE_LABELS[otherRole]}? A Parent can manage everyone and record
+            payments; a Child can only add expenses.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleRoleConfirmed()}
+              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-white disabled:opacity-60"
+            >
+              Confirm role change
+            </button>
+            <button type="button" onClick={() => setAction({ kind: "none" })} className={smallButton}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {action.kind === "change-email" && (
+        <form
+          className="flex flex-col gap-2 rounded-card bg-surface-sunken p-3"
+          onSubmit={(event) => void handleEmailSubmit(event)}
+        >
+          <label htmlFor={`email-${member.id}`} className="text-label font-medium text-ink">
+            New login email for {member.name}
+          </label>
+          <input
+            id={`email-${member.id}`}
+            type="email"
+            autoComplete="off"
+            value={action.draftEmail}
+            onChange={(event) => setAction({ kind: "change-email", draftEmail: event.target.value })}
+            className="min-h-touch rounded-card border border-surface-border bg-surface px-3 text-body"
+          />
+          <p className="text-label text-ink-subtle">
+            {member.name} will need to sign in with the new email. Their password stays the same.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-white disabled:opacity-60"
+            >
+              Save email
+            </button>
+            <button type="button" onClick={() => setAction({ kind: "none" })} className={smallButton}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {notice && (
+        <p role="status" className="text-label text-settled">
+          {notice}
         </p>
       )}
 
@@ -324,7 +559,7 @@ function AddMemberForm({
   onAdded,
 }: {
   householdId: string;
-  onAdded: () => void;
+  onAdded: (added: { name: string; url: string | null }) => void;
 }) {
   const [name, setName] = useState("");
   const [role, setRole] = useState<MembershipRole>("child");
@@ -340,55 +575,42 @@ function AddMemberForm({
     }
 
     setState({ status: "submitting" });
+    const addedName = name.trim();
 
-    try {
-      const { data, error } = await supabase.functions.invoke("add-household-member", {
-        body: {
-          household_id: householdId,
-          name: name.trim(),
-          role,
-          email: email.trim(),
-        },
-      });
+    const result = await invokeFunction<{
+      id?: string;
+      set_password_url?: string | null;
+      set_password_link_failed?: boolean;
+    }>("add-household-member", {
+      household_id: householdId,
+      name: addedName,
+      role,
+      email: email.trim(),
+    });
 
-      if (error) {
-        // supabase-js surfaces a non-2xx Edge Function response as
-        // `FunctionsHttpError`, whose `.context` is the raw Response --
-        // the function's own `{error}` body has already been consumed into
-        // `data` in some client versions and not others, so fall back to a
-        // generic message rather than assume either shape.
-        const message =
-          (data as { error?: string } | null)?.error ??
-          (error instanceof Error ? error.message : "Could not add this member.");
-        setState({ status: "error", message });
-        return;
-      }
-
-      const result = data as { initial_password?: string } | null;
-      if (!result?.initial_password) {
-        setState({ status: "error", message: "Could not add this member." });
-        return;
-      }
-
-      setState({
-        status: "done",
-        name: name.trim(),
-        email: email.trim(),
-        initialPassword: result.initial_password,
-      });
-      setName("");
-      setEmail("");
-      setRole("child");
-      onAdded();
-    } catch (caught) {
+    if (!result.ok) {
       setState({
         status: "error",
         message:
-          caught instanceof Error
-            ? `Could not reach the ledger service: ${caught.message}`
-            : "Could not reach the ledger service.",
+          result.message ??
+          (result.status === null ? NETWORK_MESSAGE : "Could not add this member."),
       });
+      return;
     }
+
+    if (!result.data) {
+      setState({ status: "error", message: "Could not add this member." });
+      return;
+    }
+
+    // The member exists once the function answers 2xx. If the link could not
+    // be minted (null URL), the Parent can make one from the member's row.
+    const url = result.data.set_password_url || null;
+    setState({ status: "done", name: addedName, linkFailed: url === null });
+    setName("");
+    setEmail("");
+    setRole("child");
+    onAdded({ name: addedName, url });
   }
 
   return (
@@ -401,13 +623,12 @@ function AddMemberForm({
           className="flex flex-col gap-2 rounded-card border border-settled/40 bg-settled/5 p-3"
         >
           <p className="text-body font-medium text-settled">{state.name} was added.</p>
-          <p className="text-label text-ink">
-            Initial password (there is no email flow -- share this with {state.name} yourself; it
-            will not be shown again):
-          </p>
-          <p className="select-all rounded-card bg-surface-sunken px-3 py-2 font-mono text-body">
-            {state.initialPassword}
-          </p>
+          {state.linkFailed && (
+            <p className="text-label text-ink">
+              {state.name} was added, but the link could not be created. Use &quot;Create
+              set-password link&quot; on their row.
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setState({ status: "idle" })}

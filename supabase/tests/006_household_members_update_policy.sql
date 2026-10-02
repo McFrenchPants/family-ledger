@@ -192,6 +192,10 @@ reset role;
 -- ---------------------------------------------------------------------------
 -- Criterion 5: archiving the household's ONLY active Parent is rejected;
 -- archiving a Parent when another active Parent exists succeeds.
+-- (Since 20260908090000 status can only change via
+-- public.set_household_member_status -- a direct UPDATE of status is denied
+-- by column privileges -- so these cases go through the function; the
+-- last-Parent rule they exercise is still the BEFORE UPDATE trigger's.)
 -- ---------------------------------------------------------------------------
 
 -- 5a: household B has exactly one active Parent (P2) -- archiving them must
@@ -200,7 +204,7 @@ set local role authenticated;
 set local request.jwt.claims to '{"sub":"91000000-0000-0000-0000-000000000004","role":"authenticated"}';
 
 select throws_ok(
-  $$ update public.household_members set status = 'archived' where id = '92000000-0000-0000-0000-000000000004' $$,
+  $$ select public.set_household_member_status('92000000-0000-0000-0000-000000000004', 'archived') $$,
   '42501',
   null,
   'Criterion 5a: archiving a household''s only active Parent is rejected'
@@ -218,9 +222,7 @@ select is(
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
-update public.household_members
-   set status = 'archived', archived_at = now()
- where id = '92000000-0000-0000-0000-000000000002';
+select public.set_household_member_status('92000000-0000-0000-0000-000000000002', 'archived');
 
 reset role;
 
@@ -247,7 +249,7 @@ set local role authenticated;
 set local request.jwt.claims to '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
 select throws_ok(
-  $$ update public.household_members set status = 'archived' where id = '92000000-0000-0000-0000-000000000001' $$,
+  $$ select public.set_household_member_status('92000000-0000-0000-0000-000000000001', 'archived') $$,
   '42501',
   null,
   'Criterion 5e: archiving the LAST remaining active Parent is rejected, after the household dropped to one'
@@ -262,9 +264,7 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"91000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
-update public.household_members
-   set status = 'active', archived_at = null
- where id = '92000000-0000-0000-0000-000000000002';
+select public.set_household_member_status('92000000-0000-0000-0000-000000000002', 'active');
 
 reset role;
 
