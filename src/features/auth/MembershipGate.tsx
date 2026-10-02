@@ -2,20 +2,18 @@ import { Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import { useMembership } from "./membership-context";
-import type { MembershipRole } from "./membership-context";
+import type { Membership } from "./membership-context";
 
 /**
- * Route guard: renders `children` only when the signed-in caller's own
- * `household_members` row (from MembershipProvider) has the given role.
+ * Renders the same loading / signed-out / error-retry / no-membership states
+ * as `RequireRole` and `RoleHomeRedirect`, and calls `children` with the
+ * caller's own membership once it has loaded. For routes that serve both
+ * roles (and pick what to show by role) rather than requiring one.
  *
- * This is routing convenience, not a security control -- a Child who
- * tampers with the client and lands on a Parent route anyway gains nothing,
- * because every balance-affecting read/write is independently checked by
- * Postgres RLS / security-definer functions regardless of which route
- * rendered. This component only decides which placeholder page a browser
- * shows.
+ * Routing convenience only: what any role can read or write is enforced by
+ * Postgres RLS and security-definer functions, not by which component renders.
  */
-export function RequireRole({ role, children }: { role: MembershipRole; children: ReactNode }) {
+export function MembershipGate({ children }: { children: (membership: Membership) => ReactNode }) {
   const membership = useMembership();
 
   switch (membership.status) {
@@ -54,10 +52,6 @@ export function RequireRole({ role, children }: { role: MembershipRole; children
       );
 
     case "loaded":
-      if (membership.membership.role !== role) {
-        return <Navigate to="/home" replace />;
-      }
-
-      return <>{children}</>;
+      return <>{children(membership.membership)}</>;
   }
 }

@@ -270,7 +270,7 @@ function RecordForm({ membership }: { membership: Membership }) {
         )}
         <button
           type="button"
-          onClick={() => navigate("/parent")}
+          onClick={() => navigate("/home")}
           className="inline-flex min-h-touch items-center justify-center rounded-card bg-settled px-4 text-body font-medium text-on-ok"
         >
           Done

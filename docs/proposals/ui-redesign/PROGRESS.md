@@ -19,7 +19,7 @@ for the design, `mockups/index.html` for the visual target.
 | --- | --- | --- | --- |
 | UI1 | Quiet the top: Settings page, menu, role redirect | done | Branch `feature/ui-redesign-p1-quiet-top`. Verified by tests/build only; not viewed in a browser (needs signed-in session). Unused install-banner dismissal helpers left in `install-prompt.ts` for UI10 cleanup. |
 | UI2 | Tokens, dark mode, type scale, icons, primitives | done | Branch `feature/ui-redesign-p2-tokens`. Tokens in `src/styles/tokens.css` (contrast test mutation-proofed); primitives in `src/components/ui/`; theme helper `src/lib/theme.ts` (key `family-ledger.theme`). Old class names alias the new tokens, so old pages already follow dark mode. New radii are `rounded-panel` (16) / `rounded-control` (12); `rounded-card` stays 8 until pages migrate. Dev gallery at `/dev/components` (dev builds only). |
-| UI3 | App shell and route map | todo | |
+| UI3 | App shell and route map | done | Branch `feature/ui-redesign-p3-app-shell`. `AppShell` replaces `RootLayout`; route table exported as `routes` from `router.tsx`; old-path redirects in `src/app/redirects.tsx`. Checked signed in as Parent and Child on the local stack (fixture `scripts/dev/seed-local-test-family.mjs`). Open for UI8: a Child still reaches their read-only plan page only via the old `/child/:id/payment-plan` address, and nothing links to it. Parent `/activity` with no child shows an interim chooser until UI7. |
 | UI4 | Child Home (playful overdue text, encouragement) | todo | |
 | UI5 | Parent Home | todo | |
 | UI6 | Add expense and Record payment | todo | Child chooser unlocked for all roles. |
@@ -31,6 +31,10 @@ for the design, `mockups/index.html` for the visual target.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — UI3 done
+
+New frame: bottom tab bar on phones (Parent: Home, Activity, +, Family, Settings; Child: Home, Activity, +, Settings), sidebar at 900 px and up, "+" sheet (Parent: expense or payment; Child: straight to Add expense), close bar on task pages, skip link and focus move on navigation. New addresses (`/home`, `/activity`, `/new/expense`, `/new/payment`, `/family`, `/family/:id`, `/settings/*`) with every old address redirecting (query kept). Sign-in and set-password now have no chrome; found in the browser that this stranded a just-signed-in user on "Signed in as…", so the sign-in page now forwards a signed-in visitor to `/` (test added). typecheck, lint, 524 tests, build clean. **First signed-in browser check of the redesign**: added a local-only fixture (`node scripts/dev/seed-local-test-family.mjs`, refuses non-local URLs, logins in its header) that adds a separate "Test Family" household without touching other local data. Verified at 375 px (dark) and desktop as Parent (home, + sheet, Activity chooser, old history link redirect) and as Child (4 tabs; all 8 Parent-only addresses bounce to `/home`; another child's `?child=` shows own history). `wrangler dev`: all 18 new/old addresses return 200. Note the dev server runs on **https**://localhost:5173. Fixture's Alex shows "Due", not overdue — adjust the fixture for UI4's overdue state. Next: UI4 (Child Home).
 
 ### 2026-10-02 — UI2 done
 

@@ -10,16 +10,16 @@ import { useHouseholdPaymentProgress } from "../features/payment-plans/useHouseh
 import { formatCents } from "../lib/currency";
 
 /**
- * `RequireRole` guarantees `useMembership()` is `{status: "loaded", ...,
- * role: "parent"}` by the time this page renders (see RequireRole.tsx) --
+ * `HomePage` (via `MembershipGate`) guarantees `useMembership()` is `{status: "loaded", ...,
+ * role: "parent"}` by the time this page renders (see HomePage.tsx) --
  * only the household id is needed here.
  */
 export function ParentDashboardPage() {
   const membership = useMembership();
 
   if (membership.status !== "loaded") {
-    // Unreachable under RequireRole; satisfies the type checker without
-    // duplicating RequireRole's loading/error UI.
+    // Unreachable under HomePage; satisfies the type checker without
+    // duplicating MembershipGate's loading/error UI.
     return null;
   }
 
@@ -93,7 +93,7 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
                   return (
                     <li key={child.memberId}>
                       <Link
-                        to={`/child/${child.memberId}/history`}
+                        to={`/activity?child=${encodeURIComponent(child.memberId)}`}
                         className="flex items-center justify-between rounded-card border border-surface-border px-4 py-3 hover:bg-surface-sunken"
                       >
                         <span className="flex flex-col gap-1">
@@ -115,13 +115,13 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
 
       <div className="flex gap-2">
         <Link
-          to="/add-expense"
+          to="/new/expense"
           className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent"
         >
           + Expense
         </Link>
         <Link
-          to="/record-payment"
+          to="/new/payment"
           className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card border border-surface-border px-4 text-body font-medium text-ink"
         >
           Record Payment
@@ -133,13 +133,13 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
         Placed here (not the top nav, which only carries role-dashboard/
         sign-in links) so it sits alongside this dashboard's other
         Parent-only actions -- discoverable the same way "Manage payment
-        plan" is on HistoryPage, and gated the same way: `/export` itself is
+        plan" is on HistoryPage, and gated the same way: `/settings/export` itself is
         wrapped in `RequireRole role="parent"` in router.tsx, this link is
         just where a Parent finds it.
       */}
       <div className="flex flex-wrap gap-2">
         <Link
-          to="/export"
+          to="/settings/export"
           className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
         >
           Export ledger (CSV)
@@ -147,12 +147,12 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
         {/*
           M6.4: a Parent-only "Manage members" page (add/archive/restore/
           rename household_members rows). Linked here for the same reason as
-          "Export ledger" just above -- `/members` itself is wrapped in
+          "Export ledger" just above -- `/family` itself is wrapped in
           `RequireRole role="parent"` in router.tsx, this link is just where
           a Parent finds it.
         */}
         <Link
-          to="/members"
+          to="/family"
           className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
         >
           Manage members
@@ -160,12 +160,12 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
         {/*
           C1: a Parent-only "Manage categories" page (add/rename/deactivate/
           reactivate `categories` rows). Linked here for the same reason as
-          "Manage members" just above -- `/parent/categories` itself is
+          "Manage members" just above -- `/settings/categories` itself is
           wrapped in `RequireRole role="parent"` in router.tsx, this link is
           just where a Parent finds it.
         */}
         <Link
-          to="/parent/categories"
+          to="/settings/categories"
           className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
         >
           Manage categories
@@ -173,12 +173,12 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
         {/*
           C3: a Parent-only "Manage presets" page (add/edit/deactivate/
           reactivate `expense_presets` rows). Linked here for the same reason
-          as "Manage categories" just above -- `/parent/presets` itself is
+          as "Manage categories" just above -- `/settings/presets` itself is
           wrapped in `RequireRole role="parent"` in router.tsx, this link is
           just where a Parent finds it.
         */}
         <Link
-          to="/parent/presets"
+          to="/settings/presets"
           className="min-h-touch inline-flex w-fit items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
         >
           Manage presets

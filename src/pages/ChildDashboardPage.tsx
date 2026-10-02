@@ -12,8 +12,8 @@ import { useChildPaymentProgress } from "../features/payment-plans/useChildPayme
 import { formatCents } from "../lib/currency";
 
 /**
- * `RequireRole` guarantees `useMembership()` is `{status: "loaded", ...,
- * role: "child"}` by the time this page renders (see RequireRole.tsx) --
+ * `HomePage` (via `MembershipGate`) guarantees `useMembership()` is `{status: "loaded", ...,
+ * role: "child"}` by the time this page renders (see HomePage.tsx) --
  * only the membership id/household id are needed here.
  *
  * Per PROJECT_REQUIREMENTS.md §11.2, this screen never shows a control that
@@ -26,8 +26,8 @@ export function ChildDashboardPage() {
   const membership = useMembership();
 
   if (membership.status !== "loaded") {
-    // Unreachable under RequireRole; satisfies the type checker without
-    // duplicating RequireRole's loading/error UI.
+    // Unreachable under HomePage; satisfies the type checker without
+    // duplicating MembershipGate's loading/error UI.
     return null;
   }
 
@@ -104,7 +104,7 @@ function ChildHome({ householdId, memberId }: { householdId: string; memberId: s
       )}
 
       <Link
-        to="/add-expense"
+        to="/new/expense"
         className="inline-flex min-h-touch items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent"
       >
         + Add Expense
