@@ -1,10 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 
-import { useSession } from "../features/auth/session-context";
-import { SessionStatus } from "../features/auth/SessionStatus";
-import { InstallBanner } from "../features/pwa/InstallBanner";
-import { PushSubscribeButton } from "../features/push/PushSubscribeButton";
-import { PushTestSendButton } from "../features/push/PushTestSendButton";
+import { useMembership } from "../features/auth/membership-context";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -15,38 +11,36 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   ].join(" ");
 
 export function RootLayout() {
-  const { session } = useSession();
+  const membership = useMembership();
+
+  // Links appear only once we know who is signed in, so nobody sees the
+  // wrong ones flash by while loading. Routing convenience, not security.
+  const homePath =
+    membership.status === "loaded"
+      ? membership.membership.role === "parent"
+        ? "/parent"
+        : "/child"
+      : null;
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-screen-sm flex-col bg-surface">
       <header className="border-b border-surface-border px-gutter py-3">
         <h1 className="text-title font-semibold">Family Ledger</h1>
         <nav aria-label="Main" className="mt-2 flex flex-wrap gap-2">
-          <NavLink to="/parent" className={navLinkClass}>
-            Parent
-          </NavLink>
-          <NavLink to="/child" className={navLinkClass}>
-            Child
-          </NavLink>
-          <NavLink to="/sign-in" className={navLinkClass}>
-            Sign in
-          </NavLink>
-          {session && (
-            <NavLink to="/account" className={navLinkClass}>
-              Change my password
-            </NavLink>
+          {homePath && (
+            <>
+              <NavLink to={homePath} className={navLinkClass}>
+                Home
+              </NavLink>
+              <NavLink to="/settings" className={navLinkClass}>
+                Settings
+              </NavLink>
+            </>
           )}
         </nav>
-
-        <div className="mt-2">
-          <SessionStatus />
-        </div>
       </header>
 
       <main className="flex-1 px-gutter py-4">
-        <InstallBanner />
-        <PushSubscribeButton />
-        <PushTestSendButton />
         <Outlet />
       </main>
     </div>

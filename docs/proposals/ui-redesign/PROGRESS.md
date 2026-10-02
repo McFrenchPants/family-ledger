@@ -17,7 +17,7 @@ for the design, `mockups/index.html` for the visual target.
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| UI1 | Quiet the top: Settings page, menu, role redirect | todo | Fixes the owner's main complaint on its own. |
+| UI1 | Quiet the top: Settings page, menu, role redirect | done | Branch `feature/ui-redesign-p1-quiet-top`. Verified by tests/build only; not viewed in a browser (needs signed-in session). Unused install-banner dismissal helpers left in `install-prompt.ts` for UI10 cleanup. |
 | UI2 | Tokens, dark mode, type scale, icons, primitives | todo | |
 | UI3 | App shell and route map | todo | |
 | UI4 | Child Home (playful overdue text, encouragement) | todo | |
@@ -31,6 +31,10 @@ for the design, `mockups/index.html` for the visual target.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — UI1 done
+
+Install banner, notification button and debug test button removed from the top of every page; new `/settings` page holds them (test button Parent-only, under Advanced). Menu shows only Home and Settings by role; `/` redirects by role. typecheck, lint, 337 tests, build all clean. Next: UI2 (design tokens, dark mode, primitives). Suggest promoting to production after UI1 (needs owner go-ahead and the account-management hosted steps first).
 
 ### 2026-10-02 — Design approved by the owner; plan written
 
