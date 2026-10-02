@@ -233,3 +233,15 @@ sequential except where noted.
     `feature/account-management`). All seven tasks done and verified locally;
     merged into `main`. Not yet on `production`: the owner must first run the
     hosted steps in `docs/DEPLOYMENT_RUNBOOK.md` section 7a.
+
+11. **UI redesign** — status: `ready` — analysis: analysis/11-ui-redesign.md
+    Requested by the owner 2026-10-02: the interface looks hastily assembled and
+    leads with install/notification prompts. A research agent produced an
+    approved design and mockups; the owner answered all open questions.
+    Front-end only (no migrations, RLS or Edge Function changes). Ten small
+    phases, each shippable alone, starting with UI1 (move install and
+    notification prompts into Settings, fix the menu).
+    Plan and tracking: `docs/proposals/ui-redesign/IMPLEMENTATION_PLAN.md`,
+    `docs/proposals/ui-redesign/PROGRESS.md`. Branches `feature/ui-redesign-pN-*`.
+    The manual "Remind" button is deliberately out of scope until push is
+    confirmed on real devices and Phase 5 exists.
