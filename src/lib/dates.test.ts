@@ -5,6 +5,7 @@ import {
   addDays,
   calendarDateInZone,
   compareCalendarDates,
+  daysBetween,
   formatCalendarDate,
   isDueToday,
   isOverdue,
@@ -174,6 +175,23 @@ describe("compareCalendarDates", () => {
   it("rejects malformed dates rather than comparing garbage", () => {
     expect(() => compareCalendarDates("2026-1-1", "2026-01-01")).toThrow(RangeError);
     expect(() => compareCalendarDates("2026-01-01", "2026-02-30")).toThrow(RangeError);
+  });
+});
+
+describe("daysBetween", () => {
+  it.each([
+    ["2026-09-15", "2026-10-02", 17],
+    ["2026-10-02", "2026-10-02", 0],
+    ["2026-10-05", "2026-10-02", -3],
+    ["2026-12-31", "2027-01-01", 1],
+    ["2024-02-28", "2024-03-01", 2], // leap year
+    ["2026-03-07", "2026-03-09", 2], // across a US DST change: still whole days
+  ])("daysBetween(%s, %s) === %i", (from, to, expected) => {
+    expect(daysBetween(from, to)).toBe(expected);
+  });
+
+  it("rejects invalid dates", () => {
+    expect(() => daysBetween("2026-02-30", "2026-03-01")).toThrow(RangeError);
   });
 });
 

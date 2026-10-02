@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 
 import { buildExpenseMemberSelector, validateExpenseForm } from "../features/ledger/add-expense";
 import type { ExpenseFormErrors } from "../features/ledger/add-expense";
@@ -74,6 +74,11 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
   const formData = useAddExpenseFormData(membership.householdId);
   const presetsState = useExpensePresets(membership.householdId);
   const navigate = useNavigate();
+  // `?child=<memberId>` (from Parent Home) picks the initial person, but
+  // only if it is one of the choices this caller already has; otherwise it
+  // is ignored. A convenience, not a control -- record_expense re-checks.
+  const [searchParams] = useSearchParams();
+  const requestedChild = searchParams.get("child");
 
   const [memberId, setMemberId] = useState("");
   const [amountInput, setAmountInput] = useState("");
@@ -105,7 +110,10 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
         activeMembers: formData.activeMembers,
         childExpenseScope: formData.childExpenseScope,
       });
-      if (selector.defaultMemberId) {
+      const requested = selector.options.find((option) => option.id === requestedChild);
+      if (requested) {
+        setMemberId(requested.id);
+      } else if (selector.defaultMemberId) {
         setMemberId(selector.defaultMemberId);
       }
     }

@@ -48,3 +48,19 @@ export function toRecentTransactions(rows: readonly RecentTransactionRow[]): Rec
     ...(row.voided_at ? { isVoided: true as const } : {}),
   }));
 }
+
+/** `RecentTransactionRow` plus the member it is charged to (household-wide reads). */
+export type HouseholdRecentTransactionRow = RecentTransactionRow & { member_id: string };
+
+/** A recent-activity row that also says whose it is, for the Parent's household view. */
+export type HouseholdRecentTransaction = RecentTransaction & { memberId: string };
+
+/** Same mapping as `toRecentTransactions`, keeping each row's `member_id`. */
+export function toHouseholdRecentTransactions(
+  rows: readonly HouseholdRecentTransactionRow[],
+): HouseholdRecentTransaction[] {
+  return toRecentTransactions(rows).map((transaction, index) => ({
+    ...transaction,
+    memberId: (rows[index] as HouseholdRecentTransactionRow).member_id,
+  }));
+}

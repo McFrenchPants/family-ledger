@@ -1,6 +1,7 @@
-import { parseMoney } from "../../lib/currency";
+import { formatCents, parseMoney } from "../../lib/currency";
 import type { Cents } from "../../lib/currency";
 import { isValidCalendarDate } from "../../lib/dates";
+import { PAYMENT_RECORDED_MESSAGES, pick } from "../../lib/messages";
 import type { ActiveMemberOption } from "./add-expense";
 
 /**
@@ -119,4 +120,25 @@ export function validateVoidReason(reason: string): { ok: true; reason: string }
     return { ok: false, error: "Enter a reason for voiding this transaction." };
   }
   return { ok: true, reason: trimmed };
+}
+
+/**
+ * The cheerful line on the "Payment recorded" panel. Payments only -- an
+ * adjustment is a correction, not progress, so it gets no line (`null`).
+ * `seed` should identify this one payment (its transaction id), so the line
+ * stays the same if the panel re-renders. The amount is shown as a positive
+ * magnitude however the ledger signs it.
+ */
+export function paymentRecordedMessage(
+  type: RecordTransactionType,
+  childName: string,
+  amountCents: Cents,
+  seed: string,
+  locale?: string,
+): string | null {
+  if (type !== "payment") return null;
+  return pick(PAYMENT_RECORDED_MESSAGES, `${seed}:payment-recorded`)({
+    name: childName,
+    amount: formatCents(Math.abs(amountCents), { locale }),
+  });
 }
