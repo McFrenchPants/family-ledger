@@ -20,7 +20,7 @@ for the design, `mockups/index.html` for the visual target.
 | UI1 | Quiet the top: Settings page, menu, role redirect | done | Branch `feature/ui-redesign-p1-quiet-top`. Verified by tests/build only; not viewed in a browser (needs signed-in session). Unused install-banner dismissal helpers left in `install-prompt.ts` for UI10 cleanup. |
 | UI2 | Tokens, dark mode, type scale, icons, primitives | done | Branch `feature/ui-redesign-p2-tokens`. Tokens in `src/styles/tokens.css` (contrast test mutation-proofed); primitives in `src/components/ui/`; theme helper `src/lib/theme.ts` (key `family-ledger.theme`). Old class names alias the new tokens, so old pages already follow dark mode. New radii are `rounded-panel` (16) / `rounded-control` (12); `rounded-card` stays 8 until pages migrate. Dev gallery at `/dev/components` (dev builds only). |
 | UI3 | App shell and route map | done | Branch `feature/ui-redesign-p3-app-shell`. `AppShell` replaces `RootLayout`; route table exported as `routes` from `router.tsx`; old-path redirects in `src/app/redirects.tsx`. Checked signed in as Parent and Child on the local stack (fixture `scripts/dev/seed-local-test-family.mjs`). Open for UI8: a Child still reaches their read-only plan page only via the old `/child/:id/payment-plan` address, and nothing links to it. Parent `/activity` with no child shows an interim chooser until UI7. |
-| UI4 | Child Home (playful overdue text, encouragement) | todo | |
+| UI4 | Child Home (playful overdue text, encouragement) | done | Branch `feature/ui-redesign-p4a-child-home`. Copy in `src/lib/messages.ts`; logic in `src/features/home/child-home.ts`; nudge rules in `src/features/push/device-nudge.ts` (reuse in UI5). Recent activity now reads `voided_at`. Browser-checked only the "due later", payment-received and empty states; overdue/due-soon/paid-off/satisfied covered by component tests only. Nudge not seen in browser (pane's notification permission is denied). |
 | UI5 | Parent Home | todo | |
 | UI6 | Add expense and Record payment | todo | Child chooser unlocked for all roles. |
 | UI7 | Activity page | todo | |
@@ -31,6 +31,10 @@ for the design, `mockups/index.html` for the visual target.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — UI4 done
+
+Child Home rewritten to the mockups: greeting, "You owe" card with status chip, progress and playful overdue/due-soon copy (rotates once per household-zone day), Add an expense, recent activity with See all, "Paid off!" and "All caught up" states, a one-time "Payment received" card (remembers seen rows per child on the device), and the bottom device nudge (30-day snooze, second dismiss = forever, hidden while overdue). New read-only hook for the household time zone (no browser fallback). Voided rows now show as voided in recent activity and never count as payments. Fixture changed so a *fresh* stack shows Alex overdue; existing local data untouched. typecheck, lint, 577 tests, build clean. No route changes, so the UI3 Child route checks still hold; Home has no payment/void/member links (test enforces). Corrected `CLAUDE.md`: the CLI here is linked to the hosted project (owner's deploy setup) — never run linked-target commands. Next: UI5 (Parent Home).
 
 ### 2026-10-02 — UI3 done
 

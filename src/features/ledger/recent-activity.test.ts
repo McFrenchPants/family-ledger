@@ -57,3 +57,32 @@ describe("toRecentTransactions", () => {
     expect(toRecentTransactions([])).toEqual([]);
   });
 });
+
+describe("toRecentTransactions voided rows", () => {
+  it("flags a voided row and leaves a live row unflagged", () => {
+    const [voided, live] = toRecentTransactions([
+      {
+        id: "tx-v",
+        description: "Payment",
+        amount_cents: -2500,
+        type: "payment",
+        occurred_on: "2026-09-10",
+        created_at: "2026-09-10T12:00:00Z",
+        voided_at: "2026-09-11T12:00:00Z",
+        category: null,
+      },
+      {
+        id: "tx-l",
+        description: "Payment",
+        amount_cents: -2500,
+        type: "payment",
+        occurred_on: "2026-09-10",
+        created_at: "2026-09-10T12:00:00Z",
+        voided_at: null,
+        category: null,
+      },
+    ]);
+    expect(voided?.isVoided).toBe(true);
+    expect(live?.isVoided).toBeUndefined();
+  });
+});
