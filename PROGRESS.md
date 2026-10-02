@@ -26,6 +26,30 @@ Owned by the orchestrator — the implementer role may never write to it (see
 
 _Newest entries on top._
 
+### 2026-10-02 — Account-management hosted steps done; advisor finding fixed
+
+Owner applied migration `20260908090000` to the hosted database and set the
+Email OTP expiration to 86400 in the Supabase dashboard; the orchestrator set
+the `APP_BASE_URL` function secret and deployed `manage-household-member` (new)
+and `add-household-member` (changed) to the hosted project. NOT yet promoted
+to `production`, so the live screens are still the pre-account-management
+version (their Archive/Restore buttons fail until promotion; nothing else
+affected).
+
+Supabase's security advisor flagged `public.household_member_push_status` as a
+critical SECURITY DEFINER view. It was a deliberate, documented, low-risk
+design (booleans only, caller re-derived, no key columns, unused by the app),
+but is now replaced by a SECURITY DEFINER function of the same name taking the
+household id (the same pattern as `household_member_balances`), migration
+`20260908100000_push_status_function.sql`, suite 009 updated (+7 assertions,
+mutation-proofed), verifier pass. Needs `npx supabase db push --linked` to
+reach the hosted project. Remaining advisor findings are performance-only
+(`auth_rls_initplan` on `household_members_select_self`, and several
+`multiple_permissive_policies`); not fixed, not urgent at household scale.
+Verifier non-blocking suggestions not done: a catalog test that fails if
+`security definer`/`search_path` is removed from the new function, and an
+archived-Parent direct test.
+
 ### 2026-10-01 — First production deploy; app live and sign-in working
 
 Live at https://family-ledger.mcfrench.workers.dev (Cloudflare Worker
