@@ -104,6 +104,12 @@ npx supabase db reset   # re-apply migrations + seed from scratch
 npx supabase stop       # tear down (do this — containers are heavy)
 ```
 
+Signed-in screens can be checked in the browser against a local-only fake
+household: `node scripts/dev/seed-local-test-family.mjs` (refuses any
+non-local URL, additive, logins listed in its header). The Vite dev server
+serves **https**://localhost:5173. The local database may also hold the
+owner's own test accounts — never reset or change those without asking.
+
 The hosted project is deliberately **not linked**. Everything local runs
 against the Docker stack. Do not use the Supabase MCP server's write tools
 (`apply_migration`, remote `execute_sql`) to change schema — every schema

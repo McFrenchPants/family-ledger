@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership, MembershipRole } from "../features/auth/membership-context";
@@ -23,24 +23,23 @@ function typeLabel(type: string): string {
 }
 
 /**
- * `/child/:memberId/history` (S2.7). Reachable from both a Parent (drilling
- * into a child's row on `ParentDashboardPage`) and a Child (their own
- * history), so like `AddExpensePage` this is not wrapped in `RequireRole` --
+ * One child's full history (S2.7), rendered by `/activity` (`ActivityPage`
+ * passes the member id: a Child's own, or the `?child=` a Parent chose).
+ * Reachable from both a Parent and a Child (their own history), so like `AddExpensePage` this is not wrapped in `RequireRole` --
  * there is no single role to require -- and instead handles `useMembership()`
  * loading/signed-out/error/no-membership states directly, mirroring
  * `AddExpensePage`'s pattern.
  *
  * None of this is a security control: `ledger_transactions_select_self` /
  * `_select_parent` RLS (P1.2) independently restrict which rows the query in
- * `useHistory` can ever return for the caller's actual role. If `:memberId`
+ * `useHistory` can ever return for the caller's actual role. If `memberId`
  * does not resolve to a readable row for this caller (wrong household, a
  * Child requesting a sibling with no access, a nonexistent id), Postgres
  * returns zero rows rather than an error -- rendered below as a plain
  * "no history to show" empty state, not a crash or a redirect loop.
  */
-export function HistoryPage() {
+export function HistoryPage({ memberId }: { memberId: string }) {
   const membership = useMembership();
-  const { memberId } = useParams<{ memberId: string }>();
 
   switch (membership.status) {
     case "loading":
@@ -78,11 +77,6 @@ export function HistoryPage() {
       );
 
     case "loaded":
-      if (!memberId) {
-        // Unreachable via the registered route (which always supplies the
-        // param), but keeps this exhaustive without a non-null assertion.
-        return <p className="text-label text-ink-subtle">No history to show.</p>;
-      }
       return <History membership={membership.membership} memberId={memberId} />;
   }
 }
@@ -124,7 +118,7 @@ function History({ membership, memberId }: { membership: Membership; memberId: s
         */}
         {membership.role === "parent" && (
           <Link
-            to={`/child/${memberId}/payment-plan`}
+            to={`/family/${encodeURIComponent(memberId)}`}
             className="min-h-touch inline-flex items-center rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
           >
             Manage payment plan

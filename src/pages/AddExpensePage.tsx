@@ -86,7 +86,7 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
     { status: "idle" } | { status: "submitting" } | { status: "error"; message: string }
   >({ status: "idle" });
 
-  const dashboardPath = membership.role === "parent" ? "/parent" : "/child";
+  const dashboardPath = "/home";
 
   // Seed the member selector's default and today's date once the form data
   // has loaded. Effect-based (not lazy initial state) because both depend on

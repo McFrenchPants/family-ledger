@@ -1,3 +1,5 @@
+import { Navigate } from "react-router-dom";
+
 import { SignInForm } from "../features/auth/SignInForm";
 import { useSession } from "../features/auth/session-context";
 
@@ -16,9 +18,9 @@ export function SignInPage() {
       {loading ? (
         <p className="text-body text-ink-subtle">Checking session…</p>
       ) : session ? (
-        <p data-testid="signed-in-panel" className="text-body text-settled">
-          Signed in as {session.user.email}.
-        </p>
+        // This page has no app chrome, so a signed-in visitor (including one
+        // who just signed in) is sent on to their home rather than stranded.
+        <Navigate to="/" replace />
       ) : (
         <SignInForm />
       )}
