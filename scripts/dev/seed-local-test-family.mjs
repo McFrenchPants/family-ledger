@@ -12,7 +12,8 @@
 //
 // Test logins (local stack only), all with password LOCAL_TEST_PASSWORD:
 //   Parent  dana@test.familyledger.local
-//   Child   alex@test.familyledger.local   (plan, $15.00 overdue)
+//   Child   alex@test.familyledger.local   (plan, $40.00 overdue -- due yesterday;
+//                                           only "Due today" if seeded on the 1st)
 //   Child   sam@test.familyledger.local    (plan, paid for the month)
 //   Child   riley@test.familyledger.local  (no plan, nothing owed)
 
@@ -139,7 +140,9 @@ async function main() {
     parent.rpc("create_payment_plan", {
       p_member_id: members.alex.id,
       p_minimum_cents: 4000,
-      p_due_day: 15,
+      // Due yesterday, so this month's period is already overdue on the day
+      // the fixture is seeded (the current period starts on the 1st).
+      p_due_day: Math.min(28, Math.max(1, new Date().getUTCDate() - 1)),
       p_starts_on: monthsAgo(1, 1),
     }),
     "alex plan",

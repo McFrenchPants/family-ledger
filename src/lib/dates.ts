@@ -233,3 +233,36 @@ export function isOverdue(
 ): boolean {
   return compareCalendarDates(due, todayInZone(timeZone, now)) < 0;
 }
+
+const displayFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * A calendar date as words for display: "Oct 15" (`"short"`), "October"
+ * (`"month"`), or "Friday, October 2" (`"long"`).
+ *
+ * A `YYYY-MM-DD` label carries no zone, so it is rendered as the UTC day it
+ * names -- this never consults the host's zone. To show *today*, pass
+ * `todayInZone(householdZone)`.
+ */
+export function formatCalendarDate(
+  date: CalendarDate,
+  style: "short" | "month" | "long" = "short",
+  locale = "en-US",
+): string {
+  assertCalendarDate(date, "Date");
+  const key = `${locale}|${style}`;
+  let formatter = displayFormatterCache.get(key);
+  if (formatter === undefined) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      timeZone: "UTC",
+      ...(style === "short"
+        ? { month: "short", day: "numeric" }
+        : style === "month"
+          ? { month: "long" }
+          : { weekday: "long", month: "long", day: "numeric" }),
+    });
+    displayFormatterCache.set(key, formatter);
+  }
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  return formatter.format(new Date(Date.UTC(year, month - 1, day)));
+}

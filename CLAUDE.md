@@ -110,7 +110,12 @@ non-local URL, additive, logins listed in its header). The Vite dev server
 serves **https**://localhost:5173. The local database may also hold the
 owner's own test accounts — never reset or change those without asking.
 
-The hosted project is deliberately **not linked**. Everything local runs
+**The CLI on this machine may be linked to the hosted (production) project**
+— the owner links it to push migrations (`supabase/.temp/project-ref`,
+git-ignored; seen linked 2026-10-02). So never run anything that targets the
+linked project (`db push`, `db pull`, `migration repair`, any `--linked`
+flag); always pass `--local` or use the local-only commands above. Don't
+unlink it either — that is the owner's deploy setup. Everything local runs
 against the Docker stack. Do not use the Supabase MCP server's write tools
 (`apply_migration`, remote `execute_sql`) to change schema — every schema
 change is a versioned migration file, reviewed like code.
