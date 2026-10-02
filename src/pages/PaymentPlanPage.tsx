@@ -369,7 +369,7 @@ function ReplacePlanControl({
               <button
                 type="button"
                 onClick={() => void handleConfirm()}
-                className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-owed px-3 text-label font-medium text-white"
+                className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-owed px-3 text-label font-medium text-on-danger"
               >
                 Confirm replace
               </button>
@@ -389,7 +389,7 @@ function ReplacePlanControl({
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-accent px-3 text-label font-medium text-white disabled:opacity-60"
+              className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-accent px-3 text-label font-medium text-on-accent disabled:opacity-60"
             >
               {submitting ? "Saving…" : "Review changes"}
             </button>
@@ -495,7 +495,7 @@ function PlanForm({
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex min-h-touch items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
+        className="inline-flex min-h-touch items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
       >
         {submitting ? "Saving…" : submitLabel}
       </button>
@@ -661,7 +661,7 @@ function DeactivatePlanControl({
           type="button"
           onClick={() => void handleConfirm()}
           disabled={state.status === "submitting"}
-          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-owed px-3 text-label font-medium text-white disabled:opacity-60"
+          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-owed px-3 text-label font-medium text-on-danger disabled:opacity-60"
         >
           {state.status === "submitting" ? "Deactivating…" : "Confirm deactivate"}
         </button>

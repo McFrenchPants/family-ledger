@@ -156,7 +156,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
       <button
         type="submit"
         disabled={submitting}
-        className="min-h-touch rounded-card bg-accent px-3 text-body font-medium text-surface disabled:opacity-50"
+        className="min-h-touch rounded-card bg-accent px-3 text-body font-medium text-on-accent disabled:opacity-50"
       >
         {submitting ? "Changing…" : "Change password"}
       </button>

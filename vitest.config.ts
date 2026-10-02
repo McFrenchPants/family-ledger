@@ -24,5 +24,9 @@ export default defineConfig({
     // (jsdom-environment ones as well as the pure-logic "node" ones) but is a
     // no-op for the latter since they never render anything.
     setupFiles: ["src/test/setup.ts"],
+    // Vitest stubs CSS imports to empty strings by default. The contrast test
+    // reads the colour tokens with `import css from "./tokens.css?raw"`, so
+    // that one file must be passed through untouched.
+    css: { include: [/src\/styles\/tokens\.css/] },
   },
 });

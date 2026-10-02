@@ -116,7 +116,7 @@ function HouseholdOverview({ householdId }: { householdId: string }) {
       <div className="flex gap-2">
         <Link
           to="/add-expense"
-          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white"
+          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent"
         >
           + Expense
         </Link>

@@ -20,6 +20,19 @@ import { SetPasswordPage } from "../pages/SetPasswordPage";
 import { SignInPage } from "../pages/SignInPage";
 
 export const router = createBrowserRouter([
+  // Dev-only component gallery, outside the authenticated layout. The
+  // import.meta.env.DEV guard is statically false in a production build, so
+  // the branch and its lazy chunk are dropped from dist/ entirely.
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: "dev/components",
+          lazy: async () => ({
+            Component: (await import("../dev/ComponentsPage")).ComponentsPage,
+          }),
+        },
+      ]
+    : []),
   {
     path: "/",
     element: <RootLayout />,

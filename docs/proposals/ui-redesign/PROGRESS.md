@@ -18,7 +18,7 @@ for the design, `mockups/index.html` for the visual target.
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | UI1 | Quiet the top: Settings page, menu, role redirect | done | Branch `feature/ui-redesign-p1-quiet-top`. Verified by tests/build only; not viewed in a browser (needs signed-in session). Unused install-banner dismissal helpers left in `install-prompt.ts` for UI10 cleanup. |
-| UI2 | Tokens, dark mode, type scale, icons, primitives | todo | |
+| UI2 | Tokens, dark mode, type scale, icons, primitives | done | Branch `feature/ui-redesign-p2-tokens`. Tokens in `src/styles/tokens.css` (contrast test mutation-proofed); primitives in `src/components/ui/`; theme helper `src/lib/theme.ts` (key `family-ledger.theme`). Old class names alias the new tokens, so old pages already follow dark mode. New radii are `rounded-panel` (16) / `rounded-control` (12); `rounded-card` stays 8 until pages migrate. Dev gallery at `/dev/components` (dev builds only). |
 | UI3 | App shell and route map | todo | |
 | UI4 | Child Home (playful overdue text, encouragement) | todo | |
 | UI5 | Parent Home | todo | |
@@ -31,6 +31,10 @@ for the design, `mockups/index.html` for the visual target.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — UI2 done
+
+Design tokens (light/dark CSS variables, one source file), type scale, 36 stroke icons, and primitives (Button, Card, AmountText, StatusChip, ProgressBar, Field, Avatar, Segmented/ChipGroup, Sheet, EmptyState, InlineStatus) added; Radix dialog and toggle-group added. Dark mode follows the phone, with a stored per-device override applied before first paint (Settings switch comes in UI9). Old pages now go dark too: 29 hard-coded white-on-colour texts swapped to on-colour tokens. typecheck, lint, 451 tests, build clean; dev gallery excluded from the production build; checked in the browser at 375 px and desktop, light and dark (gallery and sign-in page only — signed-in pages not viewed). Known dark-mode rough edges on old pages, for the page phases to fix: input borders very faint, inputs have no visible focus ring (pre-existing `outline-none`), old buttons keep 8 px radius. Next: UI3 (app shell and route map).
 
 ### 2026-10-02 — UI1 done
 
