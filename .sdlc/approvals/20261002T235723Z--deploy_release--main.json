@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "074eb772d9e742a51aa612a5755874179b8d9849",
+  "approved_at": "2026-10-02T23:57:23Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "\"the account management changes have already been applied to production, you can merge and release\" followed by \"I updated your permissions, perform the release\"",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-02T23:57:49Z",
+  "consumed_by": "supervisor-agent-2026-10-02",
+  "notes": "Instructions given live by the owner to the orchestrator session and relayed verbatim to the supervisor agent. Promotes UI2-UI5 (design tokens, app shell, Child Home, Parent Home). No supabase/ changes between production and main. Preconditions on main at this SHA: 631 unit tests pass, build green. Ran: git checkout production; git merge --no-ff main -m \"Merge main into production: UI2-UI5 design tokens, app shell, Child and Parent Home\" (production 94cf465 -> 38c5a8a); git push origin production (94cf465..38c5a8a). No wrangler deploy (Cloudflare builds from production on push)."
+}
