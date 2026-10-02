@@ -7,7 +7,7 @@ import { useMembership } from "../auth/membership-context";
 import { supabase } from "../../lib/supabase";
 
 /**
- * N4.4 subscribe-to-push affordance. Rendered once from `RootLayout` (like
+ * N4.4 subscribe-to-push affordance. Rendered from the Settings page (previously `RootLayout`, like
  * `InstallBanner`) so it's available from both the Parent and Child
  * dashboards without duplicating a per-page component -- this is a per-
  * device opt-in any active member should be able to trigger from wherever
@@ -128,7 +128,7 @@ export function PushSubscribeButton() {
 
   if (state === "unsupported") {
     return (
-      <div className="mb-4 rounded-card border border-surface-border bg-surface-sunken p-3">
+      <div className="rounded-card border border-surface-border bg-surface-sunken p-3">
         <p className="text-label text-ink-muted">
           This browser does not support push notifications.
         </p>
@@ -138,7 +138,7 @@ export function PushSubscribeButton() {
 
   if (state === "ios-install-required") {
     return (
-      <div className="mb-4 rounded-card border border-surface-border bg-surface-sunken p-3">
+      <div className="rounded-card border border-surface-border bg-surface-sunken p-3">
         <p className="text-label text-ink-muted">
           To receive notifications on this device, first install Family Ledger to your Home
           Screen (Share, then "Add to Home Screen"), then open it from there.
@@ -149,7 +149,7 @@ export function PushSubscribeButton() {
 
   if (state === "subscribed") {
     return (
-      <div className="mb-4 rounded-card border border-accent/40 bg-accent-soft p-3">
+      <div className="rounded-card border border-accent/40 bg-accent-soft p-3">
         <p role="status" className="text-label text-accent">
           Notifications enabled on this device.
         </p>
@@ -158,7 +158,7 @@ export function PushSubscribeButton() {
   }
 
   return (
-    <div className="mb-4 flex flex-col gap-2 rounded-card border border-surface-border bg-surface-sunken p-3">
+    <div className="flex flex-col gap-2 rounded-card border border-surface-border bg-surface-sunken p-3">
       <p className="text-label text-ink-muted">Enable notifications on this device.</p>
 
       {state === "denied" && (

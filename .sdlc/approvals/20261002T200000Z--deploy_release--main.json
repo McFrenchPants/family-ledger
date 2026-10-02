@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "ddea93d66a11c2afbe35f09ad68d859c90e262a0",
+  "approved_at": "2026-10-02T20:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "promote to production",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-02T20:05:00Z",
+  "consumed_by": "orchestrator-session-2026-10-02",
+  "notes": "Preconditions: typecheck, lint, 322 tests, build green on main at this SHA; db tests 305 pass. Hosted prerequisites done by owner/orchestrator 2026-10-02: migration 20260908090000 applied, APP_BASE_URL secret set, functions deployed, OTP expiry 86400, min password 8. Promotes account management (13 commits). Migration 20260908100000 (push status function) is in main but not yet applied to hosted; no app code depends on it."
+}
