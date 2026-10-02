@@ -343,7 +343,7 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
         <button
           type="submit"
           disabled={submitState.status === "submitting"}
-          className="inline-flex min-h-touch items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
+          className="inline-flex min-h-touch items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
         >
           {submitState.status === "submitting" ? "Saving…" : "Save Expense"}
         </button>

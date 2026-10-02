@@ -105,7 +105,7 @@ function ChildHome({ householdId, memberId }: { householdId: string; memberId: s
 
       <Link
         to="/add-expense"
-        className="inline-flex min-h-touch items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white"
+        className="inline-flex min-h-touch items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent"
       >
         + Add Expense
       </Link>

@@ -6,7 +6,7 @@ export function NotFoundPage() {
       <h2 className="text-title font-semibold">Page not found</h2>
       <Link
         to="/parent"
-        className="inline-flex min-h-touch w-fit items-center rounded-card bg-accent px-4 text-body font-medium text-white"
+        className="inline-flex min-h-touch w-fit items-center rounded-card bg-accent px-4 text-body font-medium text-on-accent"
       >
         Back to dashboard
       </Link>

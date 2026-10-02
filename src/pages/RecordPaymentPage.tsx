@@ -271,7 +271,7 @@ function RecordForm({ membership }: { membership: Membership }) {
         <button
           type="button"
           onClick={() => navigate("/parent")}
-          className="inline-flex min-h-touch items-center justify-center rounded-card bg-settled px-4 text-body font-medium text-white"
+          className="inline-flex min-h-touch items-center justify-center rounded-card bg-settled px-4 text-body font-medium text-on-ok"
         >
           Done
         </button>
@@ -414,7 +414,7 @@ function RecordForm({ membership }: { membership: Membership }) {
             onClick={() => setType(option)}
             aria-pressed={type === option}
             className={`min-h-touch flex-1 rounded-card px-3 text-body font-medium ${
-              type === option ? "bg-settled text-white" : "text-ink-muted"
+              type === option ? "bg-settled text-on-ok" : "text-ink-muted"
             }`}
           >
             {TYPE_COPY[option].label}
@@ -538,7 +538,7 @@ function RecordForm({ membership }: { membership: Membership }) {
         <button
           type="submit"
           disabled={submitState.status === "submitting"}
-          className="inline-flex min-h-touch items-center justify-center gap-2 rounded-card bg-settled px-4 text-body font-medium text-white disabled:opacity-60"
+          className="inline-flex min-h-touch items-center justify-center gap-2 rounded-card bg-settled px-4 text-body font-medium text-on-ok disabled:opacity-60"
         >
           <span aria-hidden="true">✓</span>
           {submitState.status === "submitting" ? "Saving…" : `Save ${copy.label}`}

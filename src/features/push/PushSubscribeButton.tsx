@@ -178,7 +178,7 @@ export function PushSubscribeButton() {
         type="button"
         onClick={() => void handleSubscribeClick()}
         disabled={state === "requesting" || state === "subscribing"}
-        className="inline-flex min-h-touch items-center justify-center self-start rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
+        className="inline-flex min-h-touch items-center justify-center self-start rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
       >
         {state === "requesting" || state === "subscribing" ? "Enabling…" : "Enable notifications"}
       </button>

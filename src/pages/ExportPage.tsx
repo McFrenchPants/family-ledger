@@ -104,7 +104,7 @@ function Export({ householdId }: { householdId: string }) {
             type="button"
             onClick={handleDownloadCsv}
             disabled={state.transactions.length === 0}
-            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
+            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
           >
             Download CSV
           </button>
@@ -142,7 +142,7 @@ function Export({ householdId }: { householdId: string }) {
           <button
             type="button"
             onClick={handleDownloadJsonBackup}
-            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-white disabled:opacity-60"
+            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
           >
             Download JSON Backup
           </button>

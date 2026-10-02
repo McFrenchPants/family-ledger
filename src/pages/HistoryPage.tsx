@@ -448,7 +448,7 @@ function VoidControl({
         <button
           type="submit"
           disabled={state.status === "submitting" || reason.trim() === ""}
-          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-owed px-3 text-label font-medium text-white disabled:opacity-60"
+          className="inline-flex min-h-touch flex-1 items-center justify-center rounded-card bg-owed px-3 text-label font-medium text-on-danger disabled:opacity-60"
         >
           {state.status === "submitting" ? "Voiding…" : "Confirm void"}
         </button>
