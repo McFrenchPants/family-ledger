@@ -83,7 +83,7 @@ export function PushTestSendButton() {
   }
 
   return (
-    <div className="mb-4 flex flex-col gap-2 rounded-card border border-dashed border-ink-subtle/40 bg-surface-sunken/60 p-3">
+    <div className="flex flex-col gap-2 rounded-card border border-dashed border-ink-subtle/40 bg-surface-sunken/60 p-3">
       <p className="text-label font-semibold uppercase tracking-wide text-ink-subtle">
         Debug: test push delivery
       </p>

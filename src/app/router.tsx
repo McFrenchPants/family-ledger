@@ -1,7 +1,8 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 
 import { RootLayout } from "./RootLayout";
 import { RequireRole } from "../features/auth/RequireRole";
+import { RoleHomeRedirect } from "../features/auth/RoleHomeRedirect";
 import { AccountPage } from "../pages/AccountPage";
 import { AddExpensePage } from "../pages/AddExpensePage";
 import { ChildDashboardPage } from "../pages/ChildDashboardPage";
@@ -14,6 +15,7 @@ import { NotFoundPage } from "../pages/NotFoundPage";
 import { ParentDashboardPage } from "../pages/ParentDashboardPage";
 import { PaymentPlanPage } from "../pages/PaymentPlanPage";
 import { RecordPaymentPage } from "../pages/RecordPaymentPage";
+import { SettingsPage } from "../pages/SettingsPage";
 import { SetPasswordPage } from "../pages/SetPasswordPage";
 import { SignInPage } from "../pages/SignInPage";
 
@@ -22,7 +24,7 @@ export const router = createBrowserRouter([
     path: "/",
     element: <RootLayout />,
     children: [
-      { index: true, element: <Navigate to="/parent" replace /> },
+      { index: true, element: <RoleHomeRedirect /> },
       {
         path: "parent",
         element: (
@@ -78,6 +80,7 @@ export const router = createBrowserRouter([
       { path: "sign-in", element: <SignInPage /> },
       { path: "set-password", element: <SetPasswordPage /> },
       { path: "account", element: <AccountPage /> },
+      { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
