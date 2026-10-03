@@ -289,3 +289,11 @@ sequential except where noted.
     allocation" non-goal in a limited form. Touches the money core: design
     spec first. Branch `feature/category-balances`; spec at
     `docs/proposals/category-balances/DESIGN_SPEC.md`.
+
+17. **Tap a Recent activity item on Home to open it on the Activity page** — status: `ready` — analysis: none (small; owner-requested 2026-10-03)
+    Requested by the owner 2026-10-03: the Recent activity list on Home (the
+    Parent and Child versions) is read-only. Each item should be tappable and
+    take the person straight to the Activity page (`src/pages/ActivityPage.tsx`)
+    with that item already expanded (and scrolled into view). Front-end only,
+    expected; check that the Activity page can find an item that is older than
+    what it first loads, and that a Child only ever reaches their own items.
