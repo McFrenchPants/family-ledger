@@ -6,6 +6,7 @@ import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { ChoiceChips } from "../components/ui/ChoiceChips";
 import { Icon } from "../components/ui/Icon";
+import { LoadError } from "../components/ui/LoadError";
 import { StickyActionBar } from "../components/ui/StickyActionBar";
 import { buildExpenseMemberSelector, validateExpenseForm } from "../features/ledger/add-expense";
 import type { ExpenseFormErrors } from "../features/ledger/add-expense";
@@ -65,12 +66,10 @@ export function AddExpensePage() {
 
     case "error":
       return (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-danger">Could not load your account: {membership.message}</p>
-          <Button size="sm" onClick={membership.retry}>
-            Retry
-          </Button>
-        </div>
+        <LoadError
+          message={`Could not load your account: ${membership.message}`}
+          onRetry={membership.retry}
+        />
       );
 
     case "no-membership":
@@ -170,12 +169,10 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
 
   if (formData.status === "error") {
     return (
-      <div role="alert" className="flex flex-col items-start gap-2">
-        <p className="text-label text-danger">Could not load this form: {formData.message}</p>
-        <Button size="sm" onClick={formData.retry}>
-          Retry
-        </Button>
-      </div>
+      <LoadError
+        message={`Could not load this form: ${formData.message}`}
+        onRetry={formData.retry}
+      />
     );
   }
 

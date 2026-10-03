@@ -6,6 +6,7 @@ import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cx } from "../components/ui/cx";
+import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
 import type { IconName } from "../components/ui/icon-paths";
 import { ProgressBar } from "../components/ui/ProgressBar";
@@ -47,7 +48,7 @@ import { useChildPaymentProgress } from "../features/payment-plans/useChildPayme
 import { usePaymentPlan } from "../features/payment-plans/usePaymentPlan";
 import { formatCents } from "../lib/currency";
 import { formatCalendarDate, todayInZone, type CalendarDate } from "../lib/dates";
-import { NO_ACTIVITY_TITLE } from "../lib/messages";
+import { NO_ACTIVITY_TITLE, noActivityForMember } from "../lib/messages";
 
 /** How many recent rows a member's page shows before "See all". */
 const RECENT_ON_PAGE = 5;
@@ -504,7 +505,9 @@ function RecentCard({ member }: { member: HouseholdMemberRow }) {
       )}
 
       {activity.status === "loaded" && activity.transactions.length === 0 && (
-        <p className="mt-2 text-label text-muted">{NO_ACTIVITY_TITLE}</p>
+        <EmptyState icon="list" title={NO_ACTIVITY_TITLE}>
+          {noActivityForMember(member.name)}
+        </EmptyState>
       )}
 
       {activity.status === "loaded" && activity.transactions.length > 0 && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
+import { Button } from "../../components/ui/Button";
 import { useMembership } from "../auth/membership-context";
 import { supabase } from "../../lib/supabase";
 
@@ -97,11 +98,11 @@ export function PushTestSendButton({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-card border border-dashed border-ink-subtle/40 bg-surface-sunken/60 p-3">
-      <p className="text-label font-semibold uppercase tracking-wide text-ink-subtle">
+    <div className="flex flex-col gap-2 rounded-control border border-dashed border-border-strong bg-sunken p-3">
+      <p className="text-caption font-semibold uppercase tracking-wide text-subtle">
         Debug: test push delivery
       </p>
-      <p className="text-label text-ink-muted">
+      <p className="text-label text-muted">
         Not a real notification feature. Sends one throwaway test push to a subscription below and
         shows the raw delivery result.
       </p>
@@ -167,29 +168,30 @@ function SubscriptionTestRow({ row }: { row: SubscriptionRow }) {
   }
 
   return (
-    <li className="flex flex-col gap-1 rounded-card border border-surface-border bg-surface px-3 py-2">
+    <li className="flex flex-col gap-1 rounded-control border border-border bg-surface px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-label text-ink-muted" title={row.endpoint}>
+        <span className="min-w-0 truncate text-label text-muted" title={row.endpoint}>
           {shortenEndpoint(row.endpoint)}
         </span>
-        <button
-          type="button"
+        <Button
+          size="sm"
+          icon="send"
           onClick={() => void handleSendClick()}
           disabled={state.status === "sending"}
-          className="inline-flex min-h-touch shrink-0 items-center justify-center rounded-card border border-ink-subtle/40 px-3 text-label font-medium text-ink-muted disabled:opacity-60"
+          className="shrink-0"
         >
           {state.status === "sending" ? "Sending…" : "Send test push"}
-        </button>
+        </Button>
       </div>
 
       {state.status === "done" && (
-        <p role="status" className="text-label text-ink-muted">
+        <p role="status" className="text-label text-muted">
           Result: {state.message}
         </p>
       )}
 
       {state.status === "error" && (
-        <p role="alert" className="text-label text-owed">
+        <p role="alert" className="text-label text-danger">
           {state.message}
         </p>
       )}

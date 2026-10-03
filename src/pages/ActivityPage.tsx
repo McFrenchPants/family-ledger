@@ -10,6 +10,7 @@ import { cx } from "../components/ui/cx";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Field } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
+import { LoadError } from "../components/ui/LoadError";
 import type { IconName } from "../components/ui/icon-paths";
 import { Segmented } from "../components/ui/Segmented";
 import { Sheet, SheetClose } from "../components/ui/Sheet";
@@ -27,7 +28,7 @@ import { useHouseholdTimezone } from "../features/ledger/useHouseholdTimezone";
 import { useHouseholdMembers } from "../features/members/useHouseholdMembers";
 import { addDays, formatCalendarDate, todayInZone } from "../lib/dates";
 import type { CalendarDate } from "../lib/dates";
-import { NO_ACTIVITY_HINT, NO_ACTIVITY_TITLE } from "../lib/messages";
+import { NO_ACTIVITY_HINT, NO_ACTIVITY_HINT_PARENT, NO_ACTIVITY_TITLE } from "../lib/messages";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -101,12 +102,10 @@ function ChildChips({
 }) {
   if (balances.status === "error") {
     return (
-      <div role="alert" className="flex flex-wrap items-center gap-2">
-        <p className="text-label text-danger">Could not load children: {balances.message}</p>
-        <Button size="sm" onClick={balances.retry}>
-          Retry
-        </Button>
-      </div>
+      <LoadError
+        message={`Could not load children: ${balances.message}`}
+        onRetry={balances.retry}
+      />
     );
   }
   const options = [
@@ -233,12 +232,10 @@ function Activity({
       )}
 
       {activity.status === "error" && (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-danger">Could not load activity: {activity.message}</p>
-          <Button size="sm" onClick={activity.retry}>
-            Retry
-          </Button>
-        </div>
+        <LoadError
+          message={`Could not load activity: ${activity.message}`}
+          onRetry={activity.retry}
+        />
       )}
 
       {activity.status === "loaded" && (
@@ -286,9 +283,7 @@ function Activity({
                     onShowEveryone ? <Button onClick={onShowEveryone}>Show everyone</Button> : undefined
                   }
                 >
-                  {isParent
-                    ? "Expenses and payments show up here as soon as anyone records them."
-                    : NO_ACTIVITY_HINT}
+                  {isParent ? NO_ACTIVITY_HINT_PARENT : NO_ACTIVITY_HINT}
                 </EmptyState>
               )}
             </Card>
@@ -317,7 +312,7 @@ function Activity({
           {activity.loadMoreError && (
             <div role="alert" className="flex flex-col items-start gap-2">
               <p className="text-label text-danger">Could not load more: {activity.loadMoreError}</p>
-              <Button size="sm" onClick={activity.loadMore}>
+              <Button size="sm" icon="undo" onClick={activity.loadMore}>
                 Try again
               </Button>
             </div>
@@ -368,7 +363,7 @@ function FiltersForm({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={categoryFieldId} className="text-label font-semibold text-ink">
+        <label htmlFor={categoryFieldId} className="text-label font-semibold text-muted">
           Category
         </label>
         <select

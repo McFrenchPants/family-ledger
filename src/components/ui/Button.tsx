@@ -3,24 +3,9 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cx } from "./cx";
 import { Icon } from "./Icon";
 import type { IconName } from "./icon-paths";
+import { buttonClass, type ButtonSize, type ButtonVariant } from "./styles";
 
-export type ButtonVariant = "primary" | "ok" | "secondary" | "ghost" | "danger";
-export type ButtonSize = "sm" | "md" | "lg";
-
-const VARIANT: Record<ButtonVariant, string> = {
-  primary: "border-accent bg-accent text-on-accent",
-  ok: "border-ok-btn bg-ok-btn text-on-ok",
-  danger: "border-danger bg-danger text-on-danger",
-  secondary: "border-border-strong bg-surface text-ink",
-  ghost: "border-transparent bg-transparent text-accent-text",
-};
-
-// 44px minimum touch target, 48px main buttons, 56px the screen's main action.
-const SIZE: Record<ButtonSize, string> = {
-  sm: "min-h-touch px-3.5 text-label",
-  md: "min-h-touch-lg px-[18px] text-body",
-  lg: "min-h-touch-xl px-5 text-head",
-};
+export type { ButtonSize, ButtonVariant } from "./styles";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -55,15 +40,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       data-variant={variant}
-      className={cx(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control border font-semibold",
-        "transition-colors duration-toggle motion-reduce:transition-none",
-        "disabled:cursor-not-allowed disabled:opacity-60",
-        VARIANT[variant],
-        SIZE[size],
-        fullWidth && "w-full",
-        className,
-      )}
+      className={cx(buttonClass({ variant, size, fullWidth }), className)}
       {...rest}
     >
       {loading ? (

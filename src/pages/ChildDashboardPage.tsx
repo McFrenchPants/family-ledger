@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 
 import { AmountText } from "../components/ui/AmountText";
 import { Avatar } from "../components/ui/Avatar";
-import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cx } from "../components/ui/cx";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
+import { LoadError } from "../components/ui/LoadError";
 import type { IconName } from "../components/ui/icon-paths";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { StatusChip } from "../components/ui/StatusChip";
@@ -175,17 +175,6 @@ function PaymentReceivedCard({ message, onDismiss }: { message: string; onDismis
 /* ------------------------------------------------------------------ */
 /* You owe                                                              */
 /* ------------------------------------------------------------------ */
-
-function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-2">
-      <p className="text-label text-danger">{message}</p>
-      <Button size="sm" onClick={onRetry}>
-        Retry
-      </Button>
-    </div>
-  );
-}
 
 function OweCard({
   balance,

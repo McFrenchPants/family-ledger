@@ -29,13 +29,13 @@ export function ToggleField({
   const descriptionId = useId();
 
   return (
-    <div className="flex min-h-touch items-center justify-between gap-4 rounded-card border border-surface-border bg-surface px-3 py-2">
+    <div className="flex min-h-touch items-center justify-between gap-4 rounded-control border border-border bg-surface px-3 py-2">
       <span className="flex flex-col">
         <span id={labelId} className="text-body font-medium text-ink">
           {label}
         </span>
         {description ? (
-          <span id={descriptionId} className="text-label text-ink-muted">
+          <span id={descriptionId} className="text-label text-muted">
             {description}
           </span>
         ) : null}
@@ -47,7 +47,7 @@ export function ToggleField({
         disabled={disabled}
         aria-labelledby={labelId}
         aria-describedby={description ? descriptionId : undefined}
-        className="relative h-6 w-11 shrink-0 rounded-full border border-surface-border bg-surface-sunken transition-colors motion-reduce:transition-none data-[state=checked]:border-accent data-[state=checked]:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        className="relative h-6 w-11 shrink-0 rounded-full border border-border-strong bg-sunken transition-colors motion-reduce:transition-none data-[state=checked]:border-accent data-[state=checked]:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Switch.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-surface shadow transition-transform will-change-transform motion-reduce:transition-none data-[state=checked]:translate-x-[1.375rem]" />
       </Switch.Root>

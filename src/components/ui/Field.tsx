@@ -1,6 +1,7 @@
 import { forwardRef, useId, type InputHTMLAttributes } from "react";
 
 import { cx } from "./cx";
+import { INPUT_BASE_CLASS, LABEL_CLASS } from "./styles";
 
 type FieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id"> & {
   label: string;
@@ -25,7 +26,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
 
   return (
     <div className={cx("flex flex-col gap-1.5", className)}>
-      <label htmlFor={inputId} className="text-label font-semibold text-ink">
+      <label htmlFor={inputId} className={LABEL_CLASS}>
         {label}
       </label>
       <input
@@ -33,11 +34,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
         id={inputId}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
-        className={cx(
-          "min-h-touch-lg rounded-control border bg-surface px-3 text-body text-ink",
-          "placeholder:text-subtle disabled:opacity-60",
-          error ? "border-danger" : "border-border-strong",
-        )}
+        className={cx(INPUT_BASE_CLASS, error ? "border-danger" : "border-border-strong")}
         {...rest}
       />
       {hint ? (

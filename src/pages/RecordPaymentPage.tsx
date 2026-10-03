@@ -14,6 +14,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { ChoiceChips } from "../components/ui/ChoiceChips";
 import { Icon } from "../components/ui/Icon";
+import { LoadError } from "../components/ui/LoadError";
 import { Segmented } from "../components/ui/Segmented";
 import { StatusChip } from "../components/ui/StatusChip";
 import type { StatusKind } from "../components/ui/status";
@@ -75,12 +76,10 @@ export function RecordPaymentPage() {
 
     case "error":
       return (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-danger">Could not load your account: {membership.message}</p>
-          <Button size="sm" onClick={membership.retry}>
-            Retry
-          </Button>
-        </div>
+        <LoadError
+          message={`Could not load your account: ${membership.message}`}
+          onRetry={membership.retry}
+        />
       );
 
     case "no-membership":
@@ -282,12 +281,10 @@ function RecordForm({ membership }: { membership: Membership }) {
 
   if (formData.status === "error") {
     return (
-      <div role="alert" className="flex flex-col items-start gap-2">
-        <p className="text-label text-danger">Could not load this form: {formData.message}</p>
-        <Button size="sm" onClick={formData.retry}>
-          Retry
-        </Button>
-      </div>
+      <LoadError
+        message={`Could not load this form: ${formData.message}`}
+        onRetry={formData.retry}
+      />
     );
   }
 
@@ -330,7 +327,7 @@ function RecordForm({ membership }: { membership: Membership }) {
         {submitState.periodEffect && (
           <Card className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-head">Payment Period</h2>
+              <h2 className="text-head">Payment period</h2>
               <StatusChip
                 kind={PERIOD_STATUS_KIND[submitState.periodEffect.status]}
                 label={PERIOD_STATUS_LABELS[submitState.periodEffect.status]}

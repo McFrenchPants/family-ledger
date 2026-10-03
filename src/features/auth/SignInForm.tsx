@@ -1,10 +1,9 @@
 import { useId, useState } from "react";
 import type { FormEvent } from "react";
 
+import { Button } from "../../components/ui/Button";
+import { INPUT_CLASS, LABEL_CLASS } from "../../components/ui/styles";
 import { supabase } from "../../lib/supabase";
-
-const fieldClass =
-  "min-h-touch rounded-card border border-surface-border bg-surface px-3 text-body text-ink outline-none focus:border-accent";
 
 /**
  * Email + password sign-in (ADR-010: no magic link, no self-service sign-up --
@@ -54,26 +53,27 @@ export function SignInForm() {
   }
 
   return (
-    <form className="flex flex-col gap-3" onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-col gap-1">
-        <label htmlFor={emailId} className="text-label font-medium text-ink">
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={emailId} className={LABEL_CLASS}>
           Email
         </label>
         <input
           id={emailId}
           type="email"
           autoComplete="username"
+          spellCheck={false}
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={fieldClass}
+          className={INPUT_CLASS}
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor={passwordId} className="text-label font-medium text-ink">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={passwordId} className={LABEL_CLASS}>
           Password
         </label>
         <input
@@ -85,23 +85,19 @@ export function SignInForm() {
           onChange={(event) => setPassword(event.target.value)}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={fieldClass}
+          className={INPUT_CLASS}
         />
       </div>
 
       {error ? (
-        <p id={errorId} role="alert" className="text-label text-owed">
+        <p id={errorId} role="alert" className="text-label font-semibold text-danger">
           {error}
         </p>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="min-h-touch rounded-card bg-accent px-3 text-body font-medium text-on-accent disabled:opacity-50"
-      >
+      <Button type="submit" variant="primary" size="lg" fullWidth disabled={submitting}>
         {submitting ? "Signing in…" : "Sign in"}
-      </button>
+      </Button>
     </form>
   );
 }
