@@ -8,7 +8,7 @@ import { Card } from "../components/ui/Card";
 import { cx } from "../components/ui/cx";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
-import type { IconName } from "../components/ui/icon-paths";
+import { transactionLook } from "../components/ui/transaction-look";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { StatusChip } from "../components/ui/StatusChip";
 import { useMembership } from "../features/auth/membership-context";
@@ -469,12 +469,6 @@ function PlanTerms({
   );
 }
 
-const TYPE_LOOK: Record<string, { icon: IconName; box: string; label: string }> = {
-  payment: { icon: "dollar", box: "bg-ok-soft text-ok", label: "Payment" },
-  adjustment: { icon: "edit", box: "bg-accent-soft text-accent-text", label: "Adjustment" },
-  expense: { icon: "tag", box: "bg-sunken text-muted", label: "Expense" },
-};
-
 function RecentCard({ member }: { member: HouseholdMemberRow }) {
   const activity = useRecentActivity(member.id);
 
@@ -522,7 +516,7 @@ function RecentCard({ member }: { member: HouseholdMemberRow }) {
 }
 
 function RecentRow({ transaction }: { transaction: RecentTransaction }) {
-  const look = TYPE_LOOK[transaction.type] ?? TYPE_LOOK.expense!;
+  const look = transactionLook(transaction.type);
   const detail = transaction.type === "expense" ? transaction.categoryName : look.label;
   const subline = [
     formatCalendarDate(transaction.occurredOn, "short"),
@@ -538,7 +532,7 @@ function RecentRow({ transaction }: { transaction: RecentTransaction }) {
       className="flex min-h-[60px] items-center gap-3 border-t border-border py-2.5 first:border-t-0"
     >
       <span className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-control", look.box)}>
-        <Icon name={transaction.isVoided ? "ban" : look.icon} />
+        <Icon name={look.icon} />
       </span>
       <span className="min-w-0 grow">
         <span className="block truncate font-semibold">{transaction.description}</span>

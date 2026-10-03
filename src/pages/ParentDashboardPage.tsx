@@ -7,7 +7,7 @@ import { Card } from "../components/ui/Card";
 import { cx } from "../components/ui/cx";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
-import type { IconName } from "../components/ui/icon-paths";
+import { transactionLook } from "../components/ui/transaction-look";
 import { LinkButton } from "../components/ui/LinkButton";
 import { LoadError } from "../components/ui/LoadError";
 import { ProgressBar } from "../components/ui/ProgressBar";
@@ -489,12 +489,6 @@ function RecentActivityCard({
   );
 }
 
-const TYPE_LOOK: Record<string, { icon: IconName; box: string; label: string }> = {
-  payment: { icon: "dollar", box: "bg-ok-soft text-ok", label: "Payment" },
-  adjustment: { icon: "edit", box: "bg-accent-soft text-accent-text", label: "Adjustment" },
-  expense: { icon: "tag", box: "bg-sunken text-muted", label: "Expense" },
-};
-
 function ActivityRow({
   transaction,
   childName,
@@ -502,7 +496,7 @@ function ActivityRow({
   transaction: HouseholdRecentTransaction;
   childName: string | null;
 }) {
-  const look = TYPE_LOOK[transaction.type] ?? TYPE_LOOK.expense!;
+  const look = transactionLook(transaction.type);
   const detail = transaction.type === "expense" ? transaction.categoryName : look.label;
   const subline = [
     formatCalendarDate(transaction.occurredOn, "short"),

@@ -11,7 +11,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { Field } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { LoadError } from "../components/ui/LoadError";
-import type { IconName } from "../components/ui/icon-paths";
+import { transactionLook } from "../components/ui/transaction-look";
 import { Segmented } from "../components/ui/Segmented";
 import { Sheet, SheetClose } from "../components/ui/Sheet";
 import { TONE_CLASSES } from "../components/ui/status";
@@ -454,12 +454,6 @@ function enteredAt(instant: string, zone: string): string {
   }).format(new Date(instant));
 }
 
-const TYPE_LOOK: Record<string, { icon: IconName; box: string; label: string }> = {
-  payment: { icon: "check", box: "bg-ok-soft text-ok", label: "Payment" },
-  adjustment: { icon: "edit", box: "bg-accent-soft text-accent-text", label: "Adjustment" },
-  expense: { icon: "tag", box: "bg-sunken text-muted", label: "Expense" },
-};
-
 function ActivityItem({
   transaction,
   childName,
@@ -475,7 +469,7 @@ function ActivityItem({
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  const look = TYPE_LOOK[transaction.type] ?? TYPE_LOOK.expense!;
+  const look = transactionLook(transaction.type);
   const detail =
     transaction.type === "expense" ? (transaction.categoryName ?? "Expense") : look.label;
   const subline = [

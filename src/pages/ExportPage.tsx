@@ -141,7 +141,7 @@ function Export({ householdId }: { householdId: string }) {
           <>
             <p className="text-label text-muted">
               A complete JSON snapshot of this household&apos;s settings, members, ledger
-              transactions, payment plans and periods, categories, and audit history -- suitable
+              transactions, payment plans and periods, categories, and audit history, suitable
               for backup or re-import, not for reading.
             </p>
             <Button
@@ -150,7 +150,7 @@ function Export({ householdId }: { householdId: string }) {
               onClick={handleDownloadJsonBackup}
               className="self-start"
             >
-              Download JSON Backup
+              Download JSON backup
             </Button>
           </>
         )}
