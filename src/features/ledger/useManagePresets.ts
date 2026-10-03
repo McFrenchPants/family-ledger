@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
  * Row shape from `expense_presets.select(...)`, with the embedded
  * `category:categories(name)` relation used throughout this codebase for
  * showing a category's name alongside a row that only stores its id (see
- * `useHistory`/`useRecentActivity`/`useLedgerExport`). Supabase returns an
+ * `useActivity`/`useRecentActivity`/`useLedgerExport`). Supabase returns an
  * embedded to-one relation as an object (or `null` when `category_id` is
  * `null`), never an array, because `category_id` -> `categories.id` is a
  * many-to-one FK.

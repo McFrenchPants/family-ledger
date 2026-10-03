@@ -1,16 +1,22 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { EmptyState } from "../components/ui/EmptyState";
+import { Field } from "../components/ui/Field";
 import { useMembership } from "../features/auth/membership-context";
+import { LoadError } from "../features/family/FamilyParts";
 import { useManageCategories } from "../features/ledger/useManageCategories";
 import type { ManagedCategory } from "../features/ledger/useManageCategories";
+import { ActiveTag, INPUT_CLASS, SubPageHeader } from "../features/settings/SettingsParts";
 import { supabase } from "../lib/supabase";
 
 /**
- * `/parent/categories` (C1). Parent-only the same way `/members` is: gated
+ * `/settings/categories` (C1). Parent-only the same way `/family` is: gated
  * by `RequireRole role="parent"` in `router.tsx`, so this component can
  * assume `useMembership()` is already `{status: "loaded", ..., role:
- * "parent"}` -- see `ManageMembersPage`'s identical assumption and header
+ * "parent"}` -- see `FamilyPage`'s identical assumption and header
  * comment for why that guard is routing convenience, not the security
  * control. Every write this page makes goes through the existing Parent-only
  * RLS policies on `categories` (see
@@ -33,28 +39,20 @@ function ManageCategories({ householdId }: { householdId: string }) {
   const categoriesState = useManageCategories(householdId);
 
   return (
-    <section className="flex flex-col gap-6">
-      <h2 className="text-title font-semibold">Manage Categories</h2>
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
+      <SubPageHeader title="Categories" />
 
       {categoriesState.status === "loading" && (
-        <p role="status" className="text-label text-ink-subtle">
+        <p role="status" className="text-label text-subtle">
           Loading categories…
         </p>
       )}
 
       {categoriesState.status === "error" && (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-owed">
-            Could not load categories: {categoriesState.message}
-          </p>
-          <button
-            type="button"
-            onClick={categoriesState.retry}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-          >
-            Retry
-          </button>
-        </div>
+        <LoadError
+          message={`Could not load categories: ${categoriesState.message}`}
+          onRetry={categoriesState.retry}
+        />
       )}
 
       {categoriesState.status === "loaded" && (
@@ -69,7 +67,7 @@ function ManageCategories({ householdId }: { householdId: string }) {
           }
         }}
       />
-    </section>
+    </div>
   );
 }
 
@@ -81,15 +79,23 @@ function CategoryList({
   refetch: () => void;
 }) {
   if (categories.length === 0) {
-    return <p className="text-label text-ink-subtle">No categories yet.</p>;
+    return (
+      <Card>
+        <EmptyState icon="tag" title="No categories yet">
+          Add one below to sort expenses.
+        </EmptyState>
+      </Card>
+    );
   }
 
   return (
-    <ul className="flex flex-col gap-2">
-      {categories.map((category) => (
-        <CategoryRow key={category.id} category={category} refetch={refetch} />
-      ))}
-    </ul>
+    <Card as="section" aria-label="Categories" className="px-4 py-1">
+      <ul>
+        {categories.map((category) => (
+          <CategoryRow key={category.id} category={category} refetch={refetch} />
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -159,11 +165,11 @@ function CategoryRow({
   }
 
   return (
-    <li className="flex flex-col gap-2 rounded-card border border-surface-border px-4 py-3">
-      <div className="flex items-center justify-between gap-2">
+    <li className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         {action.kind === "rename" ? (
           <form
-            className="flex flex-1 items-center gap-2"
+            className="flex flex-1 flex-wrap items-center gap-2"
             onSubmit={(event) => void handleRenameSubmit(event)}
           >
             <label htmlFor={`rename-${category.id}`} className="sr-only">
@@ -174,68 +180,41 @@ function CategoryRow({
               type="text"
               value={action.draftName}
               onChange={(event) => setAction({ kind: "rename", draftName: event.target.value })}
-              className="min-h-touch flex-1 rounded-card border border-surface-border px-3 text-body"
+              className={`${INPUT_CLASS} min-w-0 flex-1 basis-40`}
             />
-            <button
-              type="submit"
-              disabled={busy}
-              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-on-accent disabled:opacity-60"
-            >
+            <Button type="submit" size="sm" variant="primary" disabled={busy}>
               Save
-            </button>
-            <button
-              type="button"
-              onClick={() => setAction({ kind: "none" })}
-              className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-            >
+            </Button>
+            <Button size="sm" onClick={() => setAction({ kind: "none" })}>
               Cancel
-            </button>
+            </Button>
           </form>
         ) : (
-          <span className="flex flex-col gap-1">
-            <span className="text-body font-medium">{category.name}</span>
-            {/*
-              Status is never color-only, per this project's §17
-              accessibility rule (see `ManageMembersPage`'s identical
-              Active/Archived chip pattern) -- "Inactive" is always plain
-              text here, with the badge as a visual accent alongside it.
-            */}
-            {isActive ? (
-              <span className="inline-flex w-fit rounded-card bg-settled/10 px-2 py-0.5 text-label font-medium text-settled">
-                Active
-              </span>
-            ) : (
-              <span className="inline-flex w-fit rounded-card bg-surface-sunken px-2 py-0.5 text-label font-medium text-ink-muted">
-                Inactive
-              </span>
-            )}
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="break-words font-semibold">{category.name}</span>
+            {/* Status is never colour-only: the tag always carries a word and an icon. */}
+            <ActiveTag active={isActive} />
           </span>
         )}
 
         {action.kind !== "rename" && (
           <div className="flex shrink-0 gap-2">
-            <button
-              type="button"
+            <Button
+              size="sm"
               onClick={() => setAction({ kind: "rename", draftName: category.name })}
-              className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
             >
               Rename
-            </button>
+            </Button>
 
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void handleToggleActive()}
-              className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted disabled:opacity-60"
-            >
+            <Button size="sm" disabled={busy} onClick={() => void handleToggleActive()}>
               {isActive ? "Deactivate" : "Reactivate"}
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
       {error && (
-        <p role="alert" className="text-label text-owed">
+        <p role="alert" className="text-label font-semibold text-danger">
           {error}
         </p>
       )}
@@ -298,51 +277,45 @@ function AddCategoryForm({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-card border border-surface-border p-4">
-      <h3 className="text-body font-semibold">Add a category</h3>
+    <Card as="section" aria-labelledby="add-category-heading" className="flex flex-col gap-4">
+      <h2 id="add-category-heading" className="text-head">
+        Add a category
+      </h2>
 
-      <form className="flex flex-col gap-3" onSubmit={(event) => void handleSubmit(event)}>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-category-name" className="text-label text-ink-muted">
-            Name
-          </label>
-          <input
-            id="new-category-name"
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-        </div>
+      <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)}>
+        <Field
+          id="new-category-name"
+          label="Name"
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-category-sort-order" className="text-label text-ink-muted">
-            Sort order (optional)
-          </label>
-          <input
-            id="new-category-sort-order"
-            type="number"
-            inputMode="numeric"
-            value={sortOrderInput}
-            onChange={(event) => setSortOrderInput(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-        </div>
+        <Field
+          id="new-category-sort-order"
+          label="Sort order (optional)"
+          type="number"
+          inputMode="numeric"
+          value={sortOrderInput}
+          onChange={(event) => setSortOrderInput(event.target.value)}
+        />
 
         {state.status === "error" && (
-          <p role="alert" className="text-label text-owed">
+          <p role="alert" className="text-label font-semibold text-danger">
             {state.message}
           </p>
         )}
 
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          icon="plus"
           disabled={state.status === "submitting"}
-          className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
+          className="self-start"
         >
           {state.status === "submitting" ? "Adding…" : "Add category"}
-        </button>
+        </Button>
       </form>
-    </div>
+    </Card>
   );
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { Button } from "../../components/ui/Button";
+import { Icon } from "../../components/ui/Icon";
 import { base64UrlToUint8Array, decideInitialPushState, isPushSupported } from "./push-subscribe";
 import type { PushSubscribeState } from "./push-subscribe";
 import { isIOS, isStandalone } from "../pwa/install-prompt";
@@ -128,8 +130,8 @@ export function PushSubscribeButton() {
 
   if (state === "unsupported") {
     return (
-      <div className="rounded-card border border-surface-border bg-surface-sunken p-3">
-        <p className="text-label text-ink-muted">
+      <div className="rounded-control bg-sunken px-3 py-2.5">
+        <p className="text-label text-muted">
           This browser does not support push notifications.
         </p>
       </div>
@@ -138,8 +140,8 @@ export function PushSubscribeButton() {
 
   if (state === "ios-install-required") {
     return (
-      <div className="rounded-card border border-surface-border bg-surface-sunken p-3">
-        <p className="text-label text-ink-muted">
+      <div className="rounded-control bg-sunken px-3 py-2.5">
+        <p className="text-label text-muted">
           To receive notifications on this device, first install Family Ledger to your Home
           Screen (Share, then "Add to Home Screen"), then open it from there.
         </p>
@@ -149,8 +151,9 @@ export function PushSubscribeButton() {
 
   if (state === "subscribed") {
     return (
-      <div className="rounded-card border border-accent/40 bg-accent-soft p-3">
-        <p role="status" className="text-label text-accent">
+      <div className="flex items-start gap-2 rounded-control bg-ok-soft px-3 py-2.5 text-ok">
+        <Icon name="checkc" size={18} className="mt-px" />
+        <p role="status" className="text-label font-semibold">
           Notifications enabled on this device.
         </p>
       </div>
@@ -158,30 +161,32 @@ export function PushSubscribeButton() {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-card border border-surface-border bg-surface-sunken p-3">
-      <p className="text-label text-ink-muted">Enable notifications on this device.</p>
+    <div className="flex flex-col gap-2">
+      <p className="text-label text-muted">Enable notifications on this device.</p>
 
       {state === "denied" && (
-        <p role="alert" className="text-label text-owed">
+        <p role="alert" className="text-label font-semibold text-danger">
           Notification permission was denied. Enable notifications for this site in your browser
           settings, then try again.
         </p>
       )}
 
       {state === "error" && (
-        <p role="alert" className="text-label text-owed">
+        <p role="alert" className="text-label font-semibold text-danger">
           {errorMessage ?? "Could not enable notifications."}
         </p>
       )}
 
-      <button
-        type="button"
+      <Button
+        size="sm"
+        variant="primary"
+        icon="bell"
         onClick={() => void handleSubscribeClick()}
         disabled={state === "requesting" || state === "subscribing"}
-        className="inline-flex min-h-touch items-center justify-center self-start rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
+        className="self-start"
       >
         {state === "requesting" || state === "subscribing" ? "Enabling…" : "Enable notifications"}
-      </button>
+      </Button>
     </div>
   );
 }

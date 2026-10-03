@@ -1,8 +1,12 @@
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
 import { useMembership } from "../features/auth/membership-context";
 import { toHouseholdBackupJson } from "../features/backup/household-backup";
 import { useHouseholdBackup } from "../features/backup/useHouseholdBackup";
 import { toLedgerCsv } from "../features/ledger/ledger-export";
+import { LoadError } from "../features/family/FamilyParts";
 import { useLedgerExport } from "../features/ledger/useLedgerExport";
+import { SubPageHeader } from "../features/settings/SettingsParts";
 import { todayInZone } from "../lib/dates";
 
 /**
@@ -22,8 +26,8 @@ import { todayInZone } from "../lib/dates";
  * so a Child fetch here returns nothing useful rather than leaking anything.
  * This page adds no new database writes.
  *
- * Kept as its own small route (linked from `ParentDashboardPage`) rather than
- * folded into the dashboard itself -- S6.2's JSON backup button sits next to
+ * Kept as its own small route (linked from Settings' "Export & backup") rather
+ * than folded into Settings itself -- S6.2's JSON backup button sits next to
  * S6.1's CSV button here without reworking either.
  */
 export function ExportPage() {
@@ -71,84 +75,87 @@ function Export({ householdId }: { householdId: string }) {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-title font-semibold">Export Ledger</h2>
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
+      <SubPageHeader
+        title="Export & backup"
+        intro="Keep your own copy. Nothing is deleted from the app."
+      />
 
-      {state.status === "loading" && (
-        <p role="status" className="text-label text-ink-subtle">
-          Loading transactions…
-        </p>
-      )}
+      <Card as="section" aria-labelledby="export-csv-heading" className="flex flex-col gap-3">
+        <h2 id="export-csv-heading" className="text-head">
+          Ledger spreadsheet (CSV)
+        </h2>
 
-      {state.status === "error" && (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-owed">Could not load transactions: {state.message}</p>
-          <button
-            type="button"
-            onClick={state.retry}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {state.status === "loaded" && (
-        <>
-          <p className="text-label text-ink-subtle">
-            {state.transactions.length === 0
-              ? "No transactions to export yet."
-              : `${state.transactions.length} transaction${state.transactions.length === 1 ? "" : "s"} ready to export.`}
+        {state.status === "loading" && (
+          <p role="status" className="text-label text-subtle">
+            Loading transactions…
           </p>
-          <button
-            type="button"
-            onClick={handleDownloadCsv}
-            disabled={state.transactions.length === 0}
-            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
-          >
-            Download CSV
-          </button>
-        </>
-      )}
+        )}
 
-      <h2 className="text-title font-semibold">Full Household Backup</h2>
+        {state.status === "error" && (
+          <LoadError
+            message={`Could not load transactions: ${state.message}`}
+            onRetry={state.retry}
+          />
+        )}
 
-      {backupState.status === "loading" && (
-        <p role="status" className="text-label text-ink-subtle">
-          Preparing backup…
-        </p>
-      )}
+        {state.status === "loaded" && (
+          <>
+            <p className="text-label text-muted">
+              {state.transactions.length === 0
+                ? "No transactions to export yet."
+                : `${state.transactions.length} transaction${state.transactions.length === 1 ? "" : "s"} ready to export.`}
+            </p>
+            <Button
+              variant="primary"
+              icon="file"
+              onClick={handleDownloadCsv}
+              disabled={state.transactions.length === 0}
+              className="self-start"
+            >
+              Download CSV
+            </Button>
+          </>
+        )}
+      </Card>
 
-      {backupState.status === "error" && (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-owed">Could not prepare backup: {backupState.message}</p>
-          <button
-            type="button"
-            onClick={backupState.retry}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      <Card as="section" aria-labelledby="export-backup-heading" className="flex flex-col gap-3">
+        <h2 id="export-backup-heading" className="text-head">
+          Full household backup (JSON)
+        </h2>
 
-      {backupState.status === "loaded" && (
-        <>
-          <p className="text-label text-ink-subtle">
-            A complete JSON snapshot of this household&apos;s settings, members, ledger
-            transactions, payment plans and periods, categories, and audit history -- suitable
-            for backup or re-import, not for reading.
+        {backupState.status === "loading" && (
+          <p role="status" className="text-label text-subtle">
+            Preparing backup…
           </p>
-          <button
-            type="button"
-            onClick={handleDownloadJsonBackup}
-            className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
-          >
-            Download JSON Backup
-          </button>
-        </>
-      )}
-    </section>
+        )}
+
+        {backupState.status === "error" && (
+          <LoadError
+            message={`Could not prepare backup: ${backupState.message}`}
+            onRetry={backupState.retry}
+          />
+        )}
+
+        {backupState.status === "loaded" && (
+          <>
+            <p className="text-label text-muted">
+              A complete JSON snapshot of this household&apos;s settings, members, ledger
+              transactions, payment plans and periods, categories, and audit history -- suitable
+              for backup or re-import, not for reading.
+            </p>
+            <Button
+              variant="primary"
+              icon="download"
+              onClick={handleDownloadJsonBackup}
+              className="self-start"
+            >
+              Download JSON Backup
+            </Button>
+          </>
+        )}
+      </Card>
+    </div>
   );
 }
 

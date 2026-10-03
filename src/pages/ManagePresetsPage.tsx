@@ -1,17 +1,28 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { EmptyState } from "../components/ui/EmptyState";
+import { Field } from "../components/ui/Field";
 import { useMembership } from "../features/auth/membership-context";
+import { LoadError } from "../features/family/FamilyParts";
 import { useHouseholdCategories } from "../features/ledger/useHouseholdCategories";
 import { useManagePresets } from "../features/ledger/useManagePresets";
 import type { ManagedPreset } from "../features/ledger/useManagePresets";
+import {
+  ActiveTag,
+  INPUT_CLASS,
+  LABEL_CLASS,
+  SubPageHeader,
+} from "../features/settings/SettingsParts";
 import { formatCents, parsePositiveMoney, toDecimalString } from "../lib/currency";
 import { supabase } from "../lib/supabase";
 
 /**
- * `/parent/presets` (C3). Parent-only the same way `/parent/categories` is:
- * gated by `RequireRole role="parent"` in `router.tsx`, so this component can
- * assume `useMembership()` is already `{status: "loaded", ..., role:
+ * `/settings/presets` (C3). Parent-only the same way `/settings/categories`
+ * is: gated by `RequireRole role="parent"` in `router.tsx`, so this component
+ * can assume `useMembership()` is already `{status: "loaded", ..., role:
  * "parent"}` -- see `ManageCategoriesPage`'s identical assumption and header
  * comment for why that guard is routing convenience, not the security
  * control. Every write this page makes goes through the existing Parent-only
@@ -38,26 +49,20 @@ function ManagePresets({ householdId }: { householdId: string }) {
   const categoryOptions = categoriesState.status === "loaded" ? categoriesState.categories : [];
 
   return (
-    <section className="flex flex-col gap-6">
-      <h2 className="text-title font-semibold">Manage Presets</h2>
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
+      <SubPageHeader title="Quick-add presets" />
 
       {presetsState.status === "loading" && (
-        <p role="status" className="text-label text-ink-subtle">
+        <p role="status" className="text-label text-subtle">
           Loading presets…
         </p>
       )}
 
       {presetsState.status === "error" && (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-owed">Could not load presets: {presetsState.message}</p>
-          <button
-            type="button"
-            onClick={presetsState.retry}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-          >
-            Retry
-          </button>
-        </div>
+        <LoadError
+          message={`Could not load presets: ${presetsState.message}`}
+          onRetry={presetsState.retry}
+        />
       )}
 
       {presetsState.status === "loaded" && (
@@ -77,7 +82,7 @@ function ManagePresets({ householdId }: { householdId: string }) {
           }
         }}
       />
-    </section>
+    </div>
   );
 }
 
@@ -93,20 +98,62 @@ function PresetList({
   refetch: () => void;
 }) {
   if (presets.length === 0) {
-    return <p className="text-label text-ink-subtle">No presets yet.</p>;
+    return (
+      <Card>
+        <EmptyState icon="plus" title="No presets yet">
+          Presets are one-tap expenses, like a school lunch. Add one below.
+        </EmptyState>
+      </Card>
+    );
   }
 
   return (
-    <ul className="flex flex-col gap-2">
-      {presets.map((preset) => (
-        <PresetRow
-          key={preset.id}
-          preset={preset}
-          categoryOptions={categoryOptions}
-          refetch={refetch}
-        />
-      ))}
-    </ul>
+    <Card as="section" aria-label="Presets" className="px-4 py-1">
+      <ul>
+        {presets.map((preset) => (
+          <PresetRow
+            key={preset.id}
+            preset={preset}
+            categoryOptions={categoryOptions}
+            refetch={refetch}
+          />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/** A labelled <select> of the household's categories, with "No category" first. */
+function CategorySelect({
+  id,
+  value,
+  onChange,
+  categoryOptions,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  categoryOptions: readonly CategoryOption[];
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={LABEL_CLASS}>
+        Category (optional)
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={INPUT_CLASS}
+      >
+        <option value="">No category</option>
+        {categoryOptions.map((category) => (
+          <option key={category.id} value={category.id}>
+            {category.name}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -201,122 +248,73 @@ function PresetRow({
   }
 
   return (
-    <li className="flex flex-col gap-2 rounded-card border border-surface-border px-4 py-3">
+    <li className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0">
       {action.kind === "edit" ? (
         <form className="flex flex-col gap-3" onSubmit={(event) => void handleEditSubmit(event)}>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={`edit-label-${preset.id}`} className="text-label text-ink-muted">
-              Label
-            </label>
-            <input
-              id={`edit-label-${preset.id}`}
-              type="text"
-              value={action.draftLabel}
-              onChange={(event) =>
-                setAction({ ...action, kind: "edit", draftLabel: event.target.value })
-              }
-              className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-            />
-          </div>
+          <Field
+            id={`edit-label-${preset.id}`}
+            label="Label"
+            type="text"
+            value={action.draftLabel}
+            onChange={(event) =>
+              setAction({ ...action, kind: "edit", draftLabel: event.target.value })
+            }
+          />
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor={`edit-amount-${preset.id}`} className="text-label text-ink-muted">
-              Amount
-            </label>
-            <input
-              id={`edit-amount-${preset.id}`}
-              type="text"
-              inputMode="decimal"
-              value={action.draftAmountInput}
-              onChange={(event) =>
-                setAction({ ...action, kind: "edit", draftAmountInput: event.target.value })
-              }
-              className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-            />
-          </div>
+          <Field
+            id={`edit-amount-${preset.id}`}
+            label="Amount"
+            type="text"
+            inputMode="decimal"
+            value={action.draftAmountInput}
+            onChange={(event) =>
+              setAction({ ...action, kind: "edit", draftAmountInput: event.target.value })
+            }
+          />
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor={`edit-category-${preset.id}`} className="text-label text-ink-muted">
-              Category (optional)
-            </label>
-            <select
-              id={`edit-category-${preset.id}`}
-              value={action.draftCategoryId}
-              onChange={(event) =>
-                setAction({ ...action, kind: "edit", draftCategoryId: event.target.value })
-              }
-              className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-            >
-              <option value="">No category</option>
-              {categoryOptions.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CategorySelect
+            id={`edit-category-${preset.id}`}
+            value={action.draftCategoryId}
+            onChange={(value) => setAction({ ...action, kind: "edit", draftCategoryId: value })}
+            categoryOptions={categoryOptions}
+          />
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor={`edit-description-${preset.id}`} className="text-label text-ink-muted">
-              Description (optional)
-            </label>
-            <input
-              id={`edit-description-${preset.id}`}
-              type="text"
-              value={action.draftDescription}
-              onChange={(event) =>
-                setAction({ ...action, kind: "edit", draftDescription: event.target.value })
-              }
-              className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-            />
-          </div>
+          <Field
+            id={`edit-description-${preset.id}`}
+            label="Description (optional)"
+            type="text"
+            value={action.draftDescription}
+            onChange={(event) =>
+              setAction({ ...action, kind: "edit", draftDescription: event.target.value })
+            }
+          />
 
           <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={busy}
-              className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-on-accent disabled:opacity-60"
-            >
+            <Button type="submit" size="sm" variant="primary" disabled={busy}>
               Save
-            </button>
-            <button
-              type="button"
-              onClick={() => setAction({ kind: "none" })}
-              className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-            >
+            </Button>
+            <Button size="sm" onClick={() => setAction({ kind: "none" })}>
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex flex-col gap-1">
-            <span className="text-body font-medium">{preset.label}</span>
-            <span className="text-label text-ink-muted">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="break-words font-semibold">{preset.label}</span>
+            <span className="text-label text-muted">
               {formatCents(preset.amountCents)} · {preset.categoryName ?? "No category"}
             </span>
             {preset.description && (
-              <span className="text-label text-ink-subtle">{preset.description}</span>
+              <span className="text-label text-subtle">{preset.description}</span>
             )}
-            {/*
-              Status is never color-only, per this project's §17
-              accessibility rule -- see `ManageCategoriesPage`'s identical
-              Active/Inactive chip pattern.
-            */}
-            {isActive ? (
-              <span className="inline-flex w-fit rounded-card bg-settled/10 px-2 py-0.5 text-label font-medium text-settled">
-                Active
-              </span>
-            ) : (
-              <span className="inline-flex w-fit rounded-card bg-surface-sunken px-2 py-0.5 text-label font-medium text-ink-muted">
-                Inactive
-              </span>
-            )}
+            {/* Status is never colour-only: the tag always carries a word and an icon. */}
+            <ActiveTag active={isActive} />
           </span>
 
           <div className="flex shrink-0 gap-2">
-            <button
-              type="button"
+            <Button
+              size="sm"
               onClick={() =>
                 setAction({
                   kind: "edit",
@@ -326,25 +324,19 @@ function PresetRow({
                   draftDescription: preset.description ?? "",
                 })
               }
-              className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
             >
               Edit
-            </button>
+            </Button>
 
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void handleToggleActive()}
-              className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted disabled:opacity-60"
-            >
+            <Button size="sm" disabled={busy} onClick={() => void handleToggleActive()}>
               {isActive ? "Deactivate" : "Reactivate"}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {error && (
-        <p role="alert" className="text-label text-owed">
+        <p role="alert" className="text-label font-semibold text-danger">
           {error}
         </p>
       )}
@@ -417,84 +409,61 @@ function AddPresetForm({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-card border border-surface-border p-4">
-      <h3 className="text-body font-semibold">Add a preset</h3>
+    <Card as="section" aria-labelledby="add-preset-heading" className="flex flex-col gap-4">
+      <h2 id="add-preset-heading" className="text-head">
+        Add a preset
+      </h2>
 
-      <form className="flex flex-col gap-3" onSubmit={(event) => void handleSubmit(event)}>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-preset-label" className="text-label text-ink-muted">
-            Label
-          </label>
-          <input
-            id="new-preset-label"
-            type="text"
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-        </div>
+      <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)}>
+        <Field
+          id="new-preset-label"
+          label="Label"
+          type="text"
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+        />
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-preset-amount" className="text-label text-ink-muted">
-            Amount
-          </label>
-          <input
-            id="new-preset-amount"
-            type="text"
-            inputMode="decimal"
-            placeholder="5.00"
-            value={amountInput}
-            onChange={(event) => setAmountInput(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-        </div>
+        <Field
+          id="new-preset-amount"
+          label="Amount"
+          type="text"
+          inputMode="decimal"
+          placeholder="5.00"
+          value={amountInput}
+          onChange={(event) => setAmountInput(event.target.value)}
+        />
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-preset-category" className="text-label text-ink-muted">
-            Category (optional)
-          </label>
-          <select
-            id="new-preset-category"
-            value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          >
-            <option value="">No category</option>
-            {categoryOptions.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <CategorySelect
+          id="new-preset-category"
+          value={categoryId}
+          onChange={setCategoryId}
+          categoryOptions={categoryOptions}
+        />
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="new-preset-description" className="text-label text-ink-muted">
-            Description (optional)
-          </label>
-          <input
-            id="new-preset-description"
-            type="text"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-        </div>
+        <Field
+          id="new-preset-description"
+          label="Description (optional)"
+          type="text"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
 
         {state.status === "error" && (
-          <p role="alert" className="text-label text-owed">
+          <p role="alert" className="text-label font-semibold text-danger">
             {state.message}
           </p>
         )}
 
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          icon="plus"
           disabled={state.status === "submitting"}
-          className="inline-flex min-h-touch w-fit items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
+          className="self-start"
         >
           {state.status === "submitting" ? "Adding…" : "Add preset"}
-        </button>
+        </Button>
       </form>
-    </div>
+    </Card>
   );
 }

@@ -28,7 +28,7 @@ import { formatCents } from "../../lib/currency";
  * PostgREST's implicit embedding needs to be told which one. This export
  * intentionally surfaces only the owning member's name (not creator/voider)
  * -- that is what "whose transaction is this" means to someone reading a CSV
- * export, mirroring how `HistoryPage` groups by the member being viewed.
+ * export, mirroring how the Activity page groups by the member being viewed.
  */
 export type LedgerExportRow = {
   id: string;

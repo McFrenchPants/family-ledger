@@ -118,7 +118,7 @@ function SubscriptionTestRow({ row }: { row: SubscriptionRow }) {
       });
 
       if (error) {
-        // Mirrors ManageMembersPage's `add-household-member` handling: a
+        // Mirrors AddMemberForm's `add-household-member` handling: a
         // non-2xx Edge Function response surfaces as `error` here, and the
         // function's own `{ error }` body may or may not have already been
         // consumed into `data` depending on client version -- so prefer
