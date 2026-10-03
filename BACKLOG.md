@@ -234,7 +234,7 @@ sequential except where noted.
     merged into `main`. Not yet on `production`: the owner must first run the
     hosted steps in `docs/DEPLOYMENT_RUNBOOK.md` section 7a.
 
-11. **UI redesign** — status: `done on main, final polish (UI10) awaiting production` — analysis: analysis/11-ui-redesign.md
+11. **UI redesign** — status: `done` — analysis: analysis/11-ui-redesign.md
     Requested by the owner 2026-10-02: the interface looks hastily assembled and
     leads with install/notification prompts. A research agent produced an
     approved design and mockups; the owner answered all open questions.
@@ -246,7 +246,7 @@ sequential except where noted.
     The manual "Remind" button is deliberately out of scope until push is
     confirmed on real devices and Phase 5 exists.
 
-12. **Home improvements and payment-period rule fix** — status: `done on main, awaiting production` — analysis: none (small; owner-chosen 2026-10-03)
+12. **Home improvements and payment-period rule fix** — status: `live (production a24651e); owner to run db push for migration 20261003090000` — analysis: none (small; owner-chosen 2026-10-03)
     Tracking: `docs/proposals/home-improvements/PROGRESS.md`. Payments now
     count toward the period month they fall in (migration
     `20261003090000`, needs `npx supabase db push --linked` by the owner when
