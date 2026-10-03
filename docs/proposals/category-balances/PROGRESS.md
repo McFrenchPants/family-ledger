@@ -17,7 +17,7 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | CB1 | Tracked balances and per-balance read path | done | Migration `20261003130000`; pgTAP 013 (84, suite 420), 18 mutations all red. Verifier pass. Everyday identified by `is_everyday` (renamable, never archivable); archiving a balance still fed by categories is rejected; Everyday id normalizes to NULL in `categories.tracked_balance_id`; that column writable only via `set_category_balance` (categories INSERT/UPDATE grants narrowed to column lists). Breakdown is SECURITY DEFINER mirroring `household_member_balances`; relies on the Everyday row existing. |
-| CB2 | Payment/adjustment allocation parts | todo | Depends CB1. Verifier. |
+| CB2 | Payment/adjustment allocation parts | done | Migration `20261003140000`; pgTAP 014 (89, suite 509), mutations red. Verifier pass. Parts tied to payment/adjustment rows by composite FK (new unique key on ledger_transactions incl. type); deferred SECURITY DEFINER sum triggers; guard blocks update/delete except cascade; validation errors all 23514; audit new_values = row + `allocations`. Breakdown sends any uncovered remainder to Everyday (always 0 when triggers are on). Notes: `service_role` keeps Supabase-default writes on the new tables (server-only key, triggers still bind; accepted); no pgTAP for household-delete cascade with parts (verified by hand); backup export lacks the new tables (CB9). |
 | CB3 | Move-money transfers | todo | Depends CB2. Verifier. |
 | CB4 | Plans per balance | todo | Depends CB2. Verifier. |
 | CB5 | Child payment suggestions | todo | Depends CB2. Verifier. Phase A ends here. |
@@ -29,6 +29,11 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-03 — CB2 done
+
+Verifier pass, test:db 509, unit 816. Old front-end call shape still works
+(all to Everyday). Next: CB3 (move-money transfers).
 
 ### 2026-10-03 — CB1 done
 
