@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AmountText, MINUS } from "./AmountText";
 import { Button } from "./Button";
+import { ChoiceChips } from "./ChoiceChips";
 import { Field } from "./Field";
 import { Icon } from "./Icon";
 import { ICON_NAMES, ICON_PATHS } from "./icon-paths";
@@ -17,6 +18,7 @@ import { Segmented } from "./Segmented";
 import { Sheet } from "./Sheet";
 import { STATUS_KINDS, type StatusKind } from "./status";
 import { StatusChip } from "./StatusChip";
+import { StickyActionBar } from "./StickyActionBar";
 
 describe("spokenAmount", () => {
   it.each([
@@ -278,5 +280,65 @@ describe("Sheet", () => {
     expect(dialog).toHaveAccessibleDescription("Money received");
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("ChoiceChips", () => {
+  function Harness({ allowEmpty = false }: { allowEmpty?: boolean }) {
+    const [value, setValue] = useState<"a" | "b" | "">("a");
+    return (
+      <>
+        <span id="who">Who</span>
+        <ChoiceChips
+          label="Who"
+          labelledBy="who"
+          allowEmpty={allowEmpty}
+          value={value}
+          onValueChange={setValue}
+          options={[
+            { value: "a", label: "Alex" },
+            { value: "b", label: "Sam", content: <strong>Sam</strong> },
+          ]}
+        />
+        <p>selected: {value || "none"}</p>
+      </>
+    );
+  }
+
+  it("is a radiogroup named by its visible label; one choice at a time", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const group = screen.getByRole("radiogroup", { name: "Who" });
+    expect(group).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Alex" })).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("radio", { name: "Sam" }));
+    expect(screen.getByText("selected: b")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Alex" })).toHaveAttribute("aria-checked", "false");
+    // Not clearable by default.
+    await user.click(screen.getByRole("radio", { name: "Sam" }));
+    expect(screen.getByText("selected: b")).toBeInTheDocument();
+  });
+
+  it("can be cleared when allowEmpty is set", async () => {
+    const user = userEvent.setup();
+    render(<Harness allowEmpty />);
+    await user.click(screen.getByRole("radio", { name: "Alex" }));
+    expect(screen.getByText("selected: none")).toBeInTheDocument();
+  });
+});
+
+describe("StickyActionBar", () => {
+  it("sticks to the bottom on phones, clears the safe area, and sits in flow on desktop", () => {
+    render(
+      <StickyActionBar>
+        <button type="submit">Save</button>
+      </StickyActionBar>,
+    );
+    const bar = screen.getByTestId("sticky-action-bar");
+    expect(bar).toContainElement(screen.getByRole("button", { name: "Save" }));
+    expect(bar.className).toContain("sticky");
+    expect(bar.className).toContain("bottom-0");
+    expect(bar.className).toContain("env(safe-area-inset-bottom)");
+    expect(bar.className).toContain("min-[900px]:static");
   });
 });

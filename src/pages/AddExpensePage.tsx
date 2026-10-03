@@ -2,25 +2,47 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 
+import { Avatar } from "../components/ui/Avatar";
+import { Button } from "../components/ui/Button";
+import { ChoiceChips } from "../components/ui/ChoiceChips";
+import { Icon } from "../components/ui/Icon";
+import { StickyActionBar } from "../components/ui/StickyActionBar";
 import { buildExpenseMemberSelector, validateExpenseForm } from "../features/ledger/add-expense";
 import type { ExpenseFormErrors } from "../features/ledger/add-expense";
+import {
+  AmountEntry,
+  DateChips,
+  ErrorSummary,
+  FieldError,
+  GroupLabel,
+  OptionalDetails,
+  SaveError,
+  TextInput,
+} from "../features/ledger/EntryFormParts";
+import {
+  addExpenseButtonLabel,
+  categoryIcon,
+  expensePreviewLine,
+  typedAmountCents,
+} from "../features/ledger/entry-preview";
+import type { EntryPerson } from "../features/ledger/entry-preview";
 import { useAddExpenseFormData } from "../features/ledger/useAddExpenseFormData";
 import { useExpensePresets } from "../features/ledger/useExpensePresets";
 import type { ExpensePreset } from "../features/ledger/useExpensePresets";
+import { useMemberBalances } from "../features/ledger/useMemberBalances";
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership } from "../features/auth/membership-context";
 import { supabase } from "../lib/supabase";
 import { todayInZone } from "../lib/dates";
-import { toDecimalString } from "../lib/currency";
+import { formatCents, toDecimalString } from "../lib/currency";
 
 /**
- * `/add-expense` is reachable from both the Parent and Child dashboards
- * (S2.3/S2.4), so unlike `/parent` and `/child` it is not wrapped in
- * `RequireRole` -- there is no single role to require. It still needs *some*
- * signed-in membership before rendering the form, so this component handles
- * `useMembership()`'s states directly, mirroring `RequireRole`'s own
- * loading/signed-out/error/no-membership rendering rather than introducing a
- * second shared guard component for a one-page need.
+ * `/new/expense` is reachable by both Parents and Children, so unlike
+ * `/new/payment` it is not wrapped in `RequireRole` -- there is no single
+ * role to require. It still needs *some* signed-in membership before
+ * rendering the form, so this component handles `useMembership()`'s states
+ * directly, mirroring `RequireRole`'s own loading/signed-out/error/
+ * no-membership rendering.
  *
  * As with every other page in this app, none of this is a security control --
  * `record_expense` independently re-derives and enforces the caller's role
@@ -33,7 +55,7 @@ export function AddExpensePage() {
   switch (membership.status) {
     case "loading":
       return (
-        <p role="status" className="text-label text-ink-subtle">
+        <p role="status" className="text-label text-subtle">
           Loading your account…
         </p>
       );
@@ -44,22 +66,16 @@ export function AddExpensePage() {
     case "error":
       return (
         <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-owed">
-            Could not load your account: {membership.message}
-          </p>
-          <button
-            type="button"
-            onClick={membership.retry}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-          >
+          <p className="text-label text-danger">Could not load your account: {membership.message}</p>
+          <Button size="sm" onClick={membership.retry}>
             Retry
-          </button>
+          </Button>
         </div>
       );
 
     case "no-membership":
       return (
-        <p role="alert" className="text-label text-owed">
+        <p role="alert" className="text-label text-danger">
           Your account is not linked to a household yet. Ask a parent in your household to invite
           you.
         </p>
@@ -70,9 +86,25 @@ export function AddExpensePage() {
   }
 }
 
+const FIELD_ORDER: ReadonlyArray<keyof ExpenseFormErrors> = [
+  "amount",
+  "memberId",
+  "description",
+  "occurredOn",
+];
+
+/**
+ * Layout per the design spec (5.3): quick-add presets, a big amount, who it
+ * is for, category tiles, "What was it?", date chips, an optional note, and
+ * a sticky main button that says what will happen ("Add $42.17 to Alex’s
+ * balance") with the resulting balance beneath when this caller can see it.
+ */
 function AddExpenseForm({ membership }: { membership: Membership }) {
   const formData = useAddExpenseFormData(membership.householdId);
   const presetsState = useExpensePresets(membership.householdId);
+  // Display-only preview source. A Parent sees every child's balance; a
+  // Child only their own -- picking a sibling simply shows no preview.
+  const balances = useMemberBalances(membership.householdId);
   const navigate = useNavigate();
   // `?child=<memberId>` (from Parent Home) picks the initial person, but
   // only if it is one of the choices this caller already has; otherwise it
@@ -130,7 +162,7 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
 
   if (formData.status === "loading") {
     return (
-      <p role="status" className="text-label text-ink-subtle">
+      <p role="status" className="text-label text-subtle">
         Loading…
       </p>
     );
@@ -139,18 +171,18 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
   if (formData.status === "error") {
     return (
       <div role="alert" className="flex flex-col items-start gap-2">
-        <p className="text-label text-owed">Could not load this form: {formData.message}</p>
-        <button
-          type="button"
-          onClick={formData.retry}
-          className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-        >
+        <p className="text-label text-danger">Could not load this form: {formData.message}</p>
+        <Button size="sm" onClick={formData.retry}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
 
+  // Every role gets the same chooser (owner decision 7). The selector offers
+  // every active child to a Parent, and to a Child in an `any_member`
+  // household; it narrows to the Child alone only for `self_only`, where the
+  // server would reject anyone else.
   const selector = buildExpenseMemberSelector({
     callerRole: membership.role,
     callerMemberId: membership.memberId,
@@ -158,6 +190,17 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
     activeMembers: formData.activeMembers,
     childExpenseScope: formData.childExpenseScope,
   });
+
+  const today = todayInZone(formData.timezone);
+  const amountCents = typedAmountCents(amountInput);
+  const chosen = selector.options.find((option) => option.id === memberId);
+  const person: EntryPerson | null = chosen
+    ? { name: chosen.name, self: chosen.id === membership.memberId }
+    : null;
+  const balanceCents = chosen ? (balances?.get(chosen.id) ?? null) : null;
+  const previewLine = expensePreviewLine(balanceCents, amountCents, person);
+  const categoryName = (id: string | null) =>
+    formData.categories.find((category) => category.id === id)?.name ?? null;
 
   // Prefills the form's amount/category/description from a preset (C4). Never
   // submits -- the Parent or Child can still change any field afterward, the
@@ -172,6 +215,7 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (submitState.status === "submitting") return;
 
     const result = validateExpenseForm({ memberId, amountInput, description, occurredOn });
     if (!result.ok) {
@@ -211,150 +255,153 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
     }
   }
 
+  const submitting = submitState.status === "submitting";
+  const errorMessages = FIELD_ORDER.flatMap((key) => (fieldErrors[key] ? [fieldErrors[key]] : []));
+
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-title font-semibold">Add Expense</h2>
+    <section
+      aria-labelledby="add-expense-heading"
+      className="mx-auto flex w-full max-w-[560px] flex-col gap-4"
+    >
+      <h1 id="add-expense-heading" className="text-title">
+        Add expense
+      </h1>
 
       {presetsState.status === "loaded" && presetsState.presets.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <span className="text-label text-ink-muted">Quick add</span>
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-label font-semibold text-muted">Quick add</span>
+          <div className="-mx-gutter flex gap-2 overflow-x-auto px-gutter pb-1.5 pt-0.5 [scrollbar-width:none]">
             {presetsState.presets.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
                 onClick={() => handlePresetClick(preset)}
-                className="min-h-touch rounded-card border border-surface-border px-3 text-label font-medium text-ink-muted"
+                className="inline-flex min-h-touch shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border-strong bg-surface px-3.5 text-[0.9375rem] font-medium text-ink transition-colors hover:bg-sunken motion-reduce:transition-none"
               >
-                {preset.label}
+                <Icon name={categoryIcon(categoryName(preset.categoryId) ?? preset.label)} size={18} />
+                {preset.label} <span className="tabular-nums">{formatCents(preset.amountCents)}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)}>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="expense-member" className="text-label text-ink-muted">
-            For
-          </label>
-          {selector.locked ? (
-            <p id="expense-member" className="text-body font-medium">
-              {selector.options[0]?.name ?? membership.name}
-            </p>
+      <form
+        noValidate
+        className="flex flex-col gap-4"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
+        <ErrorSummary messages={errorMessages} />
+
+        <AmountEntry
+          id="expense-amount"
+          label="Amount"
+          value={amountInput}
+          onChange={setAmountInput}
+          error={fieldErrors.amount}
+        />
+
+        <div className="flex flex-col gap-1.5">
+          <GroupLabel id="expense-member-label">For</GroupLabel>
+          {selector.options.length === 0 ? (
+            <p className="text-body text-muted">No active children yet</p>
           ) : (
-            <select
-              id="expense-member"
+            <ChoiceChips
+              label="For"
+              labelledBy="expense-member-label"
+              describedBy={fieldErrors.memberId ? "expense-member-error" : undefined}
               value={memberId}
-              onChange={(event) => setMemberId(event.target.value)}
-              className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-            >
-              {selector.options.length === 0 && <option value="">No active children yet</option>}
-              {selector.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setMemberId}
+              options={selector.options.map((option) => ({
+                value: option.id,
+                label: option.name,
+                content: (
+                  <>
+                    <Avatar
+                      name={option.name}
+                      size="sm"
+                      className="h-7 w-7 text-caption group-data-[state=on]:bg-accent group-data-[state=on]:text-on-accent"
+                    />
+                    {option.name}
+                  </>
+                ),
+              }))}
+            />
           )}
-          {fieldErrors.memberId && (
-            <p className="text-label text-owed">{fieldErrors.memberId}</p>
-          )}
+          <FieldError id="expense-member-error">{fieldErrors.memberId}</FieldError>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="expense-amount" className="text-label text-ink-muted">
-            Amount
-          </label>
-          <input
-            id="expense-amount"
-            type="text"
-            inputMode="decimal"
-            placeholder="12.34"
-            value={amountInput}
-            onChange={(event) => setAmountInput(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-          {fieldErrors.amount && <p className="text-label text-owed">{fieldErrors.amount}</p>}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor="expense-category" className="text-label text-ink-muted">
-            Category (optional)
-          </label>
-          <select
-            id="expense-category"
-            value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          >
-            <option value="">No category</option>
-            {formData.categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor="expense-description" className="text-label text-ink-muted">
-            Description
-          </label>
-          <input
-            id="expense-description"
-            type="text"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-          {fieldErrors.description && (
-            <p className="text-label text-owed">{fieldErrors.description}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor="expense-note" className="text-label text-ink-muted">
-            Note (optional)
-          </label>
-          <input
-            id="expense-note"
-            type="text"
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor="expense-date" className="text-label text-ink-muted">
-            Date
-          </label>
-          <input
-            id="expense-date"
-            type="date"
-            value={occurredOn}
-            onChange={(event) => setOccurredOn(event.target.value)}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-body"
-          />
-          {fieldErrors.occurredOn && (
-            <p className="text-label text-owed">{fieldErrors.occurredOn}</p>
-          )}
-        </div>
-
-        {submitState.status === "error" && (
-          <div role="alert" className="flex flex-col items-start gap-2">
-            <p className="text-label text-owed">Could not save this expense: {submitState.message}</p>
+        {formData.categories.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <GroupLabel id="expense-category-label">
+              Category <span className="font-normal text-subtle">(optional)</span>
+            </GroupLabel>
+            <ChoiceChips
+              label="Category (optional)"
+              labelledBy="expense-category-label"
+              variant="tile"
+              allowEmpty
+              value={categoryId}
+              onValueChange={setCategoryId}
+              options={formData.categories.map((category) => ({
+                value: category.id,
+                label: category.name,
+                content: (
+                  <>
+                    <Icon name={categoryIcon(category.name)} size={22} />
+                    <span className="max-w-full truncate">{category.name}</span>
+                  </>
+                ),
+              }))}
+            />
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={submitState.status === "submitting"}
-          className="inline-flex min-h-touch items-center justify-center rounded-card bg-accent px-4 text-body font-medium text-on-accent disabled:opacity-60"
-        >
-          {submitState.status === "submitting" ? "Saving…" : "Save Expense"}
-        </button>
+        <TextInput
+          id="expense-description"
+          label="What was it?"
+          placeholder="e.g. Gas on the way to work"
+          value={description}
+          onChange={setDescription}
+          error={fieldErrors.description}
+        />
+
+        <DateChips
+          idPrefix="expense"
+          today={today}
+          value={occurredOn}
+          onChange={setOccurredOn}
+          error={fieldErrors.occurredOn}
+        />
+
+        <OptionalDetails label="Add a note (optional)">
+          <TextInput id="expense-note" label="Note (optional)" value={note} onChange={setNote} />
+        </OptionalDetails>
+
+        {submitState.status === "error" && (
+          <SaveError
+            message={`Could not save this expense: ${submitState.message}`}
+            disabled={submitting}
+          />
+        )}
+
+        <StickyActionBar>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={submitting}
+            className="whitespace-normal text-center"
+          >
+            {submitting ? "Saving…" : addExpenseButtonLabel(amountCents, person)}
+          </Button>
+          {previewLine && (
+            <p data-testid="expense-balance-preview" className="mt-1.5 text-center text-label text-subtle tabular-nums">
+              {previewLine}
+            </p>
+          )}
+        </StickyActionBar>
       </form>
     </section>
   );

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,9 +35,14 @@ const parent: MembershipState = {
   membership: { memberId: "p1", householdId: "h1", role: "parent", name: "Dana", status: "active" },
 };
 
-function renderPage(path = "/new/payment") {
+const child: MembershipState = {
+  status: "loaded",
+  membership: { memberId: "kid-a", householdId: "h1", role: "child", name: "Alex", status: "active" },
+};
+
+function renderPage(path = "/new/payment", membership: MembershipState = parent) {
   return render(
-    <MembershipContext.Provider value={parent}>
+    <MembershipContext.Provider value={membership}>
       <MemoryRouter initialEntries={[path]}>
         <RecordPaymentPage />
       </MemoryRouter>
@@ -45,53 +50,105 @@ function renderPage(path = "/new/payment") {
   );
 }
 
+type PeriodRow = { status: string; minimum_cents: number; paid_cents: number; remaining_cents: number };
+
+/** Active plans by child, and each plan's current period status. */
+let plans: { id: string; member_id: string }[] = [];
+let periods: Record<string, PeriodRow> = {};
+let balances: { member_id: string; balance_cents: number }[] = [];
+
+/**
+ * A chainable stand-in for supabase-js's query builder covering both reads
+ * this page makes on `payment_plans`: the roster's batched
+ * `.in().eq().returns()` (awaited), and the post-payment
+ * `.eq(member).eq(active).maybeSingle()`.
+ */
+function plansBuilder() {
+  let memberFilter: string | null = null;
+  const builder: Record<string, unknown> = {};
+  builder.in = vi.fn(() => builder);
+  builder.eq = vi.fn((column: string, value: unknown) => {
+    if (column === "member_id") memberFilter = String(value);
+    return builder;
+  });
+  builder.returns = vi.fn(() => builder);
+  builder.maybeSingle = vi.fn(() =>
+    Promise.resolve({ data: plans.find((p) => p.member_id === memberFilter) ?? null, error: null }),
+  );
+  builder.then = (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+    Promise.resolve({ data: plans, error: null }).then(resolve, reject);
+  return builder;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  rpcMock.mockImplementation((name: string) => {
+  plans = [];
+  periods = {};
+  balances = [
+    { member_id: "kid-a", balance_cents: 14732 },
+    { member_id: "kid-s", balance_cents: 11240 },
+  ];
+  rpcMock.mockImplementation((name: string, args: Record<string, string>) => {
     if (name === "record_payment" || name === "record_adjustment") {
       return Promise.resolve({ data: { id: "tx-9" }, error: null });
     }
     if (name === "household_member_balances") {
-      return Promise.resolve({
-        data: [
-          { member_id: "kid-a", balance_cents: 14732 },
-          { member_id: "kid-s", balance_cents: 11240 },
-        ],
-        error: null,
-      });
+      return Promise.resolve({ data: balances, error: null });
+    }
+    if (name === "ensure_current_payment_period") {
+      return Promise.resolve({ data: { id: `period-${args.p_plan_id}`, due_date: "2026-09-15" }, error: null });
+    }
+    if (name === "payment_period_status") {
+      const row = periods[args.p_period_id];
+      return Promise.resolve({ data: row ? [{ period_id: args.p_period_id, ...row }] : [], error: null });
     }
     throw new Error(`Unexpected rpc ${name}`);
   });
-  // No active plan: the period-effect read finds nothing.
-  const builder: Record<string, unknown> = {};
-  builder.eq = vi.fn(() => builder);
-  builder.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
-  fromMock.mockImplementation(() => ({ select: vi.fn(() => builder) }));
+  fromMock.mockImplementation(() => ({ select: vi.fn(() => plansBuilder()) }));
 });
 
-const forSelect = () => screen.getByLabelText("For") as HTMLSelectElement;
+function selectedChild(): HTMLElement {
+  const group = screen.getByRole("radiogroup", { name: "Who paid?" });
+  const selected = within(group)
+    .getAllByRole("radio")
+    .filter((radio) => radio.getAttribute("aria-checked") === "true");
+  expect(selected).toHaveLength(1);
+  return selected[0]!;
+}
 
 describe("RecordPaymentPage ?child= prefill", () => {
   it("selects the child named in the link", () => {
     renderPage("/new/payment?child=kid-s");
-    expect(forSelect().value).toBe("kid-s");
+    expect(selectedChild()).toHaveTextContent(/^S?Sam/);
   });
 
   it("ignores an id that is not one of the household's children", () => {
     renderPage("/new/payment?child=p1");
-    expect(forSelect().value).toBe("kid-a");
+    expect(selectedChild()).toHaveTextContent("Alex");
   });
 
   it("defaults to the first child without the parameter", () => {
     renderPage();
-    expect(forSelect().value).toBe("kid-a");
+    expect(selectedChild()).toHaveTextContent("Alex");
+  });
+});
+
+describe("RecordPaymentPage is Parent-only", () => {
+  it("shows a Child the Parents-only message and no form", () => {
+    renderPage("/new/payment", child);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Only a parent can record a payment or adjustment.",
+    );
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Record/ })).not.toBeInTheDocument();
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 });
 
 async function fillAndSave(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Payment amount"), "40");
   await user.type(screen.getByLabelText("Description"), "Cash");
-  await user.click(screen.getByRole("button", { name: /Save Payment/ }));
+  await user.click(screen.getByRole("button", { name: /Record \$40\.00 from Alex/ }));
 }
 
 describe("RecordPaymentPage encouragement", () => {
@@ -114,12 +171,207 @@ describe("RecordPaymentPage encouragement", () => {
   it("shows no encouragement for an adjustment", async () => {
     const user = userEvent.setup();
     renderPage("/new/payment?child=kid-a");
-    await user.click(screen.getByRole("button", { name: "Adjustment" }));
+    await user.click(screen.getByRole("radio", { name: "Adjustment" }));
     await user.type(screen.getByLabelText("Adjustment amount"), "40");
     await user.type(screen.getByLabelText("Description"), "Fix");
-    await user.click(screen.getByRole("button", { name: /Save Adjustment/ }));
+    await user.click(screen.getByRole("button", { name: /Record \$40\.00 adjustment for Alex/ }));
 
     await waitFor(() => expect(screen.getByText("Adjustment recorded")).toBeInTheDocument());
     expect(screen.queryByTestId("payment-encouragement")).not.toBeInTheDocument();
+    expect(rpcMock).toHaveBeenCalledWith("record_adjustment", expect.objectContaining({ p_amount_cents: -4000 }));
+  });
+});
+
+describe("RecordPaymentPage success panel", () => {
+  it("shows the server-fetched balance and period effect, not the preview", async () => {
+    plans = [{ id: "plan-a", member_id: "kid-a" }];
+    periods = {
+      "period-plan-a": { status: "overdue", minimum_cents: 4000, paid_cents: 2500, remaining_cents: 1500 },
+    };
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("button", { name: "Catch up $15.00" });
+
+    await user.click(screen.getByRole("button", { name: "Catch up $15.00" }));
+    await user.type(screen.getByLabelText("Description"), "Cash");
+    // After the write the server reports its own numbers.
+    balances = [{ member_id: "kid-a", balance_cents: 13232 }];
+    periods["period-plan-a"] = { status: "satisfied", minimum_cents: 4000, paid_cents: 4000, remaining_cents: 0 };
+    await user.click(screen.getByRole("button", { name: /Record \$15\.00 from Alex/ }));
+
+    await waitFor(() => expect(screen.getByText("Payment recorded")).toBeInTheDocument());
+    expect(screen.getByText(/New balance:/)).toHaveTextContent("New balance: $132.32");
+    expect(screen.getByText("Fully paid for this period.")).toBeInTheDocument();
+    expect(screen.getByText("$40.00 of $40.00 paid")).toBeInTheDocument();
+  });
+});
+
+describe("RecordPaymentPage child rows", () => {
+  it("shows each child's status and what they owe", async () => {
+    plans = [{ id: "plan-a", member_id: "kid-a" }];
+    periods = {
+      "period-plan-a": { status: "overdue", minimum_cents: 4000, paid_cents: 2500, remaining_cents: 1500 },
+    };
+    renderPage();
+    const alex = await screen.findByRole("radio", { name: /^A?Alex/ });
+    await waitFor(() => expect(alex).toHaveTextContent("$15.00 overdue"));
+    expect(alex).toHaveTextContent("$147.32owed");
+    const sam = screen.getByRole("radio", { name: /Sam/ });
+    expect(sam).toHaveTextContent("No plan");
+  });
+});
+
+describe("RecordPaymentPage amount shortcuts", () => {
+  it("offers Catch up and Pay in full for an overdue child; tapping fills, never submits", async () => {
+    plans = [{ id: "plan-a", member_id: "kid-a" }];
+    periods = {
+      "period-plan-a": { status: "overdue", minimum_cents: 4000, paid_cents: 2500, remaining_cents: 1500 },
+    };
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+
+    const catchUp = await screen.findByRole("button", { name: "Catch up $15.00" });
+    expect(screen.getByRole("button", { name: "Pay in full $147.32" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Minimum/ })).not.toBeInTheDocument();
+
+    await user.click(catchUp);
+    expect((screen.getByLabelText("Payment amount") as HTMLInputElement).value).toBe("15.00");
+    expect(catchUp).toHaveAttribute("aria-pressed", "true");
+    expect(rpcMock).not.toHaveBeenCalledWith("record_payment", expect.anything());
+
+    await user.click(screen.getByRole("button", { name: "Pay in full $147.32" }));
+    expect((screen.getByLabelText("Payment amount") as HTMLInputElement).value).toBe("147.32");
+  });
+
+  it("offers Minimum for a child with something due", async () => {
+    plans = [{ id: "plan-s", member_id: "kid-s" }];
+    periods = {
+      "period-plan-s": { status: "due", minimum_cents: 4000, paid_cents: 1000, remaining_cents: 3000 },
+    };
+    renderPage("/new/payment?child=kid-s");
+    expect(await screen.findByRole("button", { name: "Minimum $30.00" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pay in full $112.40" })).toBeInTheDocument();
+  });
+
+  it("offers only Pay in full when there is no plan", async () => {
+    renderPage("/new/payment?child=kid-s");
+    expect(await screen.findByRole("button", { name: "Pay in full $112.40" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^(Catch up|Minimum|Pay in full)/ })).toHaveLength(1);
+  });
+
+  it("offers none when nothing is owed", async () => {
+    balances = [{ member_id: "kid-a", balance_cents: 0 }];
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByText("Nothing owed");
+    expect(screen.queryByRole("group", { name: "Amount shortcuts" })).not.toBeInTheDocument();
+  });
+
+  it("hides shortcuts for an adjustment", async () => {
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("button", { name: "Pay in full $147.32" });
+    await user.click(screen.getByRole("radio", { name: "Adjustment" }));
+    expect(screen.queryByRole("button", { name: /Pay in full/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("RecordPaymentPage balance-after preview", () => {
+  it("shows the new balance from what the page read", async () => {
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("button", { name: "Pay in full $147.32" });
+    await user.type(screen.getByLabelText("Payment amount"), "15");
+    expect(screen.getByTestId("record-preview")).toHaveTextContent(
+      "Alex’s balance goes from $147.32 to $132.32",
+    );
+  });
+
+  it("shows credit and a gentle note for more than owed, without blocking", async () => {
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("button", { name: "Pay in full $147.32" });
+    await user.type(screen.getByLabelText("Payment amount"), "150");
+    const preview = screen.getByTestId("record-preview");
+    expect(preview).toHaveTextContent("Alex’s balance goes from $147.32 to −$2.68");
+    expect(preview).toHaveTextContent("Alex will be $2.68 in credit.");
+    expect(preview).toHaveTextContent("This is more than Alex owes.");
+
+    await user.type(screen.getByLabelText("Description"), "Cash");
+    const submit = screen.getByRole("button", { name: /Record \$150\.00 from Alex/ });
+    expect(submit).toBeEnabled();
+    await user.click(submit);
+    expect(rpcMock).toHaveBeenCalledWith("record_payment", expect.objectContaining({ p_amount_cents: -15000 }));
+  });
+
+  it("shows no preview when balances could not be loaded, and the form still works", async () => {
+    rpcMock.mockImplementation((name: string) => {
+      if (name === "household_member_balances") {
+        return Promise.resolve({ data: null, error: { message: "nope" } });
+      }
+      if (name === "record_payment") return Promise.resolve({ data: { id: "tx" }, error: null });
+      throw new Error(`Unexpected rpc ${name}`);
+    });
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await fillAndSave(user);
+    expect(screen.queryByTestId("record-preview")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Payment recorded")).toBeInTheDocument());
+    expect(screen.getByText(/New balance:/)).toHaveTextContent("New balance: unavailable");
+  });
+});
+
+describe("RecordPaymentPage failures", () => {
+  it("shows a retry state on a failed write and never queues it", async () => {
+    let calls = 0;
+    const base = rpcMock.getMockImplementation()!;
+    rpcMock.mockImplementation((name: string, args: Record<string, string>) => {
+      if (name === "record_payment") {
+        calls += 1;
+        return Promise.resolve({ data: null, error: { message: "network down" } });
+      }
+      return base(name, args);
+    });
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await fillAndSave(user);
+
+    const alert = await screen.findByText(/Could not save this payment: network down/);
+    expect(alert.closest("[role=alert]")).not.toBeNull();
+    expect(calls).toBe(1);
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(calls).toBe(2));
+  });
+
+  it("disables the button while saving so a double tap records once", async () => {
+    let resolveWrite: (value: unknown) => void = () => {};
+    const base = rpcMock.getMockImplementation()!;
+    rpcMock.mockImplementation((name: string, args: Record<string, string>) => {
+      if (name === "record_payment") {
+        return new Promise((resolve) => {
+          resolveWrite = resolve;
+        });
+      }
+      return base(name, args);
+    });
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await fillAndSave(user);
+
+    const saving = screen.getByRole("button", { name: /Saving/ });
+    expect(saving).toBeDisabled();
+    await user.click(saving);
+    expect(rpcMock.mock.calls.filter(([name]) => name === "record_payment")).toHaveLength(1);
+    resolveWrite({ data: { id: "tx" }, error: null });
+    await waitFor(() => expect(screen.getByText("Payment recorded")).toBeInTheDocument());
+  });
+
+  it("lists what to fix in an announced summary", async () => {
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await user.click(screen.getByRole("button", { name: /Record payment/ }));
+    const summary = screen.getAllByRole("alert")[0]!;
+    expect(summary).toHaveTextContent("Enter a description.");
+    expect(screen.getByLabelText("Payment amount")).toHaveAttribute("aria-invalid", "true");
+    expect(rpcMock).not.toHaveBeenCalledWith("record_payment", expect.anything());
   });
 });
