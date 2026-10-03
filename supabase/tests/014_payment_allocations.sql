@@ -159,7 +159,7 @@ select ok(
 );
 
 select ok(
-  to_regprocedure('public.record_payment(uuid,bigint,text,date,uuid,text,jsonb)') is not null
+  to_regprocedure('public.record_payment(uuid,bigint,text,date,uuid,text,jsonb,uuid)') is not null
   and to_regprocedure('public.record_adjustment(uuid,bigint,text,date,uuid,text,jsonb)') is not null
   and to_regprocedure('internal.record_balance_decrease(uuid,bigint,text,text,date,uuid,text,jsonb)') is not null,
   'S5: the new record_payment / record_adjustment / helper signatures exist'
@@ -173,9 +173,9 @@ select ok(
 );
 
 select ok(
-  has_function_privilege('authenticated', 'public.record_payment(uuid,bigint,text,date,uuid,text,jsonb)', 'EXECUTE')
+  has_function_privilege('authenticated', 'public.record_payment(uuid,bigint,text,date,uuid,text,jsonb,uuid)', 'EXECUTE')
   and has_function_privilege('authenticated', 'public.record_adjustment(uuid,bigint,text,date,uuid,text,jsonb)', 'EXECUTE')
-  and not has_function_privilege('anon', 'public.record_payment(uuid,bigint,text,date,uuid,text,jsonb)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.record_payment(uuid,bigint,text,date,uuid,text,jsonb,uuid)', 'EXECUTE')
   and not has_function_privilege('anon', 'public.record_adjustment(uuid,bigint,text,date,uuid,text,jsonb)', 'EXECUTE'),
   'S7: authenticated (not anon) can EXECUTE record_payment / record_adjustment'
 );

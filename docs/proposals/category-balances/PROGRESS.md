@@ -20,7 +20,7 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 | CB2 | Payment/adjustment allocation parts | done | Migration `20261003140000`; pgTAP 014 (89, suite 509), mutations red. Verifier pass. Parts tied to payment/adjustment rows by composite FK (new unique key on ledger_transactions incl. type); deferred SECURITY DEFINER sum triggers; guard blocks update/delete except cascade; validation errors all 23514; audit new_values = row + `allocations`. Breakdown sends any uncovered remainder to Everyday (always 0 when triggers are on). Notes: `service_role` keeps Supabase-default writes on the new tables (server-only key, triggers still bind; accepted); no pgTAP for household-delete cascade with parts (verified by hand); backup export lacks the new tables (CB9). |
 | CB3 | Move-money transfers | done | Migration `20261003150000`; pgTAP 015 (80, suite 589), mutations red. Verifier pass. **Direction:** a transfer from X to Y moves *paid credit*: X's balance goes up, Y's goes down ("move $150 from Everyday to Car" = from Everyday, to Car). New unique key `household_members (id, household_id)` for composite FKs. Notes for UI (CB6/CB8): a balance can be archived while it still carries live transfers, and the breakdown keeps showing its amount -- surface it, don't hide it. No test asserts transfers leave `payment_period_status` alone (true by construction). |
 | CB4 | Plans per balance | done | Migration `20261003160000`; pgTAP 016 (75, suite 664), 16 mutations red. Verifier pass. `create_payment_plan` gets trailing `p_tracked_balance_id` (null = Everyday), old 5-arg call shape still works; supersedes only same-balance plan; `payment_period_status` counts only parts on the plan's balance. Archiving a balance with an active plan is now refused (extends CB1 guard). 005 edited one line (function signature lookup). **For CB8:** front-end plan queries (`usePaymentPlan`, `useChildPaymentProgress`, `useHouseholdPaymentProgress`, `RecordPaymentPage`) read plans by child with no balance filter; they must become per-balance before a child can have two active plans in the UI. |
-| CB5 | Child payment suggestions | todo | Depends CB2. Verifier. Phase A ends here. |
+| CB5 | Child payment suggestions | done | Migration `20261003170000`; pgTAP 017 (163, suite 827), 36 mutations red (verifier re-confirmed one: guard trigger). Verifier pass. Tables `payment_suggestions` + `payment_suggestion_parts` (SELECT-only for app roles; guard trigger lets only pending->terminal change). Functions `create_payment_suggestion(member, amount, date, note, parts)` (Child, self only; null parts = all Everyday), `withdraw_payment_suggestion(id)`, `dismiss_payment_suggestion(id, reason)`; `record_payment` gains trailing `p_suggestion_id` (record_adjustment does not; old 7-arg signature dropped, 014 edited 3 lines to name the new one). Conversion locks the suggestion, single-use, same member, rolls back the payment on failure. Archived-later balance does not invalidate a pending suggestion. Front end reads `payment_suggestions?select=*,payment_suggestion_parts(*)`. **Phase A complete.** |
 | CB6 | Settings: tracked balances | todo | Phase B. Depends CB1. |
 | CB7 | Record payment split editor + move money | todo | Depends CB2-CB5. Verifier. |
 | CB8 | Home, Family, Activity with balances | todo | Depends CB4. |
@@ -29,6 +29,10 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-03 — CB5 done; Phase A (database) complete
+
+Verifier pass, test:db 827, unit 816. All database rules for category balances are in; nothing on this branch is merged or pushed and the front end is unaffected. Next: Phase B, starting CB6 (Settings: tracked balances).
 
 ### 2026-10-03 — CB4 done
 
