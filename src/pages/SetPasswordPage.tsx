@@ -2,6 +2,9 @@ import { useEffect, useId, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Button } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
+import { INPUT_CLASS, LABEL_CLASS } from "../components/ui/styles";
 import {
   describeUpdatePasswordError,
   describeVerifyError,
@@ -11,9 +14,6 @@ import {
   PASSWORD_MISMATCH_MESSAGE,
 } from "../features/auth/password-errors";
 import { supabase } from "../lib/supabase";
-
-const fieldClass =
-  "min-h-touch rounded-card border border-surface-border bg-surface px-3 text-body text-ink outline-none focus:border-accent";
 
 const INVALID_LINK_MESSAGE = "This link isn't valid. Ask a Parent for a new one.";
 const REDIRECT_DELAY_MS = 1500;
@@ -130,26 +130,39 @@ export function SetPasswordPage() {
   const deadMessage = token ? linkDead : INVALID_LINK_MESSAGE;
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-title font-semibold">Set your password</h2>
+    <section className="mx-auto mt-4 flex w-full max-w-[560px] flex-col gap-4 min-[900px]:mt-12">
+      <div className="flex items-center gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-on-accent">
+          <Icon name="lock" />
+        </span>
+        <h1 className="text-title">Set your password</h1>
+      </div>
 
       {done ? (
-        <p role="status" className="text-body text-settled">
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-control bg-ok-soft px-3 py-2.5 text-body font-semibold text-ok"
+        >
+          <Icon name="checkc" className="mt-0.5" />
           Your password is set and you are signed in. Taking you to your dashboard…
         </p>
       ) : deadMessage ? (
-        <p role="alert" className="text-body text-owed">
+        <p
+          role="alert"
+          className="flex items-start gap-2 rounded-control bg-danger-soft px-3 py-2.5 text-body font-medium text-danger"
+        >
+          <Icon name="alert" className="mt-0.5" />
           {deadMessage}
         </p>
       ) : (
-        <form className="flex flex-col gap-3" onSubmit={(event) => void handleSubmit(event)} noValidate>
-          <p className="text-body text-ink-muted">
+        <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)} noValidate>
+          <p className="text-body text-muted">
             Choose a password of at least {MIN_PASSWORD_LENGTH} characters. Setting it will sign
             you in on this device.
           </p>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor={passwordId} className="text-label font-medium text-ink">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={passwordId} className={LABEL_CLASS}>
               New password
             </label>
             <input
@@ -161,12 +174,12 @@ export function SetPasswordPage() {
               onChange={(event) => setPassword(event.target.value)}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? errorId : undefined}
-              className={fieldClass}
+              className={INPUT_CLASS}
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor={confirmId} className="text-label font-medium text-ink">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={confirmId} className={LABEL_CLASS}>
               Confirm new password
             </label>
             <input
@@ -178,23 +191,19 @@ export function SetPasswordPage() {
               onChange={(event) => setConfirm(event.target.value)}
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? errorId : undefined}
-              className={fieldClass}
+              className={INPUT_CLASS}
             />
           </div>
 
           {error ? (
-            <p id={errorId} role="alert" className="text-label text-owed">
+            <p id={errorId} role="alert" className="text-label font-semibold text-danger">
               {error}
             </p>
           ) : null}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="min-h-touch rounded-card bg-accent px-3 text-body font-medium text-on-accent disabled:opacity-50"
-          >
+          <Button type="submit" variant="primary" size="lg" fullWidth disabled={submitting}>
             {submitting ? "Saving…" : "Set password"}
-          </button>
+          </Button>
         </form>
       )}
     </section>

@@ -1,10 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { Button } from "../../components/ui/Button";
-import { cx } from "../../components/ui/cx";
 import { Icon } from "../../components/ui/Icon";
-import type { IconName } from "../../components/ui/icon-paths";
 import type { MembershipRole } from "../auth/membership-context";
 import { ROLE_LABELS, remindersLabel } from "./family-view";
 
@@ -44,48 +41,8 @@ export function ReminderIcon({ on }: { on: boolean }) {
   );
 }
 
-export function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-2">
-      <p className="text-label text-danger">{message}</p>
-      <Button size="sm" onClick={onRetry}>
-        Retry
-      </Button>
-    </div>
-  );
-}
-
-/** A link styled like a small Button (Button itself renders a <button>). */
-export function LinkButton({
-  to,
-  icon,
-  variant = "secondary",
-  className,
-  children,
-}: {
-  to: string;
-  icon: IconName;
-  variant?: "secondary" | "ok";
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      to={to}
-      className={cx(
-        "inline-flex min-h-touch items-center justify-center gap-2 whitespace-nowrap rounded-control border px-3.5 text-label font-semibold",
-        "transition-colors duration-toggle motion-reduce:transition-none",
-        variant === "ok"
-          ? "border-ok-btn bg-ok-btn text-on-ok"
-          : "border-border-strong bg-surface text-ink hover:bg-sunken",
-        className,
-      )}
-    >
-      <Icon name={icon} />
-      {children}
-    </Link>
-  );
-}
+export { LinkButton } from "../../components/ui/LinkButton";
+export { LoadError } from "../../components/ui/LoadError";
 
 /** A text link with a 44px touch target, for "See all" / "Back" style links. */
 export function TextLink({ to, children }: { to: string; children: ReactNode }) {

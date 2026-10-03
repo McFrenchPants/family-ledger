@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 
+import { Button } from "../../components/ui/Button";
+import { INPUT_CLASS, LABEL_CLASS } from "../../components/ui/styles";
+
 export type SetPasswordLink = {
   /** The one-time link. Held only in the open dialog's state; never persisted. */
   url: string;
@@ -58,15 +61,15 @@ export function SetPasswordLinkDialog({
           onClose();
         }
       }}
-      className="flex flex-col gap-3 rounded-card border border-accent/40 bg-accent-soft p-4"
+      className="flex flex-col gap-3 rounded-panel border border-accent/40 bg-accent-soft p-4"
     >
-      <h3 id={headingId} ref={headingRef} tabIndex={-1} className="text-body font-semibold">
+      <h3 id={headingId} ref={headingRef} tabIndex={-1} className="text-head">
         {link.heading}
       </h3>
       <p className="text-label text-ink">{link.intro}</p>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor={fieldId} className="text-label font-medium text-ink">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={fieldId} className={LABEL_CLASS}>
           Set-password link
         </label>
         <input
@@ -76,31 +79,23 @@ export function SetPasswordLinkDialog({
           readOnly
           value={link.url}
           onFocus={(event) => event.currentTarget.select()}
-          className="min-h-touch rounded-card border border-surface-border bg-surface px-3 font-mono text-label text-ink"
+          className={`${INPUT_CLASS} font-mono`}
         />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => void handleCopy()}
-          className="min-h-touch rounded-card bg-accent px-3 text-label font-medium text-on-accent"
-        >
+        <Button size="sm" variant="primary" onClick={() => void handleCopy()}>
           Copy link
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-        >
+        </Button>
+        <Button size="sm" onClick={onClose}>
           Close
-        </button>
+        </Button>
       </div>
-      <p role="status" className="text-label text-ink-muted">
+      <p role="status" className="text-label text-muted">
         {copyNote}
       </p>
 
-      <ul className="list-disc space-y-1 pl-5 text-label text-ink-muted">
+      <ul className="list-disc space-y-1 pl-5 text-label text-muted">
         <li>The link is valid for 24 hours and works only once.</li>
         <li>
           Anyone who has this link can set that person&apos;s password, so send it to them

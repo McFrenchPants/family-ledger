@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 
+import { Icon } from "../components/ui/Icon";
 import { SignInForm } from "../features/auth/SignInForm";
 import { useSession } from "../features/auth/session-context";
 
@@ -7,22 +8,33 @@ export function SignInPage() {
   const { session, loading } = useSession();
 
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-title font-semibold">Sign in</h2>
-        <p className="mt-1 text-body text-ink-muted">
-          Accounts are created by a Parent — there is no self-service sign-up.
-        </p>
+    <section className="mx-auto mt-4 flex w-full max-w-[560px] flex-col gap-4 min-[900px]:mt-12">
+      <div className="flex items-center gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-on-accent">
+          <Icon name="dollar" />
+        </span>
+        <h1 className="text-title">Family Ledger</h1>
       </div>
 
       {loading ? (
-        <p className="text-body text-ink-subtle">Checking session…</p>
+        <p role="status" className="text-label text-subtle">
+          Checking session…
+        </p>
       ) : session ? (
         // This page has no app chrome, so a signed-in visitor (including one
         // who just signed in) is sent on to their home rather than stranded.
         <Navigate to="/" replace />
       ) : (
-        <SignInForm />
+        <>
+          <p className="text-body text-muted">
+            Sign in to see what’s owed and what’s coming up.
+          </p>
+          <SignInForm />
+          <p className="text-label text-subtle">
+            Forgot your password? Ask a parent for a new set-password link. Accounts are
+            created by a parent; there is no self-service sign-up.
+          </p>
+        </>
       )}
     </section>
   );

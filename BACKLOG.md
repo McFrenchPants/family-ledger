@@ -217,7 +217,7 @@ sequential except where noted.
    RLS suite is in place and there is real UI worth pinning down. Keep
    `npm run test` Docker-free.
 
-10. **Account management: change own password, Parent-managed accounts** — status: `done on main, awaiting production deploy` — analysis: analysis/10-account-management.md
+10. **Account management: change own password, Parent-managed accounts** — status: `done` — analysis: analysis/10-account-management.md
     Requested by the owner 2026-10-01, right after first deploy. Today a
     signed-in person cannot change their own password, and a Parent cannot
     reset anyone's password, change a member's role, change a login email,
@@ -234,7 +234,7 @@ sequential except where noted.
     merged into `main`. Not yet on `production`: the owner must first run the
     hosted steps in `docs/DEPLOYMENT_RUNBOOK.md` section 7a.
 
-11. **UI redesign** — status: `ready` — analysis: analysis/11-ui-redesign.md
+11. **UI redesign** — status: `done on main, final polish (UI10) awaiting production` — analysis: analysis/11-ui-redesign.md
     Requested by the owner 2026-10-02: the interface looks hastily assembled and
     leads with install/notification prompts. A research agent produced an
     approved design and mockups; the owner answered all open questions.

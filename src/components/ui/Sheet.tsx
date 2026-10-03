@@ -51,7 +51,7 @@ export function Sheet({
             </div>
             <Dialog.Close
               aria-label="Close"
-              className="-mr-2 -mt-1 grid min-h-touch min-w-touch place-items-center rounded-control text-muted"
+              className="-mr-2 -mt-1 grid min-h-touch min-w-touch place-items-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-ink motion-reduce:transition-none"
             >
               <Icon name="x" />
             </Dialog.Close>

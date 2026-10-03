@@ -267,6 +267,13 @@ storage is blocked.
 
 ### UI10 — Polish, cleanup, final verification
 
+**Owner decision (2026-10-03):** the `web-design-guidelines` review skill is
+installed (user-level, so it is available here). Priorities for this phase are
+**functionality and visual consistency first**; accessibility is fine but not a
+priority -- keep the WCAG basics already in place, fix accessibility findings
+only when cheap, and don't let them displace functional or consistency work.
+Use the skill's findings as a checklist, triaged by that priority.
+
 - Motion kept subtle and reduced-motion safe; empty-state copy pass; accessibility
   walk-through (keyboard, screen reader labels, contrast, 44 px targets) using the
   `web-design-guidelines` review skill **if the owner has approved installing it**

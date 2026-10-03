@@ -7,12 +7,8 @@ import type { IconName } from "../../components/ui/icon-paths";
 
 /** Small presentational pieces shared by Settings and its sub-pages. */
 
-/** Text inputs and selects that don't go through `Field` (selects, inline rename). */
-export const INPUT_CLASS =
-  "min-h-touch-lg rounded-control border border-border-strong bg-surface px-3 text-body text-ink placeholder:text-subtle disabled:opacity-60";
-
-/** Labels for the inputs above, matching `Field`'s label. */
-export const LABEL_CLASS = "text-label font-semibold text-ink";
+/** Inputs/selects that don't go through `Field`, and their labels (shared with `Field`). */
+export { INPUT_CLASS, LABEL_CLASS } from "../../components/ui/styles";
 
 /** One row of a settings card: 56px tall, divided from the row above. */
 export const ROW_CLASS =

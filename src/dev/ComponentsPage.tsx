@@ -14,7 +14,6 @@ import { ChipGroup, Segmented } from "../components/ui/Segmented";
 import { Sheet, SheetClose } from "../components/ui/Sheet";
 import { STATUS_KINDS, type StatusKind } from "../components/ui/status";
 import { StatusChip } from "../components/ui/StatusChip";
-import { ToggleField } from "../components/ToggleField";
 import { getStoredTheme, setStoredTheme, type ThemePreference } from "../lib/theme";
 
 /**
@@ -27,7 +26,6 @@ export function ComponentsPage() {
   const [theme, setTheme] = useState<ThemePreference>(() => getStoredTheme());
   const [method, setMethod] = useState<"cash" | "card" | "transfer">("cash");
   const [filters, setFilters] = useState<string[]>(["food"]);
-  const [toggle, setToggle] = useState(true);
 
   const variants: ButtonVariant[] = ["primary", "ok", "secondary", "ghost", "danger"];
 
@@ -145,12 +143,6 @@ export function ComponentsPage() {
             { value: "fuel", label: "Fuel" },
             { value: "phone", label: "Phone" },
           ]}
-        />
-        <ToggleField
-          label="Existing ToggleField"
-          description="Radix Switch, unchanged"
-          checked={toggle}
-          onCheckedChange={setToggle}
         />
       </Card>
 

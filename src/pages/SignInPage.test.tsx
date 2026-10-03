@@ -25,12 +25,12 @@ describe("SignInPage", () => {
   it("sends a signed-in visitor on to / instead of stranding them", () => {
     renderAt({ session: { user: { email: "a@b.c" } } as Session, loading: false });
     expect(screen.getByText("root page")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Sign in" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
   });
 
   it("shows the form when nobody is signed in", () => {
     renderAt({ session: null, loading: false });
-    expect(screen.getByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Family Ledger" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 });

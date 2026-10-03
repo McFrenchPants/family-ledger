@@ -120,7 +120,7 @@ export function AddMemberForm({
           />
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="new-member-role" className="text-label font-semibold text-ink">
+            <label htmlFor="new-member-role" className="text-label font-semibold text-muted">
               Role
             </label>
             <select

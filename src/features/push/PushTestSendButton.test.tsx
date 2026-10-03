@@ -59,6 +59,33 @@ describe("PushTestSendButton", () => {
     expect(screen.queryByText("Debug: test push delivery")).not.toBeInTheDocument();
   });
 
+  it("shows the host's hint instead of nothing when there is no subscription to test", async () => {
+    orderMock.mockReturnValue(Promise.resolve({ data: [], error: null }));
+    render(
+      <MembershipContext.Provider value={loadedMember}>
+        <PushTestSendButton emptyHint={<p>turn reminders on first</p>} />
+      </MembershipContext.Provider>,
+    );
+
+    expect(await screen.findByText("turn reminders on first")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send test push" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the hint away while loading and after a failed load", async () => {
+    let resolve: (value: unknown) => void = () => {};
+    orderMock.mockReturnValue(new Promise((r) => (resolve = r)));
+    render(
+      <MembershipContext.Provider value={loadedMember}>
+        <PushTestSendButton emptyHint={<p>turn reminders on first</p>} />
+      </MembershipContext.Provider>,
+    );
+
+    await waitFor(() => expect(orderMock).toHaveBeenCalled());
+    expect(screen.queryByText("turn reminders on first")).not.toBeInTheDocument();
+    resolve({ data: null, error: { message: "boom" } });
+    await waitFor(() => expect(document.body.textContent).toBe(""));
+  });
+
   it("renders nothing when the subscription list fails to load", async () => {
     orderMock.mockReturnValue(Promise.resolve({ data: null, error: { message: "boom" } }));
     renderButton();

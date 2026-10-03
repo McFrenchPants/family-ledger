@@ -8,6 +8,7 @@ import { cx } from "../components/ui/cx";
 import { Icon } from "../components/ui/Icon";
 import type { IconName } from "../components/ui/icon-paths";
 import { Sheet, SheetClose } from "../components/ui/Sheet";
+import { buttonClass } from "../components/ui/styles";
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership, MembershipRole } from "../features/auth/membership-context";
 
@@ -242,14 +243,11 @@ function Sidebar({ member }: { member: Membership | null }) {
 /* ------------------------------------------------------------------ */
 
 const FAB_CLASS = cx(
-  "grid h-14 w-14 -translate-y-3.5 place-items-center rounded-full bg-accent text-on-accent",
+  "grid h-14 w-14 -translate-y-3.5 place-items-center rounded-full bg-accent text-on-accent hover:bg-accent/90",
   "shadow-[0_6px_16px_rgb(var(--accent)/0.35)]",
 );
 
-const SIDEBAR_LINK_BUTTON_CLASS = cx(
-  "inline-flex min-h-touch-lg w-full items-center justify-center gap-2 rounded-control border px-[18px]",
-  "border-accent bg-accent text-body font-semibold text-on-accent",
-);
+const SIDEBAR_LINK_BUTTON_CLASS = buttonClass({ variant: "primary", fullWidth: true });
 
 /**
  * A Parent gets a sheet offering both entry types. A Child gets a plain link

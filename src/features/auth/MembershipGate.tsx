@@ -1,6 +1,7 @@
 import { Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 
+import { LoadError } from "../../components/ui/LoadError";
 import { useMembership } from "./membership-context";
 import type { Membership } from "./membership-context";
 
@@ -19,7 +20,7 @@ export function MembershipGate({ children }: { children: (membership: Membership
   switch (membership.status) {
     case "loading":
       return (
-        <p role="status" className="text-label text-ink-subtle">
+        <p role="status" className="text-label text-subtle">
           Loading your account…
         </p>
       );
@@ -29,23 +30,15 @@ export function MembershipGate({ children }: { children: (membership: Membership
 
     case "error":
       return (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-owed">
-            Could not load your account: {membership.message}
-          </p>
-          <button
-            type="button"
-            onClick={membership.retry}
-            className="min-h-touch rounded-card border border-surface-border px-3 text-label text-ink-muted"
-          >
-            Retry
-          </button>
-        </div>
+        <LoadError
+          message={`Could not load your account: ${membership.message}`}
+          onRetry={membership.retry}
+        />
       );
 
     case "no-membership":
       return (
-        <p role="alert" className="text-label text-owed">
+        <p role="alert" className="text-label text-danger">
           Your account is not linked to a household yet. Ask a parent in your household to invite
           you.
         </p>
