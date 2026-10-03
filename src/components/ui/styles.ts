@@ -7,7 +7,7 @@ import { cx } from "./cx";
  */
 
 export type ButtonVariant = "primary" | "ok" | "secondary" | "ghost" | "danger";
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 // Hover only when enabled (links never match :disabled, so they always get it).
 const VARIANT: Record<ButtonVariant, string> = {
@@ -20,11 +20,13 @@ const VARIANT: Record<ButtonVariant, string> = {
     "border-transparent bg-transparent text-accent-text [&:not(:disabled)]:hover:bg-accent-soft",
 };
 
-// 44px minimum touch target, 48px main buttons, 56px the screen's main action.
+// 44px minimum touch target, 48px main buttons, 56px the screen's main action;
+// `icon` is a 44px square holding only an icon (its words go in sr-only text).
 const SIZE: Record<ButtonSize, string> = {
   sm: "min-h-touch px-3.5 text-label",
   md: "min-h-touch-lg px-[18px] text-body",
   lg: "min-h-touch-xl px-5 text-head",
+  icon: "h-touch w-touch shrink-0 px-0",
 };
 
 export function buttonClass({

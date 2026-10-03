@@ -22,7 +22,10 @@ import {
   type AttentionItem,
 } from "../features/home/parent-home";
 import type { ChildBalance } from "../features/ledger/household-balances";
-import type { HouseholdRecentTransaction } from "../features/ledger/recent-activity";
+import {
+  activitySubline,
+  type HouseholdRecentTransaction,
+} from "../features/ledger/recent-activity";
 import {
   useHouseholdBalances,
   type HouseholdBalancesState,
@@ -109,14 +112,27 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
         <Avatar name={name} />
       </header>
 
+      {/* The status line / Needs attention sits directly under the total on
+          every width: a phone stacks total, attention, children, recent; the
+          desktop grid puts attention at the top of the left column, under the
+          full-width total. An empty attention wrapper collapses. */}
       <div
         className={cx(
           "flex flex-col gap-4",
           "min-[900px]:grid min-[900px]:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] min-[900px]:items-start min-[900px]:gap-6",
+          // A tall Recent activity spans the last two rows; the 1fr row soaks
+          // up its extra height so no gap opens under the status line.
+          "min-[900px]:grid-rows-[auto_auto_1fr]",
           "min-[900px]:[grid-template-areas:'total_total'_'attention_recent'_'children_recent']",
         )}
       >
-        <div className="min-[900px]:[grid-area:attention]">
+        {children && children.length > 0 && (
+          <div className="min-[900px]:[grid-area:total]">
+            <TotalCard roster={children} progressMap={progressMap} />
+          </div>
+        )}
+
+        <div className="empty:hidden min-[900px]:[grid-area:attention]">
           <NeedsAttention
             hasChildren={children !== null && children.length > 0}
             attention={attention}
@@ -124,12 +140,6 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
             zone={zone}
           />
         </div>
-
-        {children && children.length > 0 && (
-          <div className="min-[900px]:[grid-area:total]">
-            <TotalCard roster={children} progressMap={progressMap} />
-          </div>
-        )}
 
         <div className="min-[900px]:[grid-area:children]">
           <ChildrenSection balances={balances} progressMap={progressMap} today={today} />
@@ -317,16 +327,18 @@ function ChildrenSection({
     );
   } else {
     body = (
-      <ul className="flex flex-col gap-3">
-        {orderChildren(balances.children, progressMap).map((child) => (
-          <ChildCard
-            key={child.memberId}
-            child={child}
-            progress={progressMap ? (progressMap.get(child.memberId) ?? null) : undefined}
-            today={today}
-          />
-        ))}
-      </ul>
+      <Card className="py-1">
+        <ul>
+          {orderChildren(balances.children, progressMap).map((child) => (
+            <ChildRow
+              key={child.memberId}
+              child={child}
+              progress={progressMap ? (progressMap.get(child.memberId) ?? null) : undefined}
+              today={today}
+            />
+          ))}
+        </ul>
+      </Card>
     );
   }
 
@@ -348,7 +360,13 @@ function ChildrenSection({
   );
 }
 
-function ChildCard({
+/**
+ * One compact row per child: name and amount on top, the status chip and a
+ * thin plan bar under them. The name link stretches over the whole row (its
+ * ::after covers it), so a tap anywhere opens the child's Family page; the
+ * two icon buttons sit above that layer and keep their own destinations.
+ */
+function ChildRow({
   child,
   progress,
   today,
@@ -359,70 +377,55 @@ function ChildCard({
 }) {
   const view = childCardView(child.balanceCents, progress, today);
   return (
-    <Card as="li" aria-label={child.name} data-testid="child-card">
-      <div className="flex items-center gap-3">
-        <Avatar name={child.name} />
-        <div className="min-w-0 grow">
+    <li
+      aria-label={child.name}
+      data-testid="child-card"
+      className="relative flex items-center gap-3 border-t border-border py-2.5 first:border-t-0"
+    >
+      <Avatar name={child.name} />
+      <div className="min-w-0 grow">
+        <div className="flex items-baseline justify-between gap-2">
           <Link
             to={`/family/${encodeURIComponent(child.memberId)}`}
-            className="inline-flex min-h-touch items-center text-head text-ink hover:underline"
+            className="truncate text-head text-ink after:absolute after:inset-0 after:content-[''] hover:underline"
           >
             {child.name}
           </Link>
-          {view.chip && (
-            <div>
-              <StatusChip kind={view.chip.kind} label={view.chip.label} />
-            </div>
-          )}
+          <AmountText cents={child.balanceCents} srContext="owed" className="!text-head" />
         </div>
-        <div className="text-right">
-          <AmountText
-            cents={child.balanceCents}
-            variant="hero"
-            srContext="owed"
-            className="!text-amount"
-          />
-          <p className="text-caption text-subtle" aria-hidden="true">
-            owed
-          </p>
-        </div>
+        {(view.chip || view.progress) && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {view.chip && (
+              <StatusChip kind={view.chip.kind} label={view.chip.label} className="!py-0.5" />
+            )}
+            {view.progress && (
+              <ProgressBar
+                className="grow basis-12"
+                value={view.progress.paidCents}
+                max={view.progress.minimumCents}
+                label={`${child.name}: paid this month`}
+                valueText={view.progress.text}
+                tone={view.progress.tone}
+              />
+            )}
+          </div>
+        )}
       </div>
 
-      {view.progress && (
-        <div className="mt-3">
-          <div className="flex items-baseline justify-between gap-2 text-label">
-            <span>{view.progress.text}</span>
-            <span className="text-subtle">{view.progress.dueLabel}</span>
-          </div>
-          <ProgressBar
-            className="mt-1.5"
-            value={view.progress.paidCents}
-            max={view.progress.minimumCents}
-            label={`${child.name}: paid this month`}
-            valueText={view.progress.text}
-            tone={view.progress.tone}
-          />
-        </div>
-      )}
-
-      <div className="mt-3 flex gap-2">
-        <LinkButton
-          to={`/new/expense${childParam(child.memberId)}`}
-          icon="plus"
-          className="flex-1"
-        >
-          Expense<span className="sr-only"> for {child.name}</span>
+      <div className="relative z-10 flex gap-1.5">
+        <LinkButton to={`/new/expense${childParam(child.memberId)}`} icon="plus" size="icon">
+          <span className="sr-only">Expense for {child.name}</span>
         </LinkButton>
         <LinkButton
           to={`/new/payment${childParam(child.memberId)}`}
           icon="check"
-          className="flex-1"
+          size="icon"
           variant={progress?.periodStatus === "overdue" && child.balanceCents > 0 ? "ok" : "secondary"}
         >
-          Payment<span className="sr-only"> from {child.name}</span>
+          <span className="sr-only">Payment from {child.name}</span>
         </LinkButton>
       </div>
-    </Card>
+    </li>
   );
 }
 
@@ -497,15 +500,7 @@ function ActivityRow({
   childName: string | null;
 }) {
   const look = transactionLook(transaction.type);
-  const detail = transaction.type === "expense" ? transaction.categoryName : look.label;
-  const subline = [
-    formatCalendarDate(transaction.occurredOn, "short"),
-    detail,
-    childName,
-    transaction.isVoided ? "Voided" : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const subline = activitySubline(transaction, look.label, childName);
 
   return (
     <li

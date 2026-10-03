@@ -20,7 +20,7 @@ import {
   takeNewPayments,
   type PlanView,
 } from "../features/home/child-home";
-import type { RecentTransaction } from "../features/ledger/recent-activity";
+import { activitySubline, type RecentTransaction } from "../features/ledger/recent-activity";
 import { useHouseholdTimezone } from "../features/ledger/useHouseholdTimezone";
 import { useOwnBalance } from "../features/ledger/useOwnBalance";
 import { useRecentActivity, type RecentActivityState } from "../features/ledger/useRecentActivity";
@@ -72,7 +72,8 @@ function ChildHome({
 }) {
   const balance = useOwnBalance(householdId, memberId);
   const progress = useChildPaymentProgress(memberId);
-  const activity = useRecentActivity(memberId);
+  // Home lists live rows only; voided ones stay visible under Activity.
+  const activity = useRecentActivity(memberId, { excludeVoided: true });
   const zone = useHouseholdTimezone(householdId);
   const newPayments = useNewPayments(memberId, activity);
 
@@ -395,14 +396,7 @@ function RecentActivityCard({ activity }: { activity: RecentActivityState }) {
 
 function ActivityRow({ transaction }: { transaction: RecentTransaction }) {
   const look = transactionLook(transaction.type);
-  const detail = transaction.type === "expense" ? transaction.categoryName : look.label;
-  const subline = [
-    formatCalendarDate(transaction.occurredOn, "short"),
-    detail,
-    transaction.isVoided ? "Voided" : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const subline = activitySubline(transaction, look.label);
 
   return (
     <li className="flex min-h-[60px] items-center gap-3 border-t border-border py-2.5 first:border-t-0">

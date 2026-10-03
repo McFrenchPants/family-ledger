@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabase";
 import type { RecentTransaction, RecentTransactionRow } from "./recent-activity";
 import { toRecentTransactions } from "./recent-activity";
 
-/** How many recent transactions to show on the Child dashboard. */
+/** How many recent transactions to read for a member (Child Home, a member's Family page). */
 export const RECENT_ACTIVITY_LIMIT = 8;
 
 export type RecentActivityState =
@@ -28,8 +28,15 @@ export type RecentActivityState =
  * `household_members.id`, so this hook does not (and must not) need a
  * `household_id`/role check of its own -- filtering by `memberId` is for
  * shaping the query, not for authorization, which Postgres already owns.
+ *
+ * Voided rows are included and flagged by default (a member's Family page
+ * shows them). `excludeVoided` drops them in the query itself, so Child Home
+ * still gets a full list of live rows rather than a short one.
  */
-export function useRecentActivity(memberId: string): RecentActivityState {
+export function useRecentActivity(
+  memberId: string,
+  { excludeVoided = false }: { excludeVoided?: boolean } = {},
+): RecentActivityState {
   const [state, setState] = useState<RecentActivityState>({ status: "loading" });
   const [retryToken, setRetryToken] = useState(0);
 
@@ -43,10 +50,12 @@ export function useRecentActivity(memberId: string): RecentActivityState {
 
     async function fetchActivity() {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from("ledger_transactions")
           .select("id, description, amount_cents, type, occurred_on, created_at, voided_at, category:categories(name)")
-          .eq("member_id", memberId)
+          .eq("member_id", memberId);
+        if (excludeVoided) query = query.is("voided_at", null);
+        const { data, error } = await query
           .order("occurred_on", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(RECENT_ACTIVITY_LIMIT)
@@ -84,7 +93,7 @@ export function useRecentActivity(memberId: string): RecentActivityState {
       active = false;
     };
     // `retry` is stable (useCallback, no deps) -- listed for exhaustive-deps.
-  }, [memberId, retryToken, retry]);
+  }, [memberId, excludeVoided, retryToken, retry]);
 
   return state;
 }

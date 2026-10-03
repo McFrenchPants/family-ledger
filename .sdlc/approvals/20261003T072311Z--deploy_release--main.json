@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "ee0f9b855c32f6db321cca07dfad3169a9e9cda2",
+  "approved_at": "2026-10-03T07:23:11Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "\"publish, then look for improvements on the Home page\" (answer to: publish the redesign's final polish to the live site)",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-03T07:25:11Z",
+  "consumed_by": "supervisor-release-operator-2026-10-03-ui10",
+  "notes": "Promotes UI10 (UI10.1-UI10.5 polish, cleanup, final verification) plus a backlog status fix. Front-end only; hosted database already has every migration in supabase/migrations (checked via list_migrations, latest 20260908100000). | Consumed: verified record (not consumed, SHA matched main HEAD ee0f9b8). Gate on main@ee0f9b8: npm run typecheck/lint/test (47 files, 792 tests)/build all exit 0. git push origin main (fb4616e..ee0f9b8). git diff --stat origin/production main -- supabase/ empty. git checkout production; git merge --no-ff main -m \"Merge main into production: UI10 polish, cleanup and final verification\"; git push origin production (84c2297..c6c2d81, merge commit c6c2d811b626abe4f95c3d2e1dc72380d28bee93). No wrangler deploy; Cloudflare builds from production on push. No hosted DB changes."
+}

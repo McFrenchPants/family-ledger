@@ -25,7 +25,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path to extensions, public, pg_catalog;
 
-select plan(53);
+select plan(64);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures
@@ -75,8 +75,13 @@ select throws_ok(
 
 reset role;
 
+-- Scoped to this file's fixture households: the local database may also
+-- hold other (dev/test) households' plans, which a global count would
+-- wrongly pick up.
 select is(
-  (select count(*) from public.payment_plans),
+  (select count(*) from public.payment_plans
+    where household_id in ('10000000-0000-0000-0000-00000000000a',
+                           '10000000-0000-0000-0000-00000000000b')),
   0::bigint,
   'Case 1: no payment_plans row exists after the rejected Child create_payment_plan'
 );
@@ -505,7 +510,7 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Cases 12-18: payment_period_status derivation and allocation-window edges.
+-- Cases 12-22: payment_period_status derivation and allocation-window edges.
 --
 -- Built on a fresh plan for C2 (untouched by any of the above), with a
 -- period whose window is entirely in the past relative to real "today", so
@@ -650,38 +655,39 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Case 18: allocation window boundary and voided-payment exclusion, using
--- period 2 ('upcoming', unpaid, minimum_cents 10000, window
--- (2099-01-01, 2099-01-15]).
+-- Case 18: allocation window boundary and voided/adjustment exclusion, using
+-- period 2 ('upcoming', unpaid, minimum_cents 10000). Plan starts_on is
+-- 2020-01-01, so period 2's window is the whole month
+-- [2099-01-01, 2099-02-01) (20261003090000_payment_period_whole_month.sql).
 -- ---------------------------------------------------------------------------
 
--- A payment dated exactly on period_start is EXCLUDED (window is
--- exclusive-start): pay in full ON period_start and the period should NOT
--- read 'satisfied'.
+-- A payment dated exactly on period_start is INCLUDED (window is
+-- inclusive-start). Under the old (period_start, due_date] window it counted
+-- toward no period at all -- the "$30 on Oct 1 shows $0.00 paid" bug.
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
-select public.record_payment('30000000-0000-0000-0000-000000000003', -10000, 'on period_start, case 18a', '2099-01-01'::date);
+select public.record_payment('30000000-0000-0000-0000-000000000003', -3000, 'on period_start, case 18a', '2099-01-01'::date);
 
 reset role;
 
 select is(
   (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000002')),
-  0::bigint,
-  'Case 18a: a payment dated exactly on period_start is excluded from the allocation window (paid_cents stays 0)'
+  3000::bigint,
+  'Case 18a: a payment dated exactly on period_start IS included in the allocation window'
 );
 
 select is(
   (select status from public.payment_period_status('60000000-0000-0000-0000-000000000002')),
-  'upcoming',
-  'Case 18a (status): period 2 still reads ''upcoming'' since the on-period_start payment did not count'
+  'partially_paid',
+  'Case 18a (status): period 2 reads ''partially_paid'' once the on-period_start payment counted'
 );
 
--- A payment dated exactly on due_date IS included (window is inclusive-end).
+-- A payment dated exactly on due_date is also included.
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
-select public.record_payment('30000000-0000-0000-0000-000000000003', -10000, 'on due_date, case 18b', '2099-01-15'::date);
+select public.record_payment('30000000-0000-0000-0000-000000000003', -7000, 'on due_date, case 18b', '2099-01-15'::date);
 
 reset role;
 
@@ -698,7 +704,7 @@ select is(
 );
 
 -- A voided payment does not count toward paid_cents. Void the case-18b
--- payment and confirm paid_cents drops back to 0.
+-- payment and confirm paid_cents drops back to the case-18a amount.
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
@@ -719,15 +725,190 @@ select ok(
 
 select is(
   (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000002')),
-  0::bigint,
-  'Case 18c: a voided payment no longer counts toward paid_cents (drops back to 0)'
+  3000::bigint,
+  'Case 18c: a voided payment no longer counts toward paid_cents (drops back to the 18a amount)'
 );
 
 select is(
   (select status from public.payment_period_status('60000000-0000-0000-0000-000000000002')),
-  'upcoming',
-  'Case 18c (status): period 2 reverts to ''upcoming'' once its only payment is voided'
+  'partially_paid',
+  'Case 18c (status): period 2 reverts to ''partially_paid'' once the case-18b payment is voided'
 );
+
+-- An adjustment dated inside the window never counts, even a negative
+-- (balance-reducing) one: adjustments are corrections, not plan payments.
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated"}';
+
+select public.record_adjustment('30000000-0000-0000-0000-000000000003', -7000, 'in-window adjustment, case 18d', '2099-01-10'::date);
+
+reset role;
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000002')),
+  3000::bigint,
+  'Case 18d: a balance-reducing adjustment inside the window does not count toward paid_cents'
+);
+
+-- ---------------------------------------------------------------------------
+-- Case 19: a late payment (after due_date, before the next period starts)
+-- counts toward its own month, and turns an overdue period satisfied once the
+-- minimum is met. Period 5: window [2020-03-01, 2020-04-01), due 2020-03-15.
+-- ---------------------------------------------------------------------------
+
+insert into public.payment_periods
+  (id, payment_plan_id, household_id, member_id, period_start, due_date, minimum_cents)
+values
+  ('60000000-0000-0000-0000-000000000005', (select id from tmp_plan_c2),
+   '10000000-0000-0000-0000-00000000000a', '30000000-0000-0000-0000-000000000003',
+   '2020-03-01'::date, '2020-03-15'::date, 10000);
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated"}';
+
+select public.record_payment('30000000-0000-0000-0000-000000000003', -4000, 'late partial payment, case 19a', '2020-03-20'::date);
+
+reset role;
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000005')),
+  4000::bigint,
+  'Case 19a: a payment after due_date but before the next period start counts toward the period'
+);
+
+select is(
+  (select status from public.payment_period_status('60000000-0000-0000-0000-000000000005')),
+  'overdue',
+  'Case 19a (status): still ''overdue'' while the late payments are below the minimum'
+);
+
+-- Top up on the last day of the window.
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated"}';
+
+select public.record_payment('30000000-0000-0000-0000-000000000003', -6000, 'late top-up on last day of window, case 19b', '2020-03-31'::date);
+
+reset role;
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000005')),
+  10000::bigint,
+  'Case 19b: a payment on the last day of the month window counts toward the period'
+);
+
+select is(
+  (select status from public.payment_period_status('60000000-0000-0000-0000-000000000005')),
+  'satisfied',
+  'Case 19b (status): an overdue period turns ''satisfied'' once late payments meet the minimum'
+);
+
+-- ---------------------------------------------------------------------------
+-- Case 20: a payment ON the next period's start counts toward the next
+-- period, not the previous one. Period 6: window [2020-04-01, 2020-05-01).
+-- ---------------------------------------------------------------------------
+
+insert into public.payment_periods
+  (id, payment_plan_id, household_id, member_id, period_start, due_date, minimum_cents)
+values
+  ('60000000-0000-0000-0000-000000000006', (select id from tmp_plan_c2),
+   '10000000-0000-0000-0000-00000000000a', '30000000-0000-0000-0000-000000000003',
+   '2020-04-01'::date, '2020-04-15'::date, 10000);
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000001","role":"authenticated"}';
+
+select public.record_payment('30000000-0000-0000-0000-000000000003', -2500, 'on next period start, case 20', '2020-04-01'::date);
+
+reset role;
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000006')),
+  2500::bigint,
+  'Case 20a: a payment on the next period''s start counts toward that next period'
+);
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000005')),
+  10000::bigint,
+  'Case 20b: ... and not toward the previous period (its paid_cents is unchanged)'
+);
+
+-- ---------------------------------------------------------------------------
+-- Case 21: month-end anchor. A plan starting on the 31st generates periods
+-- Jan 31, Feb 28, Mar 31 (anchored to starts_on, Postgres clamps February).
+-- Windows: Jan [Jan 31, Feb 28), Feb [Feb 28, Mar 31), Mar [Mar 31, Apr 30).
+-- Four payments with distinct power-of-two amounts on the boundary days show
+-- each lands in exactly one period: no gap, no overlap.
+--
+-- Uses C3 (household B) with an INACTIVE plan inserted directly, so it does
+-- not collide with tmp_plan_c3 under payment_plans_member_id_active_key.
+-- ---------------------------------------------------------------------------
+
+insert into public.payment_plans
+  (id, household_id, member_id, minimum_cents, due_day, starts_on, active, created_by)
+values
+  ('70000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-00000000000b',
+   '30000000-0000-0000-0000-000000000005', 1000, 28, '2021-01-31'::date, false,
+   '30000000-0000-0000-0000-000000000004');
+
+insert into public.payment_periods
+  (id, payment_plan_id, household_id, member_id, period_start, due_date, minimum_cents)
+values
+  ('60000000-0000-0000-0000-000000000011', '70000000-0000-0000-0000-000000000001',
+   '10000000-0000-0000-0000-00000000000b', '30000000-0000-0000-0000-000000000005',
+   '2021-01-31'::date, '2021-01-28'::date, 1000),
+  ('60000000-0000-0000-0000-000000000012', '70000000-0000-0000-0000-000000000001',
+   '10000000-0000-0000-0000-00000000000b', '30000000-0000-0000-0000-000000000005',
+   '2021-02-28'::date, '2021-02-28'::date, 1000),
+  ('60000000-0000-0000-0000-000000000013', '70000000-0000-0000-0000-000000000001',
+   '10000000-0000-0000-0000-00000000000b', '30000000-0000-0000-0000-000000000005',
+   '2021-03-31'::date, '2021-03-28'::date, 1000);
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000004","role":"authenticated"}';
+
+select public.record_payment('30000000-0000-0000-0000-000000000005', -100, 'last day of Jan window, case 21', '2021-02-27'::date);
+select public.record_payment('30000000-0000-0000-0000-000000000005', -200, 'first day of Feb window, case 21', '2021-02-28'::date);
+select public.record_payment('30000000-0000-0000-0000-000000000005', -400, 'last day of Feb window, case 21', '2021-03-30'::date);
+select public.record_payment('30000000-0000-0000-0000-000000000005', -800, 'first day of Mar window, case 21', '2021-03-31'::date);
+
+reset role;
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000011')),
+  100::bigint,
+  'Case 21a: Jan-31-anchored Jan period [Jan 31, Feb 28) gets only the Feb 27 payment'
+);
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000012')),
+  600::bigint,
+  'Case 21b: Feb period [Feb 28, Mar 31) gets the Feb 28 and Mar 30 payments'
+);
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000013')),
+  800::bigint,
+  'Case 21c: Mar period [Mar 31, Apr 30) gets the Mar 31 payment, not the Feb one'
+);
+
+-- ---------------------------------------------------------------------------
+-- Case 22: the function now also reads payment_plans (for starts_on) as the
+-- caller. A Child calling it on their own period must still get the full
+-- answer -- payment_plans_select_self mirrors payment_periods_select_self, so
+-- no privilege is widened and no SECURITY DEFINER is needed.
+-- ---------------------------------------------------------------------------
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"20000000-0000-0000-0000-000000000005","role":"authenticated"}';
+
+select is(
+  (select paid_cents from public.payment_period_status('60000000-0000-0000-0000-000000000012')),
+  600::bigint,
+  'Case 22: the Child sees the same paid_cents for their own period (payment_plans readable under RLS)'
+);
+
+reset role;
 
 select * from finish();
 
