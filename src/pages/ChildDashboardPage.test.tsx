@@ -28,7 +28,13 @@ vi.mock("../features/ledger/useOwnBalance", () => ({ useOwnBalance: () => balanc
 vi.mock("../features/payment-plans/useChildPaymentProgress", () => ({
   useChildPaymentProgress: () => progress,
 }));
-vi.mock("../features/ledger/useRecentActivity", () => ({ useRecentActivity: () => activity }));
+let recentActivityArgs: unknown[] = [];
+vi.mock("../features/ledger/useRecentActivity", () => ({
+  useRecentActivity: (...args: unknown[]) => {
+    recentActivityArgs = args;
+    return activity;
+  },
+}));
 vi.mock("../features/ledger/useHouseholdTimezone", () => ({ useHouseholdTimezone: () => zone }));
 // The nudge's own rules are unit-tested in device-nudge.test.ts; here we
 // only check what Home tells it.
@@ -200,9 +206,19 @@ describe("ChildDashboardPage", () => {
 
     const recent = screen.getByRole("region", { name: "Recent activity" });
     expect(within(recent).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(recent).getByText("Sep 28 · Payment")).toBeInTheDocument();
+    // A payment titled "Payment" doesn't say it twice: the subtitle is just the date.
+    const payment = within(recent).getAllByRole("listitem")[1]!;
+    expect(payment.textContent?.match(/Payment/g)).toHaveLength(1);
+    expect(within(payment).getByText("Sep 28")).toBeInTheDocument();
+    // Same for a category the title already names ("Phone bill" / Phone).
+    expect(within(recent).getByText("Sep 24")).toBeInTheDocument();
     expect(within(recent).getByRole("link", { name: "See all" })).toHaveAttribute("href", "/activity");
     expect(screen.getByTestId("nudge")).toHaveTextContent("nudge allowed");
+  });
+
+  it("asks for live rows only: voided entries stay off Home", () => {
+    renderHome();
+    expect(recentActivityArgs).toEqual([MEMBER, { excludeVoided: true }]);
   });
 
   it("shows at most five recent rows", () => {

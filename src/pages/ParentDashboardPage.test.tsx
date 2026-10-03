@@ -99,7 +99,7 @@ const SOME_ACTIVITY: HouseholdRecentActivityState = {
   transactions: [
     tx({ id: "e1" }),
     tx({ id: "p1", memberId: "katie", description: "Payment", categoryName: null, type: "payment", amountCents: -2000 }),
-    tx({ id: "p2", memberId: "sam", description: "Cash", categoryName: null, type: "payment", amountCents: -500, isVoided: true }),
+    tx({ id: "p2", memberId: "sam", description: "Cash", categoryName: null, type: "payment", amountCents: -500 }),
     tx({ id: "e2", memberId: "sam", description: "Phone bill", categoryName: "Phone", amountCents: 6000 }),
   ],
 };
@@ -243,7 +243,7 @@ describe("ParentDashboardPage", () => {
     expect(total).toHaveTextContent("across 5 children · $45.00 due by Oct 5");
   });
 
-  it("children: ordered overdue, due soonest, paid up, no plan, with Parent chips and buttons", () => {
+  it("children: ordered overdue, due soonest, paid up, no plan, with Parent chips and icon buttons", () => {
     renderHome();
     expect(childCards().map((card) => card.getAttribute("aria-label"))).toEqual([
       "Alex",
@@ -270,7 +270,12 @@ describe("ParentDashboardPage", () => {
       "/new/payment?child=alex",
     );
 
+    // Expense and Payment are icon-only: no visible words, just their names.
+    expect(within(alex).queryByText("Expense", { exact: true })).not.toBeInTheDocument();
+    expect(within(alex).queryByText("Payment", { exact: true })).not.toBeInTheDocument();
+
     expect(within(sam).getByText("$30.00 due Oct 5")).toBeInTheDocument();
+    expect(within(sam).getByRole("link", { name: "Sam" })).toHaveAttribute("href", "/family/sam");
     // Zero balance: All caught up, no progress bar.
     expect(within(ryan).getByText("All caught up")).toBeInTheDocument();
     expect(within(ryan).queryByRole("progressbar")).not.toBeInTheDocument();
@@ -280,25 +285,48 @@ describe("ParentDashboardPage", () => {
     expect(within(jo).queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
-  it("shows Waived and Due <date> chips", () => {
+  it("shows Waived and Due <date> chips, each row naming its due date once", () => {
     progress = CALM;
     renderHome();
     expect(screen.getByText("Waived")).toBeInTheDocument();
     expect(screen.getByText("Due Oct 20")).toBeInTheDocument();
+    for (const row of childCards()) {
+      expect(row.textContent?.match(/Oct [0-9]+/g)?.length ?? 0).toBeLessThanOrEqual(1);
+    }
+    // Sam's plan still shows its bar, without a second date beside it.
+    const sam = childCards().find((card) => card.getAttribute("aria-label") === "Sam")!;
+    expect(within(sam).getByRole("progressbar")).toHaveAttribute("aria-valuetext", "$0.00 of $40.00 paid");
   });
 
-  it("recent activity: 4 rows with child names, voided marked, See all", () => {
+  it("puts the status line directly under the total", () => {
+    progress = CALM;
+    renderHome();
+    const total = screen.getByRole("region", { name: "Owed to the family" });
+    const status = screen.getByTestId("all-clear");
+    const children = screen.getByRole("region", { name: "Children" });
+    expect(total.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(status.compareDocumentPosition(children) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("puts Needs attention directly under the total too", () => {
+    renderHome();
+    const total = screen.getByRole("region", { name: "Owed to the family" });
+    expect(total.compareDocumentPosition(attentionSection()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("recent activity: 4 rows with child names, the type word said once, See all", () => {
     renderHome();
     const recent = screen.getByRole("region", { name: "Recent activity" });
     const rows = within(recent).getAllByRole("listitem");
     expect(rows).toHaveLength(4);
     expect(rows[0]).toHaveTextContent("Gas");
     expect(rows[0]).toHaveTextContent("Alex");
-    expect(rows[1]).toHaveTextContent("Katie");
+    // A payment titled "Payment": the subtitle is date and child only.
+    expect(rows[1]!.textContent?.match(/Payment/g)).toHaveLength(1);
+    expect(rows[1]).toHaveTextContent("Oct 1 · Katie");
     expect(within(rows[1]!).getByRole("img", { name: /minus 20 dollars/ })).toBeInTheDocument();
-    expect(rows[2]).toHaveAttribute("data-voided", "true");
-    expect(rows[2]).toHaveTextContent("Voided");
-    expect(within(rows[2]!).getByRole("img", { name: /voided/ })).toBeInTheDocument();
+    // A payment titled something else still says what it is.
+    expect(rows[2]).toHaveTextContent("Oct 1 · Payment · Sam");
     expect(within(recent).getByRole("link", { name: "See all" })).toHaveAttribute("href", "/activity");
   });
 

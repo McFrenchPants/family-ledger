@@ -198,13 +198,24 @@ describe("childCardView", () => {
       minimumCents: 4000,
       text: "$25.00 of $40.00 paid",
       percent: 62,
-      dueLabel: "Oct 15",
       tone: "danger",
     });
     expect(childCardView(0, plan(), TODAY, LOCALE).progress).toBeNull();
     expect(childCardView(100, null, TODAY, LOCALE).progress).toBeNull();
     expect(childCardView(100, plan({ periodStatus: "waived" }), TODAY, LOCALE).progress).toBeNull();
     expect(childCardView(100, plan({ periodStatus: "satisfied", paidCents: 4000 }), TODAY, LOCALE).progress?.tone).toBe("ok");
+  });
+
+  it("names the due date at most once per row: in the chip, never again in the progress", () => {
+    for (const periodStatus of ["due", "upcoming", "partially_paid", "overdue", "satisfied"] as const) {
+      const view = childCardView(100, plan({ periodStatus, dueDate: "2026-10-05" }), TODAY, LOCALE);
+      const shown = [view.chip?.label ?? "", view.progress?.text ?? ""].join(" | ");
+      expect(shown.match(/Oct 5/g)?.length ?? 0).toBeLessThanOrEqual(1);
+    }
+    expect(childCardView(100, plan({ periodStatus: "upcoming" }), TODAY, LOCALE)).toMatchObject({
+      chip: { label: "Due Oct 15" },
+      progress: { text: "$0.00 of $40.00 paid" },
+    });
   });
 
   it("without a known today, never claims 'due soon'", () => {

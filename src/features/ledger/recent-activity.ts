@@ -1,4 +1,5 @@
 import type { Cents } from "../../lib/currency";
+import { formatCalendarDate } from "../../lib/dates";
 
 /**
  * Row shape returned by
@@ -63,4 +64,33 @@ export function toHouseholdRecentTransactions(
     ...transaction,
     memberId: (rows[index] as HouseholdRecentTransactionRow).member_id,
   }));
+}
+
+/** True when `word` appears in `text` as a whole word, ignoring case. */
+function mentions(text: string, word: string): boolean {
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|\\W)${escaped}(\\W|$)`, "i").test(text);
+}
+
+/**
+ * The second line of a Home recent-activity row: "Oct 1 · Gas · Alex".
+ * The middle part is the expense's category, or the type label ("Payment")
+ * for anything else -- dropped when the row's title already says it, so a
+ * payment titled "Payment" reads "Sep 10 · Katie", not "Payment" twice.
+ * `childName` is the Parent's view only; a Child's own rows never name anyone.
+ */
+export function activitySubline(
+  transaction: RecentTransaction,
+  typeLabel: string,
+  childName?: string | null,
+): string {
+  const detail = transaction.type === "expense" ? transaction.categoryName : typeLabel;
+  return [
+    formatCalendarDate(transaction.occurredOn, "short"),
+    detail && !mentions(transaction.description, detail) ? detail : null,
+    childName,
+    transaction.isVoided ? "Voided" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }

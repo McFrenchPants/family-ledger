@@ -20,7 +20,8 @@ export type HouseholdRecentActivityState =
  * Filtering by `household_id` shapes the query; authorization is Postgres's
  * (`ledger_transactions_select_parent` lets an active Parent read the whole
  * household; anyone else would only ever get their own rows back). Voided
- * rows are included and flagged, never hidden or counted as payments.
+ * rows are left out in the query itself -- Home shows what counts, and the
+ * list still fills to its limit; the Activity page is where voids live.
  */
 export function useHouseholdRecentActivity(householdId: string): HouseholdRecentActivityState {
   const [state, setState] = useState<HouseholdRecentActivityState>({ status: "loading" });
@@ -42,6 +43,7 @@ export function useHouseholdRecentActivity(householdId: string): HouseholdRecent
             "id, member_id, description, amount_cents, type, occurred_on, created_at, voided_at, category:categories(name)",
           )
           .eq("household_id", householdId)
+          .is("voided_at", null)
           .order("occurred_on", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(HOUSEHOLD_RECENT_ACTIVITY_LIMIT)

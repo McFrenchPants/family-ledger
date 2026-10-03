@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { toHouseholdRecentTransactions, toRecentTransactions } from "./recent-activity";
+import {
+  activitySubline,
+  toHouseholdRecentTransactions,
+  toRecentTransactions,
+  type RecentTransaction,
+} from "./recent-activity";
 
 describe("toRecentTransactions", () => {
   it("maps raw ledger_transactions rows to the rendered shape, including the embedded category name", () => {
@@ -116,5 +121,44 @@ describe("toHouseholdRecentTransactions", () => {
     expect(voided).toMatchObject({ id: "t1", memberId: "kid-1", isVoided: true });
     expect(live).toMatchObject({ id: "t2", memberId: "kid-2", categoryName: "Gas" });
     expect(live).not.toHaveProperty("isVoided");
+  });
+});
+
+describe("activitySubline", () => {
+  const row = (over: Partial<RecentTransaction>): RecentTransaction => ({
+    id: "t",
+    description: "Gas",
+    categoryName: "Transportation",
+    amountCents: 4217,
+    type: "expense",
+    occurredOn: "2026-09-10",
+    ...over,
+  });
+  const payment = row({ description: "Payment", categoryName: null, type: "payment", amountCents: -2000 });
+
+  it("drops the type word when the title already says it, keeping the child's name", () => {
+    expect(activitySubline(payment, "Payment", "Katie")).toBe("Sep 10 · Katie");
+    expect(activitySubline(payment, "Payment")).toBe("Sep 10");
+    expect(activitySubline(row({ ...payment, description: "Cash payment" }), "Payment")).toBe("Sep 10");
+  });
+
+  it("keeps the type word when the title is something else", () => {
+    expect(activitySubline(row({ ...payment, description: "Cash" }), "Payment", "Sam")).toBe(
+      "Sep 10 · Payment · Sam",
+    );
+    // A word that merely contains the label is not the label.
+    expect(activitySubline(row({ ...payment, description: "Payments app" }), "Payment")).toBe(
+      "Sep 10 · Payment",
+    );
+  });
+
+  it("shows an expense's category, unless the title repeats it", () => {
+    expect(activitySubline(row({}), "Expense", "Alex")).toBe("Sep 10 · Transportation · Alex");
+    expect(activitySubline(row({ categoryName: "Gas" }), "Expense")).toBe("Sep 10");
+    expect(activitySubline(row({ categoryName: null }), "Expense")).toBe("Sep 10");
+  });
+
+  it("still marks a voided row", () => {
+    expect(activitySubline(row({ isVoided: true }), "Expense")).toBe("Sep 10 · Transportation · Voided");
   });
 });

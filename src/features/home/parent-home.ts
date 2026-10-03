@@ -138,19 +138,23 @@ export function needsAttention(
 export type ChildCardView = {
   /** null while plan status is unknown (loading or failed). */
   chip: { kind: StatusKind; label: string } | null;
-  /** Shown only while something is owed under an active, non-waived plan. */
+  /**
+   * The thin bar under a child's row, shown only while something is owed
+   * under an active, non-waived plan. It carries no date: the due date, when
+   * Home shows one, lives in the chip alone.
+   */
   progress: {
     paidCents: Cents;
     minimumCents: Cents;
+    /** "$25.00 of $40.00 paid" -- the bar's spoken value. */
     text: string;
     percent: number;
-    dueLabel: string;
     tone: "accent" | "ok" | "danger";
   } | null;
 };
 
 /**
- * Status chip and progress line for one child card, using the Parent column
+ * Status chip and progress bar for one child row, using the Parent column
  * of the status vocabulary (design spec 6.7).
  */
 export function childCardView(
@@ -205,7 +209,6 @@ export function childCardView(
       minimumCents: progress.minimumCents,
       text: `${money(progress.paidCents)} of ${money(progress.minimumCents)} paid`,
       percent: percentPaid(progress.paidCents, progress.minimumCents),
-      dueLabel: due,
       tone:
         progress.periodStatus === "overdue"
           ? "danger"
