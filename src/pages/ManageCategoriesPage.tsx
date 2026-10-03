@@ -10,7 +10,7 @@ import { supabase } from "../lib/supabase";
  * `/parent/categories` (C1). Parent-only the same way `/members` is: gated
  * by `RequireRole role="parent"` in `router.tsx`, so this component can
  * assume `useMembership()` is already `{status: "loaded", ..., role:
- * "parent"}` -- see `ManageMembersPage`'s identical assumption and header
+ * "parent"}` -- see `FamilyPage`'s identical assumption and header
  * comment for why that guard is routing convenience, not the security
  * control. Every write this page makes goes through the existing Parent-only
  * RLS policies on `categories` (see
@@ -196,7 +196,7 @@ function CategoryRow({
             <span className="text-body font-medium">{category.name}</span>
             {/*
               Status is never color-only, per this project's §17
-              accessibility rule (see `ManageMembersPage`'s identical
+              accessibility rule (see `FamilyPage`'s identical
               Active/Archived chip pattern) -- "Inactive" is always plain
               text here, with the badge as a visual accent alongside it.
             */}

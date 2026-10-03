@@ -8,7 +8,7 @@ import { MembershipContext } from "../auth/membership-context";
 import type { MembershipState } from "../auth/membership-context";
 
 /**
- * Mirrors `ManageMembersPage.test.tsx`'s `vi.mock("../lib/supabase", ...)`
+ * Mirrors `FamilyPage.test.tsx`'s `vi.mock("../lib/supabase", ...)`
  * convention: a chainable stand-in for the query builder, extended to cover
  * the `.upsert(values, { onConflict }).select()`-shaped chain this
  * component calls (only `.upsert()` is actually awaited here -- `.select()`

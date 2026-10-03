@@ -1,7 +1,6 @@
 import { Navigate, useLocation, useParams } from "react-router-dom";
 
-import { useMembership } from "../features/auth/membership-context";
-import { PaymentPlanPage } from "../pages/PaymentPlanPage";
+import { RequireRole } from "../features/auth/RequireRole";
 
 /**
  * Old-address redirects (pre-redesign bookmarks and installed-app links).
@@ -24,25 +23,22 @@ export function LegacyChildHistoryRedirect() {
 }
 
 /**
- * `/child/:memberId/payment-plan`: a Parent moves to `/family/:memberId`.
- * Anyone else (a Child, or a visitor whose membership is still loading or
- * failed) stays on the old address and sees `PaymentPlanPage`, which handles
- * those states itself and shows a Child no plan controls. The plan RPCs
- * reject a non-Parent server-side either way.
+ * `/child/:memberId/payment-plan`: a Parent moves to `/family/:memberId`,
+ * where plan editing now lives. Anyone else is sent to `/home` (replace) by
+ * `RequireRole` -- a Child's plan status already shows on their Home --
+ * which also handles the loading, signed-out and error states. The plan
+ * functions reject a non-Parent server-side either way.
  */
 export function LegacyPaymentPlanRoute() {
-  const membership = useMembership();
   const { memberId = "" } = useParams<{ memberId: string }>();
   const { search, hash } = useLocation();
 
-  if (membership.status === "loaded" && membership.membership.role === "parent") {
-    return (
+  return (
+    <RequireRole role="parent">
       <Navigate
         to={{ pathname: `/family/${encodeURIComponent(memberId)}`, search, hash }}
         replace
       />
-    );
-  }
-
-  return <PaymentPlanPage />;
+    </RequireRole>
+  );
 }

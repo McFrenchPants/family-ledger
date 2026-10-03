@@ -24,13 +24,17 @@ for the design, `mockups/index.html` for the visual target.
 | UI5 | Parent Home | done | Branch `feature/ui-redesign-p4b-parent-home`. Logic in `src/features/home/parent-home.ts`; household recent activity hook `useHouseholdRecentActivity`. Add expense / Record payment accept `?child=` as the starting choice. Export, Categories, Presets kept as a quiet "Household tools" line on Home because Settings doesn't link them yet -- remove in UI9. Overdue/due-soon attention cards and the payment encouragement line covered by component tests only (fixture had nobody due; no real payment recorded). |
 | UI6 | Add expense and Record payment | done | Branch `feature/ui-redesign-p5-entry-forms`. Preview/shortcut maths in `src/features/ledger/entry-preview.ts`; shared pieces in `EntryFormParts.tsx`, `ui/ChoiceChips.tsx`, `ui/StickyActionBar.tsx`; balances via `useMemberBalances` (missing = no preview, never $0). Verifier: pass. Catch-up shortcut and the success screens covered by tests only (local Alex data is "Due Oct 15", not overdue). Presets/category tiles seen only with browser-faked data (local households have none). Sticky bar above the keyboard depends on the browser resizing the page; check on a real iPhone. |
 | UI7 | Activity page | done | Branch `feature/ui-redesign-p6-activity`. `HistoryPage`/`useHistory` replaced by `ActivityPage` + `useActivity` (pages of 50, `.range()`, id tiebreak). Mockup's monthly totals line dropped on purpose (would sum only loaded rows); shows "Showing N". Adjustments reachable via "Only adjustments" in the Filters sheet. Verifier: pass. Load more covered by tests only (fixture has 6 rows). For UI10: in "Everyone", rows of an archived child show no child name (names come from the active-children list); dark-mode selected state of shared `Segmented` is low-contrast. |
-| UI8 | Family and child page | todo | |
+| UI8 | Family and child page | done | Branch `feature/ui-redesign-p7-family`. `ManageMembersPage`/`PaymentPlanPage` replaced by `FamilyPage` + `FamilyMemberPage`; pieces in `src/features/family/`; reminder state via new `useMemberPushStatus` (yes/no only, so no device count). Previous/upcoming periods from the mockup dropped (no existing data source). Old `/child/:id/payment-plan`: Parent to `/family/:id`, anyone else to `/home`. Verifier: pass. Browser: Parent only, 375 px dark (list, Alex's page, replace-plan confirm then cancel, not-found); Child exclusion by router tests only. For UI10: a failed list re-read after a member change drops the success notice. |
 | UI9 | Settings completion | todo | |
 | UI10 | Polish, cleanup, final verification | todo | |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — UI8 done
+
+Family list (avatar, role chip, login email, "You", plan status chip for children, reminders on/off icon, Archived section, Add member panel) and a page per person: balance with Expense/Payment buttons, payment plan card with current month progress and the unchanged create / replace-with-confirmation / deactivate-with-confirmation flows, recent activity with See all, and a Manage section (rename, change role, change email, set-password link, archive/restore) using the same server calls and messages as before. Parent members get no balance/plan; archived members get only Restore; unknown ids get "We couldn't find this person". Old member/plan pages deleted, their tests moved across (all 25 old cases). typecheck, lint, 760 tests, build clean (orchestrator re-ran). Verifier routed (member management, role change): pass. Browser: local Test Family as Parent at 375 px dark; started and stopped the local stack. Next: UI9 (Settings completion).
 
 ### 2026-10-02 — UI7 done
 
