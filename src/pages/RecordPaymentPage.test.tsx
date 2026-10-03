@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,10 +52,41 @@ function renderPage(path = "/new/payment", membership: MembershipState = parent)
 
 type PeriodRow = { status: string; minimum_cents: number; paid_cents: number; remaining_cents: number };
 
-/** Active plans by child, and each plan's current period status. */
-let plans: { id: string; member_id: string }[] = [];
+/** Active plans by child, and each period's status (keyed by period id). */
+let plans: { id: string; member_id: string; starts_on?: string }[] = [];
 let periods: Record<string, PeriodRow> = {};
 let balances: { member_id: string; balance_cents: number }[] = [];
+/** `period_start` of the period `ensure_current_payment_period` returns. */
+let currentPeriodStart = "2026-10-01";
+/** Stored `payment_periods` rows (earlier, already-materialized periods). */
+let storedPeriods: { id: string; payment_plan_id: string; period_start: string }[] = [];
+
+/**
+ * Stand-in for the backdated-payment lookup on `payment_periods`:
+ * `.eq(plan).lte(period_start, date).order(desc).limit(1).maybeSingle()`.
+ */
+function periodsBuilder() {
+  let planFilter: string | null = null;
+  let onOrBefore: string | null = null;
+  const builder: Record<string, unknown> = {};
+  builder.eq = vi.fn((column: string, value: unknown) => {
+    if (column === "payment_plan_id") planFilter = String(value);
+    return builder;
+  });
+  builder.lte = vi.fn((_column: string, value: unknown) => {
+    onOrBefore = String(value);
+    return builder;
+  });
+  builder.order = vi.fn(() => builder);
+  builder.limit = vi.fn(() => builder);
+  builder.maybeSingle = vi.fn(() => {
+    const latest = storedPeriods
+      .filter((p) => p.payment_plan_id === planFilter && onOrBefore !== null && p.period_start <= onOrBefore)
+      .sort((a, b) => (a.period_start < b.period_start ? 1 : -1))[0];
+    return Promise.resolve({ data: latest ?? null, error: null });
+  });
+  return builder;
+}
 
 /**
  * A chainable stand-in for supabase-js's query builder covering both reads
@@ -84,6 +115,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   plans = [];
   periods = {};
+  currentPeriodStart = "2026-10-01";
+  storedPeriods = [];
   balances = [
     { member_id: "kid-a", balance_cents: 14732 },
     { member_id: "kid-s", balance_cents: 11240 },
@@ -96,7 +129,10 @@ beforeEach(() => {
       return Promise.resolve({ data: balances, error: null });
     }
     if (name === "ensure_current_payment_period") {
-      return Promise.resolve({ data: { id: `period-${args.p_plan_id}`, due_date: "2026-09-15" }, error: null });
+      return Promise.resolve({
+        data: { id: `period-${args.p_plan_id}`, period_start: currentPeriodStart, due_date: "2026-10-15" },
+        error: null,
+      });
     }
     if (name === "payment_period_status") {
       const row = periods[args.p_period_id];
@@ -104,7 +140,9 @@ beforeEach(() => {
     }
     throw new Error(`Unexpected rpc ${name}`);
   });
-  fromMock.mockImplementation(() => ({ select: vi.fn(() => plansBuilder()) }));
+  fromMock.mockImplementation((table: string) => ({
+    select: vi.fn(() => (table === "payment_periods" ? periodsBuilder() : plansBuilder())),
+  }));
 });
 
 function selectedChild(): HTMLElement {
@@ -179,6 +217,8 @@ describe("RecordPaymentPage encouragement", () => {
     await waitFor(() => expect(screen.getByText("Adjustment recorded")).toBeInTheDocument());
     expect(screen.queryByTestId("payment-encouragement")).not.toBeInTheDocument();
     expect(rpcMock).toHaveBeenCalledWith("record_adjustment", expect.objectContaining({ p_amount_cents: -4000 }));
+    expect(rpcMock).not.toHaveBeenCalledWith("ensure_current_payment_period", expect.anything());
+    expect(rpcMock).not.toHaveBeenCalledWith("payment_period_status", expect.anything());
   });
 });
 
@@ -203,6 +243,64 @@ describe("RecordPaymentPage success panel", () => {
     expect(screen.getByText(/New balance:/)).toHaveTextContent("New balance: $132.32");
     expect(screen.getByText("Fully paid for this period.")).toBeInTheDocument();
     expect(screen.getByText("$40.00 of $40.00 paid")).toBeInTheDocument();
+  });
+});
+
+describe("RecordPaymentPage period panel follows the payment's date", () => {
+  async function saveDatedPayment(user: ReturnType<typeof userEvent.setup>, date?: string) {
+    renderPage("/new/payment?child=kid-a");
+    await user.type(screen.getByLabelText("Payment amount"), "40");
+    await user.type(screen.getByLabelText("Description"), "Cash");
+    if (date) {
+      await user.click(screen.getByRole("radio", { name: /Pick date/ }));
+      fireEvent.change(screen.getByLabelText("Pick a date"), { target: { value: date } });
+    }
+    // The child rows' progress reads hit the same RPCs on load; only the
+    // calls made after Save are about the confirmation panel.
+    rpcMock.mockClear();
+    await user.click(screen.getByRole("button", { name: /Record \$40\.00 from Alex/ }));
+    await waitFor(() => expect(screen.getByText("Payment recorded")).toBeInTheDocument());
+  }
+
+  beforeEach(() => {
+    plans = [{ id: "plan-a", member_id: "kid-a", starts_on: "2026-06-01" }];
+    periods = {
+      "period-plan-a": { status: "due", minimum_cents: 4000, paid_cents: 1000, remaining_cents: 3000 },
+      "p-sep": { status: "satisfied", minimum_cents: 4000, paid_cents: 4000, remaining_cents: 0 },
+    };
+  });
+
+  it("shows the current period, named by month, for a payment dated in it", async () => {
+    await saveDatedPayment(userEvent.setup());
+    expect(screen.getByRole("heading", { name: "October payment period" })).toBeInTheDocument();
+    expect(screen.getByText("$10.00 of $40.00 paid")).toBeInTheDocument();
+    expect(rpcMock).toHaveBeenCalledWith("payment_period_status", { p_period_id: "period-plan-a" });
+    expect(fromMock).not.toHaveBeenCalledWith("payment_periods");
+  });
+
+  it("shows the stored earlier period whose month holds a backdated payment", async () => {
+    storedPeriods = [
+      { id: "p-aug", payment_plan_id: "plan-a", period_start: "2026-08-01" },
+      { id: "p-sep", payment_plan_id: "plan-a", period_start: "2026-09-01" },
+    ];
+    await saveDatedPayment(userEvent.setup(), "2026-09-10");
+    expect(rpcMock).toHaveBeenCalledWith("record_payment", expect.objectContaining({ p_occurred_on: "2026-09-10" }));
+    expect(screen.getByRole("heading", { name: "September payment period" })).toBeInTheDocument();
+    expect(screen.getByText("Fully paid for this period.")).toBeInTheDocument();
+    expect(screen.getByText("$40.00 of $40.00 paid")).toBeInTheDocument();
+    expect(rpcMock).toHaveBeenCalledWith("payment_period_status", { p_period_id: "p-sep" });
+    expect(rpcMock).not.toHaveBeenCalledWith("payment_period_status", { p_period_id: "period-plan-a" });
+  });
+
+  it.each([
+    ["the month was never stored", [{ id: "p-aug", payment_plan_id: "plan-a", period_start: "2026-08-01" }], "2026-09-10"],
+    ["the date is before any stored period", [{ id: "p-sep", payment_plan_id: "plan-a", period_start: "2026-09-01" }], "2026-05-20"],
+  ])("shows no period panel when %s", async (_case, stored, date) => {
+    storedPeriods = stored;
+    await saveDatedPayment(userEvent.setup(), date);
+    expect(screen.getByText(/New balance:/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /payment period/ })).not.toBeInTheDocument();
+    expect(rpcMock).not.toHaveBeenCalledWith("payment_period_status", expect.anything());
   });
 });
 

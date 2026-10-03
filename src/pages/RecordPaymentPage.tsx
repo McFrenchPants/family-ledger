@@ -43,7 +43,8 @@ import { useHouseholdPaymentProgress } from "../features/payment-plans/useHouseh
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership } from "../features/auth/membership-context";
 import { supabase } from "../lib/supabase";
-import { todayInZone } from "../lib/dates";
+import { addMonths, compareCalendarDates, formatCalendarDate, todayInZone } from "../lib/dates";
+import type { CalendarDate } from "../lib/dates";
 import { formatCents, toDecimalString } from "../lib/currency";
 import type { Cents } from "../lib/currency";
 import type { PaymentPeriodStatus } from "../features/payment-plans/useChildPaymentProgress";
@@ -103,6 +104,8 @@ export function RecordPaymentPage() {
 }
 
 type PeriodEffect = {
+  /** The period the payment counted toward; its month names the panel. */
+  periodStart: CalendarDate;
   status: PaymentPeriodStatus;
   minimumCents: Cents;
   paidCents: Cents;
@@ -122,8 +125,9 @@ type SubmitState =
        * Only ever populated for a `payment` (never an `adjustment` -- see
        * module comment on S3.4). `null` covers every "nothing to show" case
        * uniformly: no active plan for this child, the type was `adjustment`,
-       * or the best-effort secondary fetch failed. The confirmation panel
-       * treats all three identically -- just render the plain balance
+       * a backdated payment no stored period covers, or the best-effort
+       * secondary fetch failed. The confirmation panel treats them all
+       * identically -- just render the plain balance
        * confirmation, unchanged from Phase 1.
        */
       periodEffect: PeriodEffect | null;
@@ -166,6 +170,25 @@ function periodEffectCopy(effect: PeriodEffect): string {
     default:
       return `${formatCents(effect.remainingCents)} remaining due.`;
   }
+}
+
+/**
+ * The start of the period after the one starting `periodStart`, mirroring
+ * `payment_period_status`'s `next_period_start`: the smallest
+ * `startsOn + k months` strictly after `periodStart`, always anchored to
+ * `startsOn` (never compounded month to month, so a 31st-anchored plan stays
+ * on the 31st where it can). Only used to decide *which* stored period a
+ * backdated payment fell in -- every paid/remaining number still comes from
+ * the server.
+ */
+function nextPeriodStart(startsOn: CalendarDate, periodStart: CalendarDate): CalendarDate {
+  const [startYear, startMonth] = startsOn.split("-").map(Number) as [number, number];
+  const [periodYear, periodMonth] = periodStart.split("-").map(Number) as [number, number];
+  const months = (periodYear - startYear) * 12 + (periodMonth - startMonth);
+  const candidate = addMonths(startsOn, months);
+  return compareCalendarDates(candidate, periodStart) > 0
+    ? candidate
+    : addMonths(startsOn, months + 1);
 }
 
 const TYPE_COPY: Record<
@@ -327,7 +350,9 @@ function RecordForm({ membership }: { membership: Membership }) {
         {submitState.periodEffect && (
           <Card className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-head">Payment period</h2>
+              <h2 className="text-head">
+                {formatCalendarDate(submitState.periodEffect.periodStart, "month")} payment period
+              </h2>
               <StatusChip
                 kind={PERIOD_STATUS_KIND[submitState.periodEffect.status]}
                 label={PERIOD_STATUS_LABELS[submitState.periodEffect.status]}
@@ -401,10 +426,12 @@ function RecordForm({ membership }: { membership: Membership }) {
         try {
           const { data: planData } = await supabase
             .from("payment_plans")
-            .select("id")
+            .select("id, starts_on")
             .eq("member_id", memberId)
             .eq("active", true)
-            .maybeSingle<{ id: string }>();
+            .maybeSingle<{ id: string; starts_on: CalendarDate }>();
+
+          let target: { id: string; period_start: CalendarDate } | null = null;
 
           if (planData) {
             const { data: periodRaw, error: periodError } = await supabase.rpc(
@@ -412,32 +439,64 @@ function RecordForm({ membership }: { membership: Membership }) {
               { p_plan_id: planData.id },
             );
 
-            const periodData = periodRaw as { id: string } | null;
+            const current = periodRaw as { id: string; period_start: CalendarDate } | null;
 
-            if (!periodError && periodData) {
-              const { data: statusData, error: statusError } = await supabase.rpc(
-                "payment_period_status",
-                { p_period_id: periodData.id },
-              );
+            if (!periodError && current) {
+              if (compareCalendarDates(occurredOn, current.period_start) >= 0) {
+                target = current;
+              } else {
+                // A backdated payment counts toward the period whose month
+                // [period_start, next_period_start) holds its date, not the
+                // current one. Only periods already stored can be shown; one
+                // never materialized (or a date before the plan began) gets
+                // no panel rather than a misleading one.
+                const { data: earlier, error: earlierError } = await supabase
+                  .from("payment_periods")
+                  .select("id, period_start")
+                  .eq("payment_plan_id", planData.id)
+                  .lte("period_start", occurredOn)
+                  .order("period_start", { ascending: false })
+                  .limit(1)
+                  .maybeSingle<{ id: string; period_start: CalendarDate }>();
 
-              const statusRow = (
-                (statusData ?? []) as {
-                  period_id: string;
-                  status: PaymentPeriodStatus;
-                  minimum_cents: number;
-                  paid_cents: number;
-                  remaining_cents: number;
-                }[]
-              )[0];
-
-              if (!statusError && statusRow) {
-                periodEffect = {
-                  status: statusRow.status,
-                  minimumCents: statusRow.minimum_cents,
-                  paidCents: statusRow.paid_cents,
-                  remainingCents: Math.max(0, statusRow.remaining_cents),
-                };
+                if (
+                  !earlierError &&
+                  earlier &&
+                  compareCalendarDates(
+                    occurredOn,
+                    nextPeriodStart(planData.starts_on, earlier.period_start),
+                  ) < 0
+                ) {
+                  target = earlier;
+                }
               }
+            }
+          }
+
+          if (target) {
+            const { data: statusData, error: statusError } = await supabase.rpc(
+              "payment_period_status",
+              { p_period_id: target.id },
+            );
+
+            const statusRow = (
+              (statusData ?? []) as {
+                period_id: string;
+                status: PaymentPeriodStatus;
+                minimum_cents: number;
+                paid_cents: number;
+                remaining_cents: number;
+              }[]
+            )[0];
+
+            if (!statusError && statusRow) {
+              periodEffect = {
+                periodStart: target.period_start,
+                status: statusRow.status,
+                minimumCents: statusRow.minimum_cents,
+                paidCents: statusRow.paid_cents,
+                remainingCents: Math.max(0, statusRow.remaining_cents),
+              };
             }
           }
         } catch {

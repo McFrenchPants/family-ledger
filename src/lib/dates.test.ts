@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   TimeZoneError,
   addDays,
+  addMonths,
   calendarDateInZone,
   compareCalendarDates,
   daysBetween,
@@ -175,6 +176,26 @@ describe("compareCalendarDates", () => {
   it("rejects malformed dates rather than comparing garbage", () => {
     expect(() => compareCalendarDates("2026-1-1", "2026-01-01")).toThrow(RangeError);
     expect(() => compareCalendarDates("2026-01-01", "2026-02-30")).toThrow(RangeError);
+  });
+});
+
+describe("addMonths", () => {
+  it.each([
+    ["2026-09-15", 1, "2026-10-15"],
+    ["2026-01-31", 1, "2026-02-28"], // clamps like Postgres date + interval
+    ["2024-01-31", 1, "2024-02-29"], // leap year
+    ["2026-01-31", 2, "2026-03-31"], // anchored, not compounded
+    ["2026-11-30", 3, "2027-02-28"],
+    ["2026-03-31", -1, "2026-02-28"],
+    ["2026-01-15", -1, "2025-12-15"],
+    ["2026-05-10", 0, "2026-05-10"],
+  ])("addMonths(%s, %i) === %s", (date, months, expected) => {
+    expect(addMonths(date, months)).toBe(expected);
+  });
+
+  it("rejects invalid input", () => {
+    expect(() => addMonths("2026-02-30", 1)).toThrow(RangeError);
+    expect(() => addMonths("2026-02-01", 1.5)).toThrow(TypeError);
   });
 });
 
