@@ -278,3 +278,14 @@ sequential except where noted.
     immediately. Pre-existing; spotted during H1, 2026-10-03. Also worth a
     test: calling `payment_period_status` for another household's period
     returns zero rows (currently covered by reasoning, not by a test).
+
+16. **Separate balances by category, with payment splitting** — status: `in progress` (design spec awaiting owner sign-off) — analysis: analysis/16-category-balances.md
+    Requested by the owner 2026-10-03: keep a child's debts separate (e.g. a
+    car with a $300/month minimum and $1,000 of college) and choose how each
+    payment is divided between them. Owner decisions: allocate to category
+    balances (not individual expenses), per-balance monthly minimums,
+    suggested split the Parent can adjust, Child may suggest a split for a
+    Parent to confirm. Reverses `PROJECT_REQUIREMENTS.md` §3's "complex debt
+    allocation" non-goal in a limited form. Touches the money core: design
+    spec first. Branch `feature/category-balances`; spec at
+    `docs/proposals/category-balances/DESIGN_SPEC.md`.
