@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import html from "../../index.html?raw";
 
 import {
+  THEME_BAR_COLORS,
   THEME_STORAGE_KEY,
   applyTheme,
   getStoredTheme,
@@ -25,12 +26,29 @@ const throwingStorage: ThemeStorage = {
 
 const root = () => document.documentElement;
 
+/** The two theme-color metas as index.html declares them (OS light, OS dark). */
+function addBarMetas() {
+  for (const [scheme, color] of Object.entries(THEME_BAR_COLORS)) {
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    meta.media = `(prefers-color-scheme: ${scheme})`;
+    meta.content = color;
+    document.head.appendChild(meta);
+  }
+}
+const barColors = () =>
+  Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')).map(
+    (m) => m.content,
+  );
+
 beforeEach(() => {
   window.localStorage.clear();
   root().removeAttribute("data-theme");
+  addBarMetas();
 });
 afterEach(() => {
   root().removeAttribute("data-theme");
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.remove());
 });
 
 describe("getStoredTheme", () => {
@@ -91,6 +109,21 @@ describe("applyTheme", () => {
     applyTheme("auto", el);
     expect(el.hasAttribute("data-theme")).toBe(false);
   });
+
+  it("points both browser-bar colours at an explicit choice, and auto restores them", () => {
+    const { light, dark } = THEME_BAR_COLORS;
+    applyTheme("dark");
+    expect(barColors()).toEqual([dark, dark]);
+    applyTheme("light");
+    expect(barColors()).toEqual([light, light]);
+    applyTheme("auto");
+    expect(barColors()).toEqual([light, dark]);
+  });
+
+  it("updates the browser bar even when storage throws", () => {
+    setStoredTheme("dark", throwingStorage);
+    expect(barColors()).toEqual([THEME_BAR_COLORS.dark, THEME_BAR_COLORS.dark]);
+  });
 });
 
 describe("index.html pre-paint script", () => {
@@ -114,6 +147,27 @@ describe("index.html pre-paint script", () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, "sepia");
     run();
     expect(root().hasAttribute("data-theme")).toBe(false);
+    expect(barColors()).toEqual([THEME_BAR_COLORS.light, THEME_BAR_COLORS.dark]);
+  });
+
+  it("points the browser bar at a stored explicit choice", () => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, "light");
+    run();
+    expect(barColors()).toEqual([THEME_BAR_COLORS.light, THEME_BAR_COLORS.light]);
+    window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    run();
+    expect(barColors()).toEqual([THEME_BAR_COLORS.dark, THEME_BAR_COLORS.dark]);
+  });
+
+  it("declares the theme-color metas with the same colours as the theme helper", () => {
+    expect(html).toContain(
+      `<meta name="theme-color" media="(prefers-color-scheme: light)" content="${THEME_BAR_COLORS.light}" />`,
+    );
+    expect(html).toContain(
+      `<meta name="theme-color" media="(prefers-color-scheme: dark)" content="${THEME_BAR_COLORS.dark}" />`,
+    );
+    expect(inline).toContain(`"${THEME_BAR_COLORS.light}"`);
+    expect(inline).toContain(`"${THEME_BAR_COLORS.dark}"`);
   });
 
   it("declares both colour schemes", () => {

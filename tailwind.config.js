@@ -12,36 +12,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Legacy names used across the existing pages. Kept as aliases onto
-        // the new tokens so those pages pick up dark mode automatically.
-        ink: {
-          DEFAULT: token("ink"),
-          muted: token("muted"),
-          subtle: token("subtle"),
-        },
-        surface: {
-          DEFAULT: token("surface"),
-          sunken: token("sunken"),
-          border: token("border"),
-        },
-        accent: {
-          DEFAULT: token("accent"),
-          soft: token("accent-soft"),
-          text: token("accent-text"),
-        },
-        owed: token("danger"),
-        settled: token("ok"),
-
-        // New token names (design spec 6.x).
+        // Token names from design spec 6.2.
         bg: token("bg"),
+        surface: token("surface"),
         sunken: token("sunken"),
         raised: token("raised"),
         border: {
           DEFAULT: token("border"),
           strong: token("border-strong"),
         },
+        ink: token("ink"),
         muted: token("muted"),
         subtle: token("subtle"),
+        accent: {
+          DEFAULT: token("accent"),
+          soft: token("accent-soft"),
+          text: token("accent-text"),
+        },
         danger: {
           DEFAULT: token("danger"),
           soft: token("danger-soft"),
@@ -98,9 +85,7 @@ export default {
         "touch-xl": "3.5rem", // 56px: the screen's main action
       },
       borderRadius: {
-        // Legacy: what existing pages use for both buttons and boxes.
-        card: "0.5rem",
-        // New shape scale: cards/sheets 16px, buttons/inputs 12px.
+        // Shape scale: cards/sheets 16px, buttons/inputs 12px.
         panel: "1rem",
         control: "0.75rem",
       },

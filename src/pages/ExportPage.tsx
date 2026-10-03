@@ -10,12 +10,12 @@ import { SubPageHeader } from "../features/settings/SettingsParts";
 import { todayInZone } from "../lib/dates";
 
 /**
- * `/export` (S6.1 + S6.2): lets a signed-in Parent download their household's
+ * `/settings/export` (S6.1 + S6.2): lets a signed-in Parent download their household's
  * full `ledger_transactions` history as a CSV file, or a complete JSON
  * snapshot of the whole household (settings, members, transactions, payment
  * plans/periods, categories, and audit history) for backup/re-import.
  *
- * Parent-only the same way `/parent` is: `router.tsx` wraps this page in
+ * Parent-only like the other Parent settings pages: `router.tsx` wraps this page in
  * `RequireRole role="parent"`, so this component can assume
  * `useMembership()` is already `{status: "loaded", ..., role: "parent"}` by
  * the time it renders (see `ParentDashboardPage`'s identical assumption).

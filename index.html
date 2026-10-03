@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    <!-- Browser/status bar colour: the page background (--bg in src/styles/tokens.css). -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f6f8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1015" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Family Ledger</title>
     <script>
@@ -11,8 +14,14 @@
       // Must use the same key as THEME_STORAGE_KEY in src/lib/theme.ts.
       try {
         var t = window.localStorage.getItem("family-ledger.theme");
-        if (t === "light" || t === "dark")
+        if (t === "light" || t === "dark") {
           document.documentElement.setAttribute("data-theme", t);
+          // Browser bar follows the explicit choice too. Colours must match
+          // THEME_BAR_COLORS in src/lib/theme.ts (a test checks).
+          var c = t === "dark" ? "#0d1015" : "#f5f6f8";
+          var m = document.querySelectorAll('meta[name="theme-color"]');
+          for (var i = 0; i < m.length; i++) m[i].setAttribute("content", c);
+        }
       } catch (e) {}
     </script>
   </head>

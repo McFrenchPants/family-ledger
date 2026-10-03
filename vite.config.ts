@@ -30,8 +30,12 @@ export default defineConfig({
         start_url: "/",
         scope: "/",
         display: "standalone",
-        theme_color: "#2f5d8a",
-        background_color: "#ffffff",
+        // Light page background (--bg in src/styles/tokens.css), so the
+        // installed app's status bar and splash blend into the app shell.
+        // The manifest has no dark variant; index.html's theme-color metas
+        // switch it to the dark --bg where the browser supports that.
+        theme_color: "#f5f6f8",
+        background_color: "#f5f6f8",
         icons: [
           {
             src: "/icons/icon-192.png",
