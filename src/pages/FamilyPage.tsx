@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { Avatar } from "../components/ui/Avatar";
@@ -12,6 +12,9 @@ import { AddMemberForm } from "../features/family/AddMemberForm";
 import { ArchivedTag, LoadError, ReminderIcon, RoleTag } from "../features/family/FamilyParts";
 import { memberPath, planChip } from "../features/family/family-view";
 import { useFamilyMembers } from "../features/family/useFamilyMembers";
+import { BalanceBreakdownList } from "../features/ledger/BalanceBreakdownList";
+import { breakdownLines } from "../features/ledger/balance-breakdown";
+import { useBalanceBreakdown } from "../features/ledger/useAllTrackedBalances";
 import { useHouseholdBalances } from "../features/ledger/useHouseholdBalances";
 import { useHouseholdTimezone } from "../features/ledger/useHouseholdTimezone";
 import { SetPasswordLinkDialog } from "../features/members/SetPasswordLinkDialog";
@@ -19,6 +22,7 @@ import type { SetPasswordLink } from "../features/members/SetPasswordLinkDialog"
 import type { HouseholdMemberRow } from "../features/members/useHouseholdMembers";
 import { useLoginEmails } from "../features/members/useLoginEmails";
 import { remindersFor, useMemberPushStatus } from "../features/members/useMemberPushStatus";
+import { headlineProgress } from "../features/payment-plans/plan-selection";
 import { useHouseholdPaymentProgress } from "../features/payment-plans/useHouseholdPaymentProgress";
 import { todayInZone, type CalendarDate } from "../lib/dates";
 
@@ -164,6 +168,7 @@ function MemberLists({
   const balances = useHouseholdBalances(householdId);
   const childIds = active.filter((member) => member.role === "child").map((member) => member.id);
   const progress = useHouseholdPaymentProgress(householdId, childIds);
+  const { balances: balanceInfos, breakdown } = useBalanceBreakdown(householdId);
 
   const balanceOf = new Map(
     balances.status === "loaded"
@@ -173,14 +178,43 @@ function MemberLists({
   // Only a map covering every child counts, so nobody flashes as "No plan"
   // while the progress hook catches up with the roster.
   const progressMap =
-    progress.status === "loaded" && childIds.every((id) => progress.progressByMemberId.has(id))
-      ? progress.progressByMemberId
+    progress.status === "loaded" && childIds.every((id) => progress.plansByMemberId.has(id))
+      ? progress.plansByMemberId
       : null;
 
+  // The child's balances worth listing (empty when the household has only
+  // Everyday, or nothing beyond it is owed or planned).
+  const linesFor = (member: HouseholdMemberRow) =>
+    member.role === "child" &&
+    progressMap &&
+    zoneSettled &&
+    balanceInfos &&
+    breakdown &&
+    (balanceOf.get(member.id) ?? 0) > 0
+      ? breakdownLines(
+          balanceInfos,
+          breakdown.get(member.id),
+          new Set((progressMap.get(member.id) ?? []).map((plan) => plan.balanceId)),
+        )
+      : [];
+
   const chipFor = (member: HouseholdMemberRow) =>
-    member.role === "child" && progressMap && zoneSettled
-      ? planChip(balanceOf.get(member.id), progressMap.get(member.id), today)
+    member.role === "child" && progressMap && zoneSettled && linesFor(member).length === 0
+      ? planChip(balanceOf.get(member.id), headlineProgress(progressMap.get(member.id)), today)
       : null;
+
+  // With a breakdown each balance carries its own plan chip instead.
+  const breakdownFor = (member: HouseholdMemberRow) => {
+    const lines = linesFor(member);
+    return lines.length > 0 ? (
+      <BalanceBreakdownList
+        lines={lines}
+        plans={progressMap?.get(member.id)}
+        today={today}
+        childName={member.name}
+      />
+    ) : null;
+  };
 
   // Plan status is secondary here: a failure leaves the list working and
   // says so once, with a retry.
@@ -216,6 +250,7 @@ function MemberLists({
                 email={emails[member.id] ?? null}
                 isSelf={member.id === selfId}
                 chip={chipFor(member)}
+                breakdown={breakdownFor(member)}
                 reminders={remindersFor(push, member.id)}
               />
             ))}
@@ -258,6 +293,7 @@ function MemberRow({
   email,
   isSelf,
   chip,
+  breakdown = null,
   reminders,
   quiet = false,
 }: {
@@ -265,6 +301,8 @@ function MemberRow({
   email: string | null;
   isSelf: boolean;
   chip: ReturnType<typeof planChip>;
+  /** The child's balances with their plan status; replaces the single chip. */
+  breakdown?: ReactNode;
   /** null while unknown: no icon at all rather than a guess. */
   reminders: boolean | null;
   quiet?: boolean;
@@ -287,6 +325,7 @@ function MemberRow({
           {email && <span className="break-all text-label text-subtle">{email}</span>}
           {isSelf && <span className="text-label text-subtle">You</span>}
           {chip && <StatusChip kind={chip.kind} label={chip.label} />}
+          {breakdown && <span className="block w-full">{breakdown}</span>}
         </span>
         {reminders !== null && <ReminderIcon on={reminders} />}
         <Icon name="chev" className="text-subtle" />

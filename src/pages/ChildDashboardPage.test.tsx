@@ -8,6 +8,8 @@ import { ChildDashboardPage } from "./ChildDashboardPage";
 import { MembershipContext } from "../features/auth/membership-context";
 import type { MembershipState } from "../features/auth/membership-context";
 import { SEEN_ACTIVITY_KEY_PREFIX, resetSessionAnnouncements } from "../features/home/child-home";
+import type { BalanceInfo } from "../features/ledger/balance-breakdown";
+import type { MemberBreakdown } from "../features/ledger/useBalanceSplitData";
 import type { RecentTransaction } from "../features/ledger/recent-activity";
 import type { HouseholdTimezoneState } from "../features/ledger/useHouseholdTimezone";
 import type { OwnBalanceState } from "../features/ledger/useOwnBalance";
@@ -23,6 +25,20 @@ let balance: OwnBalanceState;
 let progress: ChildPaymentProgressState;
 let activity: RecentActivityState;
 let zone: HouseholdTimezoneState;
+
+
+type BreakdownState = {
+  balances: readonly BalanceInfo[] | null;
+  breakdown: MemberBreakdown | null;
+};
+let breakdownState: BreakdownState;
+vi.mock("../features/ledger/useAllTrackedBalances", () => ({
+  useBalanceBreakdown: () => breakdownState,
+}));
+
+const EVERYDAY: BalanceInfo = { id: "everyday", name: "Everyday", isEveryday: true, active: true };
+const CAR: BalanceInfo = { id: "b-car", name: "Car", isEveryday: false, active: true };
+const COLLEGE: BalanceInfo = { id: "b-college", name: "College", isEveryday: false, active: true };
 
 vi.mock("../features/ledger/useOwnBalance", () => ({ useOwnBalance: () => balance }));
 vi.mock("../features/payment-plans/useChildPaymentProgress", () => ({
@@ -52,14 +68,17 @@ const membership: MembershipState = {
 
 const plan = (over: Partial<ChildPaymentProgress>): ChildPaymentProgressState => ({
   status: "loaded",
-  progress: {
-    periodStatus: "due",
-    minimumCents: 4000,
-    paidCents: 0,
-    remainingCents: 4000,
-    dueDate: "2026-10-15",
-    ...over,
-  },
+  plans: [
+    {
+      balanceId: "everyday",
+      periodStatus: "due",
+      minimumCents: 4000,
+      paidCents: 0,
+      remainingCents: 4000,
+      dueDate: "2026-10-15",
+      ...over,
+    },
+  ],
 });
 
 const tx = (over: Partial<RecentTransaction> & { id: string }): RecentTransaction => ({
@@ -100,6 +119,7 @@ beforeEach(() => {
   resetSessionAnnouncements();
   retry.mockReset();
   balance = { status: "loaded", balanceCents: 18732 };
+  breakdownState = { balances: [EVERYDAY], breakdown: new Map() };
   progress = plan({});
   activity = SOME_ACTIVITY;
   zone = { status: "loaded", timezone: "America/New_York" };
@@ -179,7 +199,7 @@ describe("ChildDashboardPage", () => {
 
   it("empty: a brand-new child sees $0.00, All caught up, and a teaching activity card", () => {
     balance = { status: "loaded", balanceCents: 0 };
-    progress = { status: "loaded", progress: null };
+    progress = { status: "loaded", plans: [] };
     activity = { status: "loaded", transactions: [] };
     renderHome();
     const card = oweCard();
@@ -269,8 +289,28 @@ describe("ChildDashboardPage", () => {
     expect(card.querySelector('[data-callout="ok"]')).toHaveTextContent(/on time/);
   });
 
+  it("with several balances: their own amounts and plans per balance, empty balances hidden", () => {
+    breakdownState = {
+      balances: [EVERYDAY, CAR, COLLEGE],
+      breakdown: new Map([[MEMBER, new Map([["everyday", 3000], ["b-car", 15732], ["b-college", 0]])]]),
+    };
+    progress = {
+      status: "loaded",
+      plans: [
+        { balanceId: "b-car", periodStatus: "due", minimumCents: 5000, paidCents: 0, remainingCents: 5000, dueDate: "2026-10-15" },
+      ],
+    };
+    renderHome();
+    const card = oweCard();
+    const blocks = card.querySelectorAll("[data-balance]");
+    expect([...blocks].map((block) => block.getAttribute("data-balance"))).toEqual(["Everyday", "Car"]);
+    expect(blocks[1]).toHaveTextContent(/\$157\.32.*owed/);
+    expect(blocks[1]).toHaveTextContent("Next minimum: $50.00 due Oct 15.");
+    expect(blocks[0]).not.toHaveTextContent(/minimum/);
+  });
+
   it("no plan: nothing plan-related", () => {
-    progress = { status: "loaded", progress: null };
+    progress = { status: "loaded", plans: [] };
     renderHome();
     const card = oweCard();
     expect(within(card).queryByRole("progressbar")).not.toBeInTheDocument();

@@ -36,7 +36,8 @@ import {
   typedAmountCents,
 } from "../features/ledger/entry-preview";
 import { childCardView } from "../features/home/parent-home";
-import type { KnownProgress } from "../features/home/parent-home";
+import { balanceLabeler } from "../features/ledger/balance-breakdown";
+import { headlineProgress } from "../features/payment-plans/plan-selection";
 import { useAddExpenseFormData } from "../features/ledger/useAddExpenseFormData";
 import { useMemberBalances } from "../features/ledger/useMemberBalances";
 import { useHouseholdPaymentProgress } from "../features/payment-plans/useHouseholdPaymentProgress";
@@ -574,8 +575,9 @@ function RecordForm({ membership }: { membership: Membership }) {
     }
   }
 
-  const progressOf = (id: string): KnownProgress =>
-    progressState.status === "loaded" ? (progressState.progressByMemberId.get(id) ?? null) : undefined;
+  // Every active plan of a child (one per balance), or undefined while unknown.
+  const plansOf = (id: string) =>
+    progressState.status === "loaded" ? (progressState.plansByMemberId.get(id) ?? []) : undefined;
   const balanceOf = (id: string): Cents | null => balances?.get(id) ?? null;
 
   const chosen = options.find((option) => option.id === memberId) ?? null;
@@ -583,7 +585,14 @@ function RecordForm({ membership }: { membership: Membership }) {
   const amountCents = typedAmountCents(amountInput);
   const preview = chosen ? paymentPreview(chosenBalance, amountCents, chosen.name) : null;
   const shortcuts =
-    type === "payment" && chosen ? paymentShortcuts(chosenBalance, progressOf(chosen.id)) : [];
+    type === "payment" && chosen
+      ? paymentShortcuts(chosenBalance, plansOf(chosen.id), undefined, {
+          balanceLabel: balanceLabeler(
+            splitBalances.map((balance) => ({ ...balance, active: true })),
+          ),
+          owedByBalance,
+        })
+      : [];
   const submitting = submitState.status === "submitting";
   const errorMessages = FIELD_ORDER.flatMap((key) => (fieldErrors[key] ? [fieldErrors[key]] : []));
 
@@ -698,7 +707,13 @@ function RecordForm({ membership }: { membership: Membership }) {
                 const chip =
                   balance === null
                     ? null
-                    : childCardView(balance, progressOf(option.id), today).chip;
+                    : childCardView(
+                        balance,
+                        plansOf(option.id) === undefined
+                          ? undefined
+                          : headlineProgress(plansOf(option.id)),
+                        today,
+                      ).chip;
                 return {
                   value: option.id,
                   label: option.name,
@@ -749,7 +764,7 @@ function RecordForm({ membership }: { membership: Membership }) {
                 const pressed = amountCents === shortcut.cents;
                 return (
                   <button
-                    key={shortcut.kind}
+                    key={shortcut.label}
                     type="button"
                     aria-pressed={pressed}
                     onClick={() => setAmountInput(toDecimalString(shortcut.cents))}

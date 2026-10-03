@@ -6,19 +6,19 @@ import { toPaymentPlanRow } from "./payment-plans";
 
 /**
  * Discriminated union so a failed fetch cannot be silently treated as "no
- * plan" -- mirrors `useHouseholdBalances`/`useActivity`'s shape. `plan: null`
+ * plan" -- mirrors `useHouseholdBalances`/`useActivity`'s shape. `plans: []`
  * in the `loaded` state is a normal, non-error outcome (the member has no
  * active plan right now), distinct from `error`.
  */
-export type PaymentPlanState =
+export type PaymentPlansState =
   | { status: "loading" }
   | { status: "error"; message: string; retry: () => void }
-  | { status: "loaded"; plan: PaymentPlanRow | null; refetch: () => void };
+  | { status: "loaded"; plans: readonly PaymentPlanRow[]; refetch: () => void };
 
 /**
- * Fetches a member's current *active* payment plan (S3.1). Only one row per
- * member can ever be `active = true` (enforced server-side), so
- * `.maybeSingle()` is exact here, not a workaround.
+ * Fetches a member's current *active* payment plans (S3.1). A member can have
+ * at most one active plan per tracked balance (enforced server-side), so this
+ * returns one row per balance that has a plan, ordered by start date.
  *
  * Mirrors `useHouseholdBalances`'s retry-token/cleanup-on-unmount pattern:
  * the `active` boolean guards against a stale response landing after this
@@ -28,8 +28,8 @@ export type PaymentPlanState =
  * create/deactivate RPC, per this project's "refetch, don't hand-roll
  * optimistic state" convention -- see `ActivityPage`'s `onVoided`).
  */
-export function usePaymentPlan(memberId: string): PaymentPlanState {
-  const [state, setState] = useState<PaymentPlanState>({ status: "loading" });
+export function usePaymentPlans(memberId: string): PaymentPlansState {
+  const [state, setState] = useState<PaymentPlansState>({ status: "loading" });
   const [retryToken, setRetryToken] = useState(0);
 
   const retry = useCallback(() => {
@@ -44,10 +44,11 @@ export function usePaymentPlan(memberId: string): PaymentPlanState {
       try {
         const { data, error } = await supabase
           .from("payment_plans")
-          .select("id, minimum_cents, due_day, starts_on, ends_on, active")
+          .select("id, minimum_cents, due_day, starts_on, ends_on, active, tracked_balance_id")
           .eq("member_id", memberId)
           .eq("active", true)
-          .maybeSingle<PaymentPlanDbRow>();
+          .order("starts_on", { ascending: true })
+          .returns<PaymentPlanDbRow[]>();
 
         if (!active) {
           return;
@@ -60,7 +61,7 @@ export function usePaymentPlan(memberId: string): PaymentPlanState {
 
         setState({
           status: "loaded",
-          plan: data ? toPaymentPlanRow(data) : null,
+          plans: (data ?? []).map(toPaymentPlanRow),
           refetch: retry,
         });
       } catch (caught) {

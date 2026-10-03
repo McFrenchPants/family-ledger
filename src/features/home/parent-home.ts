@@ -21,6 +21,7 @@ import {
   type CalendarDate,
 } from "../../lib/dates";
 import type { ChildBalance } from "../ledger/household-balances";
+import { headlineProgress, type PlansByMember } from "../payment-plans/plan-selection";
 import type { ChildPaymentProgress } from "../payment-plans/useChildPaymentProgress";
 import { DUE_SOON_DAYS } from "./child-home";
 
@@ -51,6 +52,8 @@ function plural(count: number, one: string, many: string): string {
 export type AttentionItem = {
   memberId: string;
   name: string;
+  /** Which of the child's plans this is (a child can have one per balance). */
+  balanceId: string;
   kind: "overdue" | "due-soon";
   /** What is still owed for the current period (server's remaining, clamped >= 0). */
   amountCents: Cents;
@@ -64,63 +67,72 @@ export type AttentionItem = {
 };
 
 /**
- * One item per child who is overdue or due within `DUE_SOON_DAYS` (today
+ * One item per plan that is overdue or due within `DUE_SOON_DAYS` (today
  * included), worst first: overdue before due-soon, then earliest due date,
  * then name. A child with nothing owed, no plan, a satisfied or waived
  * period, or nothing left to pay this period never needs attention.
+ *
+ * `balanceLabel` names a plan's balance ("Car") when the household has more
+ * than one, so two plans of one child read apart; null leaves the wording as
+ * it was.
  *
  * `today` must be today's date in the household zone.
  */
 export function needsAttention(
   children: readonly ChildBalance[],
-  progressByMemberId: ReadonlyMap<string, ChildPaymentProgress | null>,
+  plansByMemberId: PlansByMember,
   today: CalendarDate,
   locale?: string,
+  balanceLabel: (balanceId: string) => string | null = () => null,
 ): AttentionItem[] {
   const money = (cents: Cents) => formatCents(cents, { locale });
   const items: AttentionItem[] = [];
 
   for (const child of children) {
-    const progress = progressByMemberId.get(child.memberId);
-    // Same rule as Child Home: with nothing owed, nothing is pressing.
-    if (!progress || child.balanceCents <= 0 || progress.remainingCents <= 0) continue;
+    for (const progress of plansByMemberId.get(child.memberId) ?? []) {
+      // Same rule as Child Home: with nothing owed, nothing is pressing.
+      if (child.balanceCents <= 0 || progress.remainingCents <= 0) continue;
+      const label = balanceLabel(progress.balanceId);
+      const on = label ? ` on ${label}` : "";
 
-    const due = formatCalendarDate(progress.dueDate, "short");
-    const month = formatCalendarDate(progress.dueDate, "month");
-    const base = {
-      memberId: child.memberId,
-      name: child.name,
-      amountCents: progress.remainingCents,
-      dueDate: progress.dueDate,
-    };
+      const due = formatCalendarDate(progress.dueDate, "short");
+      const month = formatCalendarDate(progress.dueDate, "month");
+      const base = {
+        memberId: child.memberId,
+        balanceId: progress.balanceId,
+        name: child.name,
+        amountCents: progress.remainingCents,
+        dueDate: progress.dueDate,
+      };
 
-    if (progress.periodStatus === "overdue") {
-      const late = Math.max(0, daysBetween(progress.dueDate, today));
+      if (progress.periodStatus === "overdue") {
+        const late = Math.max(0, daysBetween(progress.dueDate, today));
+        items.push({
+          ...base,
+          kind: "overdue",
+          headline: `${child.name} is ${money(progress.remainingCents)} behind${on}`,
+          detail: `${month} ${label ? `${label} ` : ""}minimum, due ${due} · ${plural(late, "day", "days")} overdue`,
+          chipLabel: "Overdue",
+        });
+        continue;
+      }
+
+      if (progress.periodStatus === "satisfied" || progress.periodStatus === "waived") continue;
+      if (!isDueSoon(progress.dueDate, today)) continue;
+
+      const until = Math.max(0, daysBetween(today, progress.dueDate));
       items.push({
         ...base,
-        kind: "overdue",
-        headline: `${child.name} is ${money(progress.remainingCents)} behind`,
-        detail: `${month} minimum, due ${due} · ${plural(late, "day", "days")} overdue`,
-        chipLabel: "Overdue",
+        kind: "due-soon",
+        headline:
+          until === 0
+            ? `${child.name} owes ${money(progress.remainingCents)}${on} today`
+            : `${child.name} owes ${money(progress.remainingCents)}${on} by ${due}`,
+        detail: `${month} ${label ? `${label} ` : ""}minimum, due ${due}`,
+        chipLabel:
+          until === 0 ? "Due today" : until === 1 ? "Due tomorrow" : `Due in ${until} days`,
       });
-      continue;
     }
-
-    if (progress.periodStatus === "satisfied" || progress.periodStatus === "waived") continue;
-    if (!isDueSoon(progress.dueDate, today)) continue;
-
-    const until = Math.max(0, daysBetween(today, progress.dueDate));
-    items.push({
-      ...base,
-      kind: "due-soon",
-      headline:
-        until === 0
-          ? `${child.name} owes ${money(progress.remainingCents)} today`
-          : `${child.name} owes ${money(progress.remainingCents)} by ${due}`,
-      detail: `${month} minimum, due ${due}`,
-      chipLabel:
-        until === 0 ? "Due today" : until === 1 ? "Due tomorrow" : `Due in ${until} days`,
-    });
   }
 
   return items.sort(
@@ -240,15 +252,16 @@ function childRank(child: ChildBalance, progress: KnownProgress): number {
 }
 
 /**
- * Children in display order: overdue first, then due soonest, then paid up,
- * then no plan. Ties keep the roster's order (the sort is stable).
+ * Children in display order (by each child's most pressing plan): overdue
+ * first, then due soonest, then paid up, then no plan. Ties keep the
+ * roster's order (the sort is stable).
  */
 export function orderChildren(
   children: readonly ChildBalance[],
-  progressByMemberId: ReadonlyMap<string, ChildPaymentProgress | null> | null,
+  plansByMemberId: PlansByMember | null,
 ): ChildBalance[] {
   const progressOf = (child: ChildBalance): KnownProgress =>
-    progressByMemberId ? (progressByMemberId.get(child.memberId) ?? null) : undefined;
+    plansByMemberId ? headlineProgress(plansByMemberId.get(child.memberId)) : undefined;
 
   return [...children].sort((a, b) => {
     const pa = progressOf(a);
@@ -272,33 +285,30 @@ export type HouseholdTotal = {
 };
 
 /**
- * The household total and its secondary line. `progressByMemberId` is null
+ * The household total and its secondary line. `plansByMemberId` is null
  * while plan status is unknown; the line then only counts the children.
  * Only periods that are neither satisfied nor waived, for a child who owes
  * something, count toward "due"; the date is the latest such due date.
  */
 export function householdTotal(
   children: readonly ChildBalance[],
-  progressByMemberId: ReadonlyMap<string, ChildPaymentProgress | null> | null,
+  plansByMemberId: PlansByMember | null,
   locale?: string,
 ): HouseholdTotal {
   const totalCents = sumCents(children.map((child) => child.balanceCents));
   const across = `across ${plural(children.length, "child", "children")}`;
 
-  const dueRows = progressByMemberId
-    ? children.flatMap((child) => {
-        const progress = progressByMemberId.get(child.memberId);
-        if (
-          !progress ||
-          child.balanceCents <= 0 ||
-          progress.remainingCents <= 0 ||
-          progress.periodStatus === "satisfied" ||
-          progress.periodStatus === "waived"
-        ) {
-          return [];
-        }
-        return [progress];
-      })
+  const dueRows = plansByMemberId
+    ? children.flatMap((child) =>
+        child.balanceCents <= 0
+          ? []
+          : (plansByMemberId.get(child.memberId) ?? []).filter(
+              (progress) =>
+                progress.remainingCents > 0 &&
+                progress.periodStatus !== "satisfied" &&
+                progress.periodStatus !== "waived",
+            ),
+      )
     : [];
 
   if (dueRows.length === 0) return { totalCents, summary: across };

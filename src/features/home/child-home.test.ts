@@ -16,6 +16,7 @@ import {
 const LOCALE = "en-US";
 
 const progress = (over: Partial<ChildPaymentProgress>): ChildPaymentProgress => ({
+  balanceId: "everyday",
   periodStatus: "due",
   minimumCents: 4000,
   paidCents: 0,

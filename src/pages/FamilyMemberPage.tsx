@@ -31,9 +31,22 @@ import {
   CreatePlanForm,
   DeactivatePlanConfirm,
   ReplacePlanForm,
+  type PlanBalanceChoice,
 } from "../features/family/PlanControls";
 import { useFamilyMembers } from "../features/family/useFamilyMembers";
+import { BalanceBreakdownList } from "../features/ledger/BalanceBreakdownList";
+import {
+  balanceLabeler,
+  breakdownLines,
+  type BalanceInfo,
+  type BreakdownLine,
+} from "../features/ledger/balance-breakdown";
 import type { RecentTransaction } from "../features/ledger/recent-activity";
+import {
+  useAllTrackedBalances,
+  type AllTrackedBalancesState,
+} from "../features/ledger/useAllTrackedBalances";
+import { useMemberBreakdown } from "../features/ledger/useBalanceSplitData";
 import {
   useHouseholdBalances,
   type HouseholdBalancesState,
@@ -44,8 +57,12 @@ import type { HouseholdMemberRow } from "../features/members/useHouseholdMembers
 import { useLoginEmails } from "../features/members/useLoginEmails";
 import { remindersFor, useMemberPushStatus } from "../features/members/useMemberPushStatus";
 import type { PaymentPlanRow } from "../features/payment-plans/payment-plans";
-import { useChildPaymentProgress } from "../features/payment-plans/useChildPaymentProgress";
-import { usePaymentPlan } from "../features/payment-plans/usePaymentPlan";
+import { planOnBalance } from "../features/payment-plans/plan-selection";
+import {
+  useChildPaymentProgress,
+  type ChildPaymentProgress,
+} from "../features/payment-plans/useChildPaymentProgress";
+import { usePaymentPlans, type PaymentPlansState } from "../features/payment-plans/usePaymentPlan";
 import { formatCents } from "../lib/currency";
 import { formatCalendarDate, todayInZone, type CalendarDate } from "../lib/dates";
 import { NO_ACTIVITY_TITLE, noActivityForMember } from "../lib/messages";
@@ -232,18 +249,47 @@ function ChildSections({
   zoneSettled: boolean;
 }) {
   const balances = useHouseholdBalances(householdId);
+  const balanceState = useAllTrackedBalances(householdId);
+  const { breakdown } = useMemberBreakdown(householdId);
+  const plans = usePaymentPlans(member.id);
   const balanceCents =
     balances.status === "loaded"
       ? balances.children.find((child) => child.memberId === member.id)?.balanceCents
       : undefined;
 
+  // The balances worth listing under the total (none for an Everyday-only household).
+  const lines =
+    balanceState.status === "loaded" && breakdown && plans.status === "loaded"
+      ? breakdownLines(
+          balanceState.balances,
+          breakdown.get(member.id),
+          new Set(plans.plans.map((plan) => plan.balanceId)),
+        )
+      : [];
+
+  // What the child owes on one balance, for that balance's plan chip. Before the
+  // breakdown is known, an Everyday-only household's total is its one balance.
+  const owedOn = (balanceId: string): number | undefined => {
+    if (breakdown) return breakdown.get(member.id)?.get(balanceId) ?? 0;
+    return balanceState.status === "loaded" && balanceState.balances.every((b) => b.isEveryday)
+      ? balanceCents
+      : undefined;
+  };
+
   return (
     <div className="flex flex-col gap-4 min-[900px]:grid min-[900px]:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] min-[900px]:items-start min-[900px]:gap-6">
       <div className="flex flex-col gap-4">
-        <BalanceCard member={member} balances={balances} balanceCents={balanceCents} />
+        <BalanceCard
+          member={member}
+          balances={balances}
+          balanceCents={balanceCents}
+          lines={balanceCents !== undefined && balanceCents > 0 ? lines : []}
+        />
         <PlanCard
           member={member}
-          balanceCents={balanceCents}
+          plans={plans}
+          balanceState={balanceState}
+          owedOn={owedOn}
           today={today}
           zoneSettled={zoneSettled}
         />
@@ -257,10 +303,12 @@ function BalanceCard({
   member,
   balances,
   balanceCents,
+  lines,
 }: {
   member: HouseholdMemberRow;
   balances: HouseholdBalancesState;
   balanceCents: number | undefined;
+  lines: readonly BreakdownLine[];
 }) {
   return (
     <Card as="section" aria-labelledby="balance-label">
@@ -283,6 +331,9 @@ function BalanceCard({
         {balanceCents !== undefined && (
           <AmountText cents={balanceCents} variant="hero" srContext="owed" />
         )}
+        {lines.length > 0 && (
+          <BalanceBreakdownList lines={lines} plans={undefined} today={null} childName={member.name} />
+        )}
       </div>
       <div className="flex gap-2">
         <LinkButton to={`/new/expense${childParam(member.id)}`} icon="plus" className="flex-1">
@@ -298,50 +349,68 @@ function BalanceCard({
 
 function PlanCard({
   member,
-  balanceCents,
+  plans,
+  balanceState,
+  owedOn,
   today,
   zoneSettled,
 }: {
   member: HouseholdMemberRow;
-  balanceCents: number | undefined;
+  plans: PaymentPlansState;
+  balanceState: AllTrackedBalancesState;
+  owedOn: (balanceId: string) => number | undefined;
   today: CalendarDate | null;
   zoneSettled: boolean;
 }) {
-  const plan = usePaymentPlan(member.id);
-  // Bumped after any plan change so the current period is read again.
+  // Bumped after any plan change so the current periods are read again.
   const [progressKey, setProgressKey] = useState(0);
-  const [mode, setMode] = useState<"view" | "edit" | "deactivate">("view");
+  const [adding, setAdding] = useState(false);
 
   function handleChanged() {
-    setMode("view");
+    setAdding(false);
     setProgressKey((key) => key + 1);
-    if (plan.status === "loaded") plan.refetch();
+    if (plans.status === "loaded") plans.refetch();
   }
+
+  const infos = balanceState.status === "loaded" ? balanceState.balances : null;
+  // The household has balances beyond Everyday: plans are named after theirs.
+  const named = infos !== null && infos.some((balance) => !balance.isEveryday);
+  const labelOf = balanceLabeler(infos);
+
+  const planned = new Set(plans.status === "loaded" ? plans.plans.map((plan) => plan.balanceId) : []);
+  // Active balances with no plan yet, Everyday first: where a plan can still be added.
+  const available: PlanBalanceChoice[] = (infos ?? []).filter(
+    (balance) => balance.active && !planned.has(balance.id),
+  );
+
+  const ready = plans.status === "loaded" && infos !== null;
 
   return (
     <Card as="section" aria-labelledby="plan-heading" className="flex flex-col gap-3">
       <div className="flex min-h-touch items-center justify-between gap-2">
         <h2 id="plan-heading" className="text-head">
-          Payment plan
+          {named ? "Payment plans" : "Payment plan"}
         </h2>
-        {plan.status === "loaded" && plan.plan !== null && mode === "view" && (
-          <Button size="sm" variant="ghost" icon="edit" onClick={() => setMode("edit")}>
-            Edit plan
-          </Button>
-        )}
       </div>
 
-      {plan.status === "loading" && (
+      {!ready && plans.status !== "error" && balanceState.status !== "error" && (
         <p role="status" className="text-label text-subtle">
           Loading payment plan…
         </p>
       )}
 
-      {plan.status === "error" && (
-        <LoadError message={`Could not load this plan: ${plan.message}`} onRetry={plan.retry} />
+      {plans.status === "error" && (
+        <LoadError message={`Could not load this plan: ${plans.message}`} onRetry={plans.retry} />
       )}
 
-      {plan.status === "loaded" && plan.plan === null && (
+      {balanceState.status === "error" && (
+        <LoadError
+          message={`Could not load the balances: ${balanceState.message}`}
+          onRetry={balanceState.retry}
+        />
+      )}
+
+      {ready && plans.plans.length === 0 && (
         // "No active plan" is a first-class state -- not blank, not an error.
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
@@ -354,69 +423,221 @@ function PlanCard({
               due day.
             </p>
           </div>
-          <CreatePlanForm memberId={member.id} onSaved={handleChanged} />
+          <CreatePlanForm memberId={member.id} balances={available} onSaved={handleChanged} />
         </div>
       )}
 
-      {plan.status === "loaded" && plan.plan !== null && (
-        <>
-          <PlanTerms
-            key={progressKey}
-            plan={plan.plan}
-            memberId={member.id}
-            balanceCents={balanceCents}
-            today={today}
-            zoneSettled={zoneSettled}
-          />
+      {ready && plans.plans.length > 0 && (
+        <PlanList
+          key={progressKey}
+          member={member}
+          plans={orderPlans(plans.plans, infos)}
+          named={named}
+          labelOf={labelOf}
+          owedOn={owedOn}
+          today={today}
+          zoneSettled={zoneSettled}
+          onChanged={handleChanged}
+        />
+      )}
 
-          {mode === "edit" && (
-            <ReplacePlanForm
-              memberId={member.id}
-              plan={plan.plan}
-              onDone={handleChanged}
-              onCancel={() => setMode("view")}
-            />
-          )}
-
-          {mode === "deactivate" && (
-            <DeactivatePlanConfirm
-              planId={plan.plan.id}
-              onDone={handleChanged}
-              onCancel={() => setMode("view")}
-            />
-          )}
-
-          {mode === "view" && (
+      {ready && plans.plans.length > 0 && available.length > 0 && (
+        <div className="flex flex-col gap-3 border-t border-border pt-3">
+          {adding ? (
+            <>
+              <h3 className="text-head">Add a plan</h3>
+              <CreatePlanForm memberId={member.id} balances={available} onSaved={handleChanged} />
+              <Button size="sm" className="self-start" onClick={() => setAdding(false)}>
+                Cancel
+              </Button>
+            </>
+          ) : (
             <Button
               size="sm"
               variant="ghost"
-              className="self-start !px-1 !text-danger"
-              onClick={() => setMode("deactivate")}
+              icon="plus"
+              className="self-start"
+              onClick={() => setAdding(true)}
             >
-              Deactivate plan
+              Add a plan for another balance
             </Button>
           )}
-        </>
+        </div>
       )}
     </Card>
   );
 }
 
+/** Plans in the household's balance order (Everyday first). */
+function orderPlans(
+  plans: readonly PaymentPlanRow[],
+  infos: readonly BalanceInfo[] | null,
+): PaymentPlanRow[] {
+  const position = (plan: PaymentPlanRow) => {
+    const index = (infos ?? []).findIndex((balance) => balance.id === plan.balanceId);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  return [...plans].sort((a, b) => position(a) - position(b));
+}
+
+/**
+ * Every active plan with this month's progress. The progress read happens
+ * once for the child (not per plan); the card re-mounts this after a change.
+ */
+function PlanList({
+  member,
+  plans,
+  named,
+  labelOf,
+  owedOn,
+  today,
+  zoneSettled,
+  onChanged,
+}: {
+  member: HouseholdMemberRow;
+  plans: readonly PaymentPlanRow[];
+  named: boolean;
+  labelOf: (balanceId: string) => string | null;
+  owedOn: (balanceId: string) => number | undefined;
+  today: CalendarDate | null;
+  zoneSettled: boolean;
+  onChanged: () => void;
+}) {
+  const progress = useChildPaymentProgress(member.id);
+
+  return (
+    <div className="flex flex-col gap-3">
+      {progress.status === "loading" && (
+        <p role="status" className="text-label text-subtle">
+          Checking this month…
+        </p>
+      )}
+      {progress.status === "error" && (
+        <LoadError
+          message={`Could not load this month's progress: ${progress.message}`}
+          onRetry={progress.retry}
+        />
+      )}
+      {plans.map((plan, index) => (
+        <PlanBlock
+          key={plan.id}
+          member={member}
+          plan={plan}
+          balanceName={named ? labelOf(plan.balanceId) : null}
+          current={
+            progress.status === "loaded" ? planOnBalance(progress.plans, plan.balanceId) : undefined
+          }
+          owedCents={owedOn(plan.balanceId)}
+          today={today}
+          zoneSettled={zoneSettled}
+          onChanged={onChanged}
+          separated={index > 0}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** One plan: its terms and progress, with Edit (replace) and Deactivate for that plan only. */
+function PlanBlock({
+  member,
+  plan,
+  balanceName,
+  current,
+  owedCents,
+  today,
+  zoneSettled,
+  onChanged,
+  separated,
+}: {
+  member: HouseholdMemberRow;
+  plan: PaymentPlanRow;
+  balanceName: string | null;
+  current: ChildPaymentProgress | null | undefined;
+  owedCents: number | undefined;
+  today: CalendarDate | null;
+  zoneSettled: boolean;
+  onChanged: () => void;
+  separated: boolean;
+}) {
+  const [mode, setMode] = useState<"view" | "edit" | "deactivate">("view");
+  const forBalance = balanceName ? <span className="sr-only"> on {balanceName}</span> : null;
+
+  function handleDone() {
+    setMode("view");
+    onChanged();
+  }
+
+  return (
+    <div
+      data-balance={balanceName ?? undefined}
+      className={cx("flex flex-col gap-3", separated && "border-t border-border pt-3")}
+    >
+      <div className="flex min-h-touch items-center justify-between gap-2">
+        {balanceName ? <h3 className="text-head">{balanceName}</h3> : <span />}
+        {mode === "view" && (
+          <Button size="sm" variant="ghost" icon="edit" onClick={() => setMode("edit")}>
+            Edit plan{forBalance}
+          </Button>
+        )}
+      </div>
+
+      <PlanTerms
+        plan={plan}
+        current={current}
+        balanceCents={owedCents}
+        today={today}
+        zoneSettled={zoneSettled}
+      />
+
+      {mode === "edit" && (
+        <ReplacePlanForm
+          memberId={member.id}
+          plan={plan}
+          balanceName={balanceName}
+          onDone={handleDone}
+          onCancel={() => setMode("view")}
+        />
+      )}
+
+      {mode === "deactivate" && (
+        <DeactivatePlanConfirm
+          planId={plan.id}
+          balanceName={balanceName}
+          onDone={handleDone}
+          onCancel={() => setMode("view")}
+        />
+      )}
+
+      {mode === "view" && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="self-start !px-1 !text-danger"
+          onClick={() => setMode("deactivate")}
+        >
+          Deactivate plan{forBalance}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function PlanTerms({
   plan,
-  memberId,
+  current,
   balanceCents,
   today,
   zoneSettled,
 }: {
   plan: PaymentPlanRow;
-  memberId: string;
+  /** This plan's current period; undefined while unknown. */
+  current: ChildPaymentProgress | null | undefined;
+  /** What the child owes on this plan's balance, for the status chip. */
   balanceCents: number | undefined;
   today: CalendarDate | null;
   zoneSettled: boolean;
 }) {
-  const progress = useChildPaymentProgress(memberId);
-  const current = progress.status === "loaded" ? progress.progress : undefined;
   const chip = zoneSettled ? planChip(balanceCents, current, today) : null;
   const view = current ? planProgressView(current) : null;
 
@@ -433,17 +654,6 @@ function PlanTerms({
         {chip && <StatusChip kind={chip.kind} label={chip.label} />}
       </div>
 
-      {progress.status === "loading" && (
-        <p role="status" className="text-label text-subtle">
-          Checking this month…
-        </p>
-      )}
-      {progress.status === "error" && (
-        <LoadError
-          message={`Could not load this month's progress: ${progress.message}`}
-          onRetry={progress.retry}
-        />
-      )}
       {view && (
         <div>
           <div className="flex flex-wrap items-baseline justify-between gap-2 text-label">

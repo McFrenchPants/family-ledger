@@ -17,9 +17,18 @@ import { Sheet, SheetClose } from "../components/ui/Sheet";
 import { TONE_CLASSES } from "../components/ui/status";
 import { MembershipGate } from "../features/auth/MembershipGate";
 import type { Membership } from "../features/auth/membership-context";
+import {
+  feedDate,
+  mergeFeed,
+  type BalanceTransfer,
+  type FeedItem,
+} from "../features/ledger/activity-feed";
+import { splitText, transferText, type BalanceInfo } from "../features/ledger/balance-breakdown";
 import type { ActivityTransaction } from "../features/ledger/history";
 import { validateVoidReason } from "../features/ledger/record-transaction";
 import { useActivity } from "../features/ledger/useActivity";
+import { useBalanceTransfers, usePaymentAllocations } from "../features/ledger/useActivityExtras";
+import { useAllTrackedBalances } from "../features/ledger/useAllTrackedBalances";
 import type { ActivityKind } from "../features/ledger/useActivity";
 import { useHouseholdBalances } from "../features/ledger/useHouseholdBalances";
 import type { HouseholdBalancesState } from "../features/ledger/useHouseholdBalances";
@@ -168,6 +177,35 @@ function Activity({
   const zoneState = useHouseholdTimezone(membership.householdId);
   const zone = zoneState.status === "loaded" ? zoneState.timezone : null;
 
+  // Balance moves are neither expenses, payments nor adjustments, and have no
+  // category: they are listed only under "All" with no category chosen. The
+  // child chips and date range narrow them like the ledger rows.
+  const showTransfers = kind === "all" && !categoryId;
+  const transfers = useBalanceTransfers({
+    householdId: membership.householdId,
+    memberId,
+    from: from || undefined,
+    to: to || undefined,
+    enabled: showTransfers,
+  });
+  const balanceState = useAllTrackedBalances(membership.householdId);
+  const balanceInfos = balanceState.status === "loaded" ? balanceState.balances : null;
+  const allocations = usePaymentAllocations(
+    activity.status === "loaded"
+      ? activity.transactions
+          .filter((transaction) => transaction.type !== "expense")
+          .map((transaction) => transaction.id)
+      : [],
+  );
+  const feed: FeedItem[] =
+    activity.status === "loaded"
+      ? mergeFeed(
+          activity.transactions,
+          transfers.status === "loaded" ? transfers.transfers : [],
+          activity.hasMore,
+        )
+      : [];
+
   const sheetFilterCount = [categoryId, from, to].filter(Boolean).length + (kind === "adjustment" ? 1 : 0);
   const anyFilter = kind !== "all" || sheetFilterCount > 0;
 
@@ -242,7 +280,7 @@ function Activity({
         <>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-label text-muted">
             <span data-testid="activity-count">
-              Showing {activity.transactions.length}
+              Showing {feed.length}
               {activity.hasMore ? " — load more for older entries" : ""}
             </span>
             {isParent && memberId !== undefined && (
@@ -265,7 +303,14 @@ function Activity({
             )}
           </div>
 
-          {activity.transactions.length === 0 ? (
+          {transfers.status === "error" && showTransfers && (
+            <LoadError
+              message={`Could not load balance moves: ${transfers.message}`}
+              onRetry={transfers.retry}
+            />
+          )}
+
+          {feed.length === 0 ? (
             <Card>
               {anyFilter ? (
                 <EmptyState
@@ -289,20 +334,32 @@ function Activity({
             </Card>
           ) : (
             <Card className="px-4 py-1">
-              {groupByDay(activity.transactions).map((group) => (
+              {groupByDay(feed).map((group) => (
                 <section key={group.date} aria-label={dayLabel(group.date, zone)}>
                   <h2 className="pt-3 text-caption uppercase text-subtle">{dayLabel(group.date, zone)}</h2>
                   <ul>
-                    {group.transactions.map((transaction) => (
-                      <ActivityItem
-                        key={transaction.id}
-                        transaction={transaction}
-                        childName={nameOf ? (nameOf.get(transaction.memberId) ?? null) : null}
-                        isParent={isParent}
-                        zone={zone}
-                        onVoided={activity.refetch}
-                      />
-                    ))}
+                    {group.items.map((item) =>
+                      item.kind === "transfer" ? (
+                        <TransferItem
+                          key={`transfer-${item.transfer.id}`}
+                          transfer={item.transfer}
+                          childName={nameOf ? (nameOf.get(item.transfer.memberId) ?? null) : null}
+                          balances={balanceInfos}
+                        />
+                      ) : (
+                        <ActivityItem
+                          key={item.transaction.id}
+                          transaction={item.transaction}
+                          childName={
+                            nameOf ? (nameOf.get(item.transaction.memberId) ?? null) : null
+                          }
+                          split={splitText(allocations.get(item.transaction.id), balanceInfos)}
+                          isParent={isParent}
+                          zone={zone}
+                          onVoided={activity.refetch}
+                        />
+                      ),
+                    )}
                   </ul>
                 </section>
               ))}
@@ -420,15 +477,16 @@ function FiltersForm({
 /* Rows                                                                 */
 /* ------------------------------------------------------------------ */
 
-type DayGroup = { date: CalendarDate; transactions: ActivityTransaction[] };
+type DayGroup = { date: CalendarDate; items: FeedItem[] };
 
-/** Consecutive rows sharing an `occurred_on`, in the order the server sent them. */
-function groupByDay(transactions: readonly ActivityTransaction[]): DayGroup[] {
+/** Consecutive rows sharing an `occurred_on`, in the order the list is in. */
+function groupByDay(items: readonly FeedItem[]): DayGroup[] {
   const groups: DayGroup[] = [];
-  for (const transaction of transactions) {
+  for (const item of items) {
+    const date = feedDate(item);
     const last = groups[groups.length - 1];
-    if (last && last.date === transaction.occurredOn) last.transactions.push(transaction);
-    else groups.push({ date: transaction.occurredOn, transactions: [transaction] });
+    if (last && last.date === date) last.items.push(item);
+    else groups.push({ date, items: [item] });
   }
   return groups;
 }
@@ -454,15 +512,71 @@ function enteredAt(instant: string, zone: string): string {
   }).format(new Date(instant));
 }
 
+/**
+ * A balance move: "Moved $150.00 from Everyday to Car". Read-only here (no
+ * void control); a voided move stays listed, struck through and chipped.
+ */
+function TransferItem({
+  transfer,
+  childName,
+  balances,
+}: {
+  transfer: BalanceTransfer;
+  childName: string | null;
+  balances: readonly BalanceInfo[] | null;
+}) {
+  const voided = transfer.isVoided;
+  const subline = [childName, "Balance move", voided ? "Voided" : null].filter(Boolean).join(" · ");
+  const text = transferText(transfer, balances);
+
+  return (
+    <li
+      data-testid="transfer-row"
+      data-voided={voided ? "true" : undefined}
+      className="border-t border-border first:border-t-0"
+    >
+      <div className="flex min-h-[60px] w-full items-center gap-3 py-2.5">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-control bg-sunken text-muted">
+          <Icon name="dollar" />
+        </span>
+        <span className="min-w-0 grow">
+          <span className={cx("block font-semibold", voided && "text-subtle line-through")}>
+            {text}
+          </span>
+          <span className="block text-label text-subtle">{subline}</span>
+          {transfer.note && <span className="block text-label text-muted">{transfer.note}</span>}
+          {voided && transfer.voidReason && (
+            <span className="block text-label text-muted">Reason: {transfer.voidReason}</span>
+          )}
+        </span>
+        {voided && (
+          <span
+            className={cx(
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption font-semibold",
+              TONE_CLASSES.neutral,
+            )}
+          >
+            <Icon name="ban" size={14} />
+            Voided
+          </span>
+        )}
+      </div>
+    </li>
+  );
+}
+
 function ActivityItem({
   transaction,
   childName,
+  split,
   isParent,
   zone,
   onVoided,
 }: {
   transaction: ActivityTransaction;
   childName: string | null;
+  /** How a payment or adjustment was split across balances; null when there is nothing to say. */
+  split: string | null;
   isParent: boolean;
   zone: string | null;
   onVoided: () => void;
@@ -498,6 +612,7 @@ function ActivityItem({
             {transaction.description}
           </span>
           <span className="block text-label text-subtle">{subline}</span>
+          {split && <span className="block text-label text-muted">{split}</span>}
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           {/* Sign follows the stored amount: expenses +, payments and adjustments −. */}

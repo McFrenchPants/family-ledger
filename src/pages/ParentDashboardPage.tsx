@@ -21,7 +21,16 @@ import {
   orderChildren,
   type AttentionItem,
 } from "../features/home/parent-home";
+import { BalanceBreakdownList } from "../features/ledger/BalanceBreakdownList";
+import {
+  balanceLabeler,
+  breakdownLines,
+  type BalanceInfo,
+  type BreakdownLine,
+} from "../features/ledger/balance-breakdown";
 import type { ChildBalance } from "../features/ledger/household-balances";
+import type { MemberBreakdown } from "../features/ledger/useBalanceSplitData";
+import { useBalanceBreakdown } from "../features/ledger/useAllTrackedBalances";
 import {
   activitySubline,
   type HouseholdRecentTransaction,
@@ -38,6 +47,7 @@ import {
   useHouseholdTimezone,
   type HouseholdTimezoneState,
 } from "../features/ledger/useHouseholdTimezone";
+import { headlineProgress, type PlansByMember } from "../features/payment-plans/plan-selection";
 import type { ChildPaymentProgress } from "../features/payment-plans/useChildPaymentProgress";
 import {
   useHouseholdPaymentProgress,
@@ -69,7 +79,7 @@ export function ParentDashboardPage() {
   return <ParentHome householdId={householdId} name={name} />;
 }
 
-type ProgressMap = ReadonlyMap<string, ChildPaymentProgress | null>;
+type ProgressMap = PlansByMember;
 
 function ParentHome({ householdId, name }: { householdId: string; name: string }) {
   const balances = useHouseholdBalances(householdId);
@@ -81,6 +91,9 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
   const memberIds =
     balances.status === "loaded" ? balances.children.map((child) => child.memberId) : [];
   const progress = useHouseholdPaymentProgress(householdId, memberIds);
+  // Per-balance amounts for the breakdown under each child; best effort (the
+  // total above it is always shown).
+  const { balances: balanceInfos, breakdown } = useBalanceBreakdown(householdId);
 
   // "Today" and the time of day are the household's, never the browser's.
   const timezone = zone.status === "loaded" ? zone.timezone : null;
@@ -93,12 +106,14 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
   const progressMap: ProgressMap | null =
     progress.status === "loaded" &&
     children !== null &&
-    children.every((child) => progress.progressByMemberId.has(child.memberId))
-      ? progress.progressByMemberId
+    children.every((child) => progress.plansByMemberId.has(child.memberId))
+      ? progress.plansByMemberId
       : null;
 
   const attention: AttentionItem[] | null =
-    children && progressMap && today ? needsAttention(children, progressMap, today) : null;
+    children && progressMap && today
+      ? needsAttention(children, progressMap, today, undefined, balanceLabeler(balanceInfos))
+      : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -142,7 +157,13 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
         </div>
 
         <div className="min-[900px]:[grid-area:children]">
-          <ChildrenSection balances={balances} progressMap={progressMap} today={today} />
+          <ChildrenSection
+            balances={balances}
+            progressMap={progressMap}
+            today={today}
+            balanceInfos={balanceInfos}
+            breakdown={breakdown}
+          />
         </div>
 
         <div className="flex flex-col gap-3 min-[900px]:[grid-area:recent]">
@@ -202,6 +223,7 @@ function NeedsAttention({
       </p>
     );
   }
+  const childCount = new Set(attention.map((item) => item.memberId)).size;
   if (attention.length === 0) {
     return (
       <p data-testid="all-clear" className="flex items-center gap-2 text-body text-ok">
@@ -216,13 +238,13 @@ function NeedsAttention({
       <h2 id="attention-heading" className="mb-2 flex items-center gap-2 text-head">
         Needs attention
         <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-danger-soft px-2 py-0.5 text-label font-semibold text-danger">
-          {attention.length}
-          <span className="sr-only"> {attention.length === 1 ? "child" : "children"}</span>
+          {childCount}
+          <span className="sr-only"> {childCount === 1 ? "child" : "children"}</span>
         </span>
       </h2>
       <ul className="flex flex-col gap-2.5">
         {attention.map((item) => (
-          <AttentionCard key={item.memberId} item={item} />
+          <AttentionCard key={`${item.memberId}:${item.balanceId}`} item={item} />
         ))}
       </ul>
     </section>
@@ -293,10 +315,14 @@ function ChildrenSection({
   balances,
   progressMap,
   today,
+  balanceInfos,
+  breakdown,
 }: {
   balances: HouseholdBalancesState;
   progressMap: ProgressMap | null;
   today: CalendarDate | null;
+  balanceInfos: readonly BalanceInfo[] | null;
+  breakdown: MemberBreakdown | null;
 }) {
   let body: ReactNode;
   if (balances.status === "loading") {
@@ -333,7 +359,16 @@ function ChildrenSection({
             <ChildRow
               key={child.memberId}
               child={child}
-              progress={progressMap ? (progressMap.get(child.memberId) ?? null) : undefined}
+              plans={progressMap ? (progressMap.get(child.memberId) ?? []) : undefined}
+              lines={
+                balanceInfos && breakdown
+                  ? breakdownLines(
+                      balanceInfos,
+                      breakdown.get(child.memberId),
+                      new Set((progressMap?.get(child.memberId) ?? []).map((plan) => plan.balanceId)),
+                    )
+                  : []
+              }
               today={today}
             />
           ))}
@@ -368,13 +403,21 @@ function ChildrenSection({
  */
 function ChildRow({
   child,
-  progress,
+  plans,
+  lines,
   today,
 }: {
   child: ChildBalance;
-  progress: ChildPaymentProgress | null | undefined;
+  /** Every active plan of the child; undefined while plan status is unknown. */
+  plans: readonly ChildPaymentProgress[] | undefined;
+  /** The child's balances worth listing; empty when the total says it all. */
+  lines: readonly BreakdownLine[];
   today: CalendarDate | null;
 }) {
+  const progress = plans === undefined ? undefined : headlineProgress(plans);
+  // With a breakdown each balance carries its own plan status, so the row's
+  // single chip and bar would only repeat (or contradict) them.
+  const split = lines.length > 0 && child.balanceCents > 0;
   const view = childCardView(child.balanceCents, progress, today);
   return (
     <li
@@ -393,7 +436,7 @@ function ChildRow({
           </Link>
           <AmountText cents={child.balanceCents} srContext="owed" className="!text-head" />
         </div>
-        {(view.chip || view.progress) && (
+        {!split && (view.chip || view.progress) && (
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
             {view.chip && (
               <StatusChip kind={view.chip.kind} label={view.chip.label} className="!py-0.5" />
@@ -409,6 +452,9 @@ function ChildRow({
               />
             )}
           </div>
+        )}
+        {split && (
+          <BalanceBreakdownList lines={lines} plans={plans} today={today} childName={child.name} />
         )}
       </div>
 
