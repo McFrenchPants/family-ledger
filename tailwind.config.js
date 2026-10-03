@@ -35,6 +35,7 @@ export default {
         // New token names (design spec 6.x).
         bg: token("bg"),
         sunken: token("sunken"),
+        raised: token("raised"),
         border: {
           DEFAULT: token("border"),
           strong: token("border-strong"),

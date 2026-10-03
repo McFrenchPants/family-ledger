@@ -7,12 +7,18 @@ export type FamilyMembers = {
   state: HouseholdMembersState;
   /**
    * The roster to show: the latest loaded list, kept on screen while a
-   * refetch is in flight so an open panel (and its message) is not torn
-   * down by a reload. `null` before the first load, and after a failure.
+   * refetch is in flight, and also when that refetch fails, so an open panel
+   * (and its success message) is not torn down by a reload. `null` before
+   * the first load, and when the first load failed.
    */
   members: HouseholdMemberRow[] | null;
   /** True while a refetch replaces an already-shown list. */
   refreshing: boolean;
+  /**
+   * Set when a re-read failed while an earlier list is still on screen:
+   * the caller shows it beside that (possibly out-of-date) list, with retry.
+   */
+  refreshError: { message: string; retry: () => void } | null;
   refetch: () => void;
 };
 
@@ -25,14 +31,16 @@ export function useFamilyMembers(householdId: string): FamilyMembers {
   if (state.status === "loaded") {
     last.current = state.members;
     refetchRef.current = state.refetch;
-  } else if (state.status === "error") {
-    last.current = null;
   }
 
   return {
     state,
     members: last.current,
     refreshing: state.status === "loading" && last.current !== null,
+    refreshError:
+      state.status === "error" && last.current !== null
+        ? { message: state.message, retry: state.retry }
+        : null,
     refetch: refetchRef.current,
   };
 }

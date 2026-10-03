@@ -109,10 +109,19 @@ function Family({ householdId, selfId }: { householdId: string; selfId: string }
         </p>
       )}
 
-      {family.state.status === "error" && (
+      {family.state.status === "error" && members === null && (
         <LoadError
           message={`Could not load members: ${family.state.message}`}
           onRetry={family.state.retry}
+        />
+      )}
+
+      {/* A failed re-read after a change keeps the last list (and any
+          success message above) on screen, and says the list may be stale. */}
+      {family.refreshError && (
+        <LoadError
+          message={`Could not refresh the member list: ${family.refreshError.message}`}
+          onRetry={family.refreshError.retry}
         />
       )}
 

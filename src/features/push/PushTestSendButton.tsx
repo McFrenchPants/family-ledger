@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
 import { useMembership } from "../auth/membership-context";
 import { supabase } from "../../lib/supabase";
@@ -33,7 +34,16 @@ type RowsState =
   | { status: "error" }
   | { status: "loaded"; rows: SubscriptionRow[] };
 
-export function PushTestSendButton() {
+export function PushTestSendButton({
+  emptyHint = null,
+}: {
+  /**
+   * Shown instead of nothing once the list has loaded and the member has no
+   * subscription to test yet, so a host section (Settings > Advanced) does
+   * not look empty. A failed load still renders nothing.
+   */
+  emptyHint?: ReactNode;
+} = {}) {
   const membership = useMembership();
   const memberId = membership.status === "loaded" ? membership.membership.memberId : null;
   const [rowsState, setRowsState] = useState<RowsState>({ status: "loading" });
@@ -78,8 +88,12 @@ export function PushTestSendButton() {
   // test yet, is not worth surfacing as an error to the member -- it simply
   // doesn't render, leaving the real UI (PushSubscribeButton, the rest of
   // the page) undisturbed.
-  if (rowsState.status !== "loaded" || rowsState.rows.length === 0) {
+  if (rowsState.status !== "loaded") {
     return null;
+  }
+
+  if (rowsState.rows.length === 0) {
+    return <>{emptyHint}</>;
   }
 
   return (

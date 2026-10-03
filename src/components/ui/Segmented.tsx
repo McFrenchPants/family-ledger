@@ -17,7 +17,9 @@ type SegmentedProps<T extends string> = {
 /**
  * Single-choice segmented control (Radix ToggleGroup, arrow-key roving
  * focus). Always has exactly one selected option: Radix would let a click on
- * the active segment clear the value, which we ignore.
+ * the active segment clear the value, which we ignore. The selected
+ * segment uses `--raised`, which stays clearly lighter than the sunken
+ * track in dark mode too.
  */
 export function Segmented<T extends string>({
   label,
@@ -43,7 +45,7 @@ export function Segmented<T extends string>({
           className={cx(
             "min-h-touch flex-1 rounded-[0.5rem] px-3 text-label font-semibold text-muted",
             "transition-colors duration-toggle motion-reduce:transition-none",
-            "data-[state=on]:bg-surface data-[state=on]:text-ink data-[state=on]:shadow-card",
+            "data-[state=on]:bg-raised data-[state=on]:text-ink data-[state=on]:shadow-card",
           )}
         >
           {option.label}

@@ -2,6 +2,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Session } from "@supabase/supabase-js";
+import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,7 +23,14 @@ vi.mock("../features/push/PushSubscribeButton", () => ({
   PushSubscribeButton: () => <p>reminders control</p>,
 }));
 vi.mock("../features/push/PushTestSendButton", () => ({
-  PushTestSendButton: () => <p>test push control</p>,
+  // Renders the hint Settings passes, as the real control does when this
+  // member has no subscription to test.
+  PushTestSendButton: ({ emptyHint }: { emptyHint?: ReactNode }) => (
+    <div>
+      <p>test push control</p>
+      {emptyHint}
+    </div>
+  ),
 }));
 
 const signOutMock = vi.mocked(supabase.auth.signOut);
@@ -105,21 +113,26 @@ describe("SettingsPage", () => {
       "/settings/presets",
     );
 
-    // Export and backup.
+    // Export and backup: one row, since the export page offers both formats.
     const exportSection = section("Export & backup");
-    expect(
-      within(exportSection).getByRole("link", { name: "Ledger spreadsheet (CSV)" }),
-    ).toHaveAttribute("href", "/settings/export");
-    expect(within(exportSection).getByRole("link", { name: "Full backup (JSON)" })).toHaveAttribute(
-      "href",
-      "/settings/export",
-    );
+    const exportLinks = within(exportSection).getAllByRole("link");
+    expect(exportLinks).toHaveLength(1);
+    expect(exportLinks[0]).toHaveAccessibleName("Spreadsheet (CSV) or full backup (JSON)");
+    expect(exportLinks[0]).toHaveAttribute("href", "/settings/export");
 
     // Advanced: collapsed by default, holding the test-push control.
     const advanced = screen.getByText("Advanced").closest("details");
     expect(advanced).not.toBeNull();
     expect(advanced).not.toHaveAttribute("open");
     expect(within(advanced!).getByText("test push control")).toBeInTheDocument();
+  });
+
+  it("explains an otherwise empty Advanced section on a device without reminders", () => {
+    renderSettings(signedIn, member("parent"));
+    const advanced = screen.getByText("Advanced").closest("details")!;
+    expect(
+      within(advanced).getByText("Turn on reminders on this device to send a test notification."),
+    ).toBeInTheDocument();
   });
 
   it("opens Advanced on request", async () => {
@@ -147,6 +160,7 @@ describe("SettingsPage", () => {
     expect(screen.queryByRole("heading", { name: "Export & backup" })).not.toBeInTheDocument();
     expect(screen.queryByText("Advanced")).not.toBeInTheDocument();
     expect(screen.queryByText("test push control")).not.toBeInTheDocument();
+    expect(screen.queryByText(/send a test notification/)).not.toBeInTheDocument();
     for (const href of ["/family", "/settings/categories", "/settings/presets", "/settings/export"]) {
       expect(document.querySelector(`a[href="${href}"]`)).toBeNull();
     }

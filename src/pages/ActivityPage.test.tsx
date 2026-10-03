@@ -11,6 +11,7 @@ import type { MembershipState } from "../features/auth/membership-context";
 import type { ActivityTransactionRow } from "../features/ledger/history";
 import type { HouseholdBalancesState } from "../features/ledger/useHouseholdBalances";
 import type { HouseholdCategoriesState } from "../features/ledger/useHouseholdCategories";
+import type { HouseholdMembersState } from "../features/members/useHouseholdMembers";
 
 const { fromMock, rpcMock } = vi.hoisted(() => ({ fromMock: vi.fn(), rpcMock: vi.fn() }));
 vi.mock("../lib/supabase", () => ({ supabase: { from: fromMock, rpc: rpcMock } }));
@@ -20,6 +21,10 @@ vi.mock("./ChildDashboardPage", () => ({ ChildDashboardPage: () => <p>child dash
 let balances: HouseholdBalancesState = { status: "loading" };
 vi.mock("../features/ledger/useHouseholdBalances", () => ({
   useHouseholdBalances: () => balances,
+}));
+let householdMembers: HouseholdMembersState = { status: "loading" };
+vi.mock("../features/members/useHouseholdMembers", () => ({
+  useHouseholdMembers: () => householdMembers,
 }));
 vi.mock("../features/ledger/useHouseholdTimezone", () => ({
   useHouseholdTimezone: () => ({ status: "loaded", timezone: "America/Los_Angeles" }),
@@ -144,6 +149,7 @@ beforeEach(() => {
   dataset = [];
   respond = null;
   balances = roster;
+  householdMembers = { status: "loading" };
 });
 
 
@@ -201,6 +207,45 @@ describe("ActivityPage as a Parent", () => {
     // Payments: a true minus and the ok colour; expenses: a plus in ink.
     expect(screen.getByText("−$20.00").closest("[data-kind]")).toHaveClass("text-ok");
     expect(screen.getByText("+$10.01").closest("[data-kind]")).toHaveClass("text-ink");
+  });
+
+  it("names an archived child's rows in the Everyone view, without giving them a chip", async () => {
+    householdMembers = {
+      status: "loaded",
+      refetch: () => {},
+      members: [
+        { id: "p1", name: "Dana", role: "parent", status: "active", createdAt: "2026-01-01", archivedAt: null },
+        { id: "c1", name: "Alex", role: "child", status: "active", createdAt: "2026-01-01", archivedAt: null },
+        { id: "c2", name: "Sam", role: "child", status: "active", createdAt: "2026-01-01", archivedAt: null },
+        {
+          id: "c9",
+          name: "Jordan",
+          role: "child",
+          status: "archived",
+          createdAt: "2026-01-01",
+          archivedAt: "2026-06-01T00:00:00Z",
+        },
+      ],
+    };
+    dataset = [row(1, { member_id: "c9", description: "Old phone bill" })];
+    renderAt("/activity", member("parent"));
+
+    await screen.findByText("Old phone bill");
+    expect(screen.getByText("Jordan · Gas · added by Dana")).toBeInTheDocument();
+    const chips = screen.getByRole("radiogroup", { name: "Child" });
+    expect(within(chips).getAllByRole("radio").map((chip) => chip.textContent)).toEqual([
+      "Everyone",
+      "Alex",
+      "Sam",
+    ]);
+  });
+
+  it("still names active children's rows when the member list fails", async () => {
+    householdMembers = { status: "error", message: "db down", retry: () => {} };
+    dataset = [row(1, { description: "Gas on the way to work" })];
+    renderAt("/activity", member("parent"));
+
+    expect(await screen.findByText("Alex · Gas · added by Dana")).toBeInTheDocument();
   });
 
   it("orders newest first with an id tiebreak and fetches 50 at a time", async () => {

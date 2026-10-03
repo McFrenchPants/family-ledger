@@ -589,6 +589,29 @@ describe("FamilyMemberPage: managing a member", () => {
       await waitFor(() => expect(tableMock.select).toHaveBeenCalledTimes(2));
     });
 
+    it("keeps the page, with a retry, when the re-read after a rename fails", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await heading();
+      await user.click(within(manage()).getByRole("button", { name: "Rename" }));
+      const field = within(manage()).getByLabelText("Name");
+      await user.clear(field);
+      await user.type(field, "Samantha");
+      membersResult = { data: null, error: { message: "db down" } };
+      await user.click(within(manage()).getByRole("button", { name: "Save" }));
+
+      expect(await screen.findByText("Could not refresh this person's details: db down")).toBeInTheDocument();
+      // Still the person's page, not a full-page load error.
+      expect(manage()).toBeInTheDocument();
+      expect(screen.queryByText(/Could not load this person/)).not.toBeInTheDocument();
+
+      membersResult = { data: [row("m2", "Samantha", "child")], error: null };
+      await user.click(screen.getByRole("button", { name: "Retry" }));
+      expect(await screen.findByRole("heading", { level: 1, name: "Samantha" })).toBeInTheDocument();
+      expect(screen.queryByText(/Could not refresh/)).not.toBeInTheDocument();
+    });
+
     it("refuses an empty name without calling the server", async () => {
       const user = userEvent.setup();
       renderPage();

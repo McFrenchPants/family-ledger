@@ -16,7 +16,6 @@ import { Sheet, SheetClose } from "../components/ui/Sheet";
 import { TONE_CLASSES } from "../components/ui/status";
 import { MembershipGate } from "../features/auth/MembershipGate";
 import type { Membership } from "../features/auth/membership-context";
-import type { ChildBalance } from "../features/ledger/household-balances";
 import type { ActivityTransaction } from "../features/ledger/history";
 import { validateVoidReason } from "../features/ledger/record-transaction";
 import { useActivity } from "../features/ledger/useActivity";
@@ -25,6 +24,7 @@ import { useHouseholdBalances } from "../features/ledger/useHouseholdBalances";
 import type { HouseholdBalancesState } from "../features/ledger/useHouseholdBalances";
 import { useHouseholdCategories } from "../features/ledger/useHouseholdCategories";
 import { useHouseholdTimezone } from "../features/ledger/useHouseholdTimezone";
+import { useHouseholdMembers } from "../features/members/useHouseholdMembers";
 import { addDays, formatCalendarDate, todayInZone } from "../lib/dates";
 import type { CalendarDate } from "../lib/dates";
 import { NO_ACTIVITY_HINT, NO_ACTIVITY_TITLE } from "../lib/messages";
@@ -63,6 +63,17 @@ function ParentActivity({ membership }: { membership: Membership }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const child = searchParams.get("child") || null;
   const balances = useHouseholdBalances(membership.householdId);
+  // Every member, archived included, so an archived child's rows still carry
+  // a name in the Everyone view. The chips stay active children only.
+  const members = useHouseholdMembers(membership.householdId);
+  const names = new Map<string, string>([
+    ...(members.status === "loaded"
+      ? members.members.map((member) => [member.id, member.name] as const)
+      : []),
+    ...(balances.status === "loaded"
+      ? balances.children.map((child) => [child.memberId, child.name] as const)
+      : []),
+  ]);
 
   function chooseChild(next: string) {
     setSearchParams(next === EVERYONE ? {} : { child: next }, { replace: true });
@@ -72,7 +83,7 @@ function ParentActivity({ membership }: { membership: Membership }) {
     <Activity
       membership={membership}
       memberId={child ?? undefined}
-      roster={balances.status === "loaded" ? balances.children : null}
+      names={names}
       childChips={<ChildChips balances={balances} value={child ?? EVERYONE} onChange={chooseChild} />}
       onShowEveryone={child ? () => chooseChild(EVERYONE) : undefined}
     />
@@ -128,15 +139,15 @@ type SegmentKind = (typeof KIND_OPTIONS)[number]["value"];
 function Activity({
   membership,
   memberId,
-  roster = null,
+  names = null,
   childChips,
   onShowEveryone,
 }: {
   membership: Membership;
   /** One member's rows, or undefined for the whole household (Parent "Everyone"). */
   memberId: string | undefined;
-  /** Active children, for naming rows in the Everyone view. */
-  roster?: readonly ChildBalance[] | null;
+  /** Member id to name (archived members included), for naming rows in the Everyone view. */
+  names?: ReadonlyMap<string, string> | null;
   childChips?: ReactNode;
   onShowEveryone?: () => void;
 }) {
@@ -169,10 +180,7 @@ function Activity({
   }
 
   // Each row names its child only when several children are in view.
-  const nameOf =
-    isParent && memberId === undefined
-      ? new Map((roster ?? []).map((child) => [child.memberId, child.name]))
-      : null;
+  const nameOf = isParent && memberId === undefined ? (names ?? new Map<string, string>()) : null;
 
   return (
     <div className="flex flex-col gap-4">

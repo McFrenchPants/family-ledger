@@ -105,7 +105,7 @@ function MemberPage({
   const member = family.members?.find((row) => row.id === memberId) ?? null;
 
   let body;
-  if (family.state.status === "error") {
+  if (family.state.status === "error" && family.members === null) {
     body = (
       <LoadError
         message={`Could not load this person: ${family.state.message}`}
@@ -173,6 +173,12 @@ function MemberPage({
   return (
     <div className="mx-auto flex w-full max-w-[960px] flex-col gap-4">
       <BackToFamily />
+      {family.refreshError && (
+        <LoadError
+          message={`Could not refresh this person's details: ${family.refreshError.message}`}
+          onRetry={family.refreshError.retry}
+        />
+      )}
       {body}
     </div>
   );

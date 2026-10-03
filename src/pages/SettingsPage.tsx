@@ -6,7 +6,6 @@ import { Icon } from "../components/ui/Icon";
 import { useMembership } from "../features/auth/membership-context";
 import { useSession } from "../features/auth/session-context";
 import { useSignOut } from "../features/auth/useSignOut";
-import { LinkButton } from "../features/family/FamilyParts";
 import { ROLE_LABELS } from "../features/family/family-view";
 import { PushSubscribeButton } from "../features/push/PushSubscribeButton";
 import { PushTestSendButton } from "../features/push/PushTestSendButton";
@@ -113,14 +112,10 @@ export function SettingsPage() {
             title="Export & backup"
             intro="Keep your own copy. Nothing is deleted from the app."
           >
-            <div className="mt-2 flex flex-wrap gap-3">
-              <LinkButton to="/settings/export" icon="file">
-                Ledger spreadsheet (CSV)
-              </LinkButton>
-              <LinkButton to="/settings/export" icon="download">
-                Full backup (JSON)
-              </LinkButton>
-            </div>
+            {/* One row: the export page offers both the CSV and the JSON. */}
+            <SettingsLinkRow to="/settings/export" icon="download">
+              Spreadsheet (CSV) or full backup (JSON)
+            </SettingsLinkRow>
           </SettingsSection>
 
           <details className="group rounded-panel border border-border bg-surface px-4 py-1 shadow-card">
@@ -134,10 +129,17 @@ export function SettingsPage() {
             </summary>
             <div className="flex flex-col gap-2 pb-4">
               <p className="text-label text-muted">
-                Tools for checking that reminders reach this device. Shown only once this device
-                has reminders turned on.
+                Tools for checking that reminders reach this device.
               </p>
-              <PushTestSendButton />
+              <PushTestSendButton
+                emptyHint={
+                  <div className="rounded-control bg-sunken px-3 py-2.5">
+                    <p className="text-label text-muted">
+                      Turn on reminders on this device to send a test notification.
+                    </p>
+                  </div>
+                }
+              />
             </div>
           </details>
         </>

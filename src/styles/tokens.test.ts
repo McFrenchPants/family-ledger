@@ -80,6 +80,8 @@ const PAIRS: ReadonlyArray<readonly [string, string, number]> = [
   ["ok", "ok-soft", TEXT],
   ["accent-text", "accent-soft", TEXT],
   ["muted", "sunken", TEXT],
+  // Selected segment of the Segmented control.
+  ["ink", "raised", TEXT],
   // Coloured text directly on cards (amounts, errors, warnings).
   ["danger", "surface", TEXT],
   ["warn", "surface", TEXT],
@@ -130,6 +132,17 @@ describe.each(Object.keys(themes))("%s theme contrast", (themeName) => {
       ratio,
       `${themeName}: --${fg} on --${bg} is ${ratio.toFixed(2)}:1`,
     ).toBeGreaterThanOrEqual(min);
+  });
+});
+
+describe("selected segment fill", () => {
+  it("stands out from the sunken track in dark at least as much as in light", () => {
+    const { light, dark } = themes;
+    const lightStep = contrast(light.raised, light.sunken);
+    const darkStep = contrast(dark.raised, dark.sunken);
+    expect(darkStep).toBeGreaterThanOrEqual(lightStep);
+    // A card surface alone would not: that was the low-contrast bug.
+    expect(contrast(dark.surface, dark.sunken)).toBeLessThan(lightStep);
   });
 });
 
