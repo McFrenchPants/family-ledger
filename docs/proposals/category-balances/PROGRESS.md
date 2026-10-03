@@ -21,7 +21,7 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 | CB3 | Move-money transfers | done | Migration `20261003150000`; pgTAP 015 (80, suite 589), mutations red. Verifier pass. **Direction:** a transfer from X to Y moves *paid credit*: X's balance goes up, Y's goes down ("move $150 from Everyday to Car" = from Everyday, to Car). New unique key `household_members (id, household_id)` for composite FKs. Notes for UI (CB6/CB8): a balance can be archived while it still carries live transfers, and the breakdown keeps showing its amount -- surface it, don't hide it. No test asserts transfers leave `payment_period_status` alone (true by construction). |
 | CB4 | Plans per balance | done | Migration `20261003160000`; pgTAP 016 (75, suite 664), 16 mutations red. Verifier pass. `create_payment_plan` gets trailing `p_tracked_balance_id` (null = Everyday), old 5-arg call shape still works; supersedes only same-balance plan; `payment_period_status` counts only parts on the plan's balance. Archiving a balance with an active plan is now refused (extends CB1 guard). 005 edited one line (function signature lookup). **For CB8:** front-end plan queries (`usePaymentPlan`, `useChildPaymentProgress`, `useHouseholdPaymentProgress`, `RecordPaymentPage`) read plans by child with no balance filter; they must become per-balance before a child can have two active plans in the UI. |
 | CB5 | Child payment suggestions | done | Migration `20261003170000`; pgTAP 017 (163, suite 827), 36 mutations red (verifier re-confirmed one: guard trigger). Verifier pass. Tables `payment_suggestions` + `payment_suggestion_parts` (SELECT-only for app roles; guard trigger lets only pending->terminal change). Functions `create_payment_suggestion(member, amount, date, note, parts)` (Child, self only; null parts = all Everyday), `withdraw_payment_suggestion(id)`, `dismiss_payment_suggestion(id, reason)`; `record_payment` gains trailing `p_suggestion_id` (record_adjustment does not; old 7-arg signature dropped, 014 edited 3 lines to name the new one). Conversion locks the suggestion, single-use, same member, rolls back the payment on failure. Archived-later balance does not invalidate a pending suggestion. Front end reads `payment_suggestions?select=*,payment_suggestion_parts(*)`. **Phase A complete.** |
-| CB6 | Settings: tracked balances | todo | Phase B. Depends CB1. |
+| CB6 | Settings: tracked balances | done | Phase B, front end only. Categories settings page gains a Balances section (add, rename, reorder by renumbering 1..n, archive/restore; Everyday labelled default, rename-only) and a per-category "Counts toward" picker with a plain-English note that remapping moves past expenses and totals never change. Calls the CB1 RPCs; DB errors shown inline. Vitest 9 in that file, typecheck, lint clean. **Not looked at in a browser** (local Supabase not running); unit tests mock supabase. New balances get a blank sort order, so they list last. |
 | CB7 | Record payment split editor + move money | todo | Depends CB2-CB5. Verifier. |
 | CB8 | Home, Family, Activity with balances | todo | Depends CB4. |
 | CB9 | Child suggestions UI, export, requirements doc | todo | Depends CB5, CB7. |
@@ -29,6 +29,10 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-03 — CB6 done
+
+Default tier (no verifier: UI only, no new money or security logic). Next: CB7 (record payment split editor + move money), verifier tier.
 
 ### 2026-10-03 — CB5 done; Phase A (database) complete
 

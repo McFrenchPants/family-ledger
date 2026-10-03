@@ -46,12 +46,29 @@ function makeInsertBuilder(resultRef: { current: { error: { message: string; cod
 }
 
 const categoriesResult: QueryResult<
-  { id: string; name: string; sort_order: number | null; active: boolean }[]
+  {
+    id: string;
+    name: string;
+    sort_order: number | null;
+    active: boolean;
+    tracked_balance_id: string | null;
+  }[]
 > = {
   data: [
-    { id: "c1", name: "Groceries", sort_order: 1, active: true },
-    { id: "c2", name: "Toys", sort_order: 2, active: true },
-    { id: "c3", name: "Old Category", sort_order: null, active: false },
+    { id: "c1", name: "Groceries", sort_order: 1, active: true, tracked_balance_id: null },
+    { id: "c2", name: "Toys", sort_order: 2, active: true, tracked_balance_id: "b-car" },
+    { id: "c3", name: "Old Category", sort_order: null, active: false, tracked_balance_id: null },
+  ],
+  error: null,
+};
+
+const balancesResult: QueryResult<
+  { id: string; name: string; sort_order: number | null; active: boolean; is_everyday: boolean }[]
+> = {
+  data: [
+    { id: "b-car", name: "Car", sort_order: 1, active: true, is_everyday: false },
+    { id: "b-college", name: "College", sort_order: 2, active: true, is_everyday: false },
+    { id: "b-every", name: "Everyday", sort_order: null, active: true, is_everyday: true },
   ],
   error: null,
 };
@@ -64,13 +81,15 @@ const insertResultRef: { current: { error: { message: string; code?: string } | 
   current: { error: null },
 };
 
-const { fromMock } = vi.hoisted(() => ({
+const { fromMock, rpcMock } = vi.hoisted(() => ({
   fromMock: vi.fn(),
+  rpcMock: vi.fn(),
 }));
 
 vi.mock("../lib/supabase", () => ({
   supabase: {
     from: fromMock,
+    rpc: rpcMock,
   },
 }));
 
@@ -89,7 +108,11 @@ beforeEach(() => {
     update: vi.fn(() => makeUpdateBuilder(updateResultRef)),
     insert: vi.fn(() => makeInsertBuilder(insertResultRef)),
   };
-  fromMock.mockReturnValue(tableMock);
+  const balancesTable = { select: vi.fn(() => makeSelectBuilder(balancesResult)) };
+  fromMock.mockImplementation((table: string) =>
+    table === "tracked_balances" ? balancesTable : tableMock,
+  );
+  rpcMock.mockResolvedValue({ error: null });
 });
 
 const loadedParent: MembershipState = {
@@ -190,6 +213,74 @@ describe("ManageCategoriesPage", () => {
 
     await waitFor(() => {
       expect(tableMock.update).toHaveBeenCalledWith({ active: true });
+    });
+  });
+
+  it("lists balances with Everyday first and never archivable", async () => {
+    renderPage();
+
+    await screen.findByText("Groceries");
+    const balances = screen.getByRole("region", { name: "Balances" });
+    const rows = within(balances).getAllByRole("listitem");
+    expect(rows.map((row) => within(row).getByText(/^(Everyday|Car|College)$/).textContent)).toEqual([
+      "Everyday",
+      "Car",
+      "College",
+    ]);
+
+    expect(within(rows[0]).getByText("Default balance")).toBeInTheDocument();
+    expect(within(rows[0]).getByRole("button", { name: "Rename" })).toBeInTheDocument();
+    expect(within(rows[0]).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+    expect(within(rows[1]).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+  });
+
+  it("adds a balance for the household and shows a rejected archive", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Groceries");
+    await user.type(screen.getByLabelText("Balance name"), "Vacation");
+    await user.click(screen.getByRole("button", { name: "Add balance" }));
+
+    await waitFor(() => {
+      expect(rpcMock).toHaveBeenCalledWith("create_tracked_balance", {
+        p_household_id: "h1",
+        p_name: "Vacation",
+      });
+    });
+
+    rpcMock.mockResolvedValueOnce({ error: { message: "Move its categories first." } });
+    const carRow = screen.getByText("Car", { selector: "span" }).closest("li")!;
+    await user.click(within(carRow).getByRole("button", { name: "Archive" }));
+
+    expect(await within(carRow).findByRole("alert")).toHaveTextContent("Move its categories first.");
+  });
+
+  it("changes where a category counts, using null for Everyday", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Groceries");
+    const groceriesRow = screen.getByText("Groceries").closest("li")!;
+    await user.selectOptions(within(groceriesRow).getByLabelText("Counts toward"), "Car");
+
+    await waitFor(() => {
+      expect(rpcMock).toHaveBeenCalledWith("set_category_balance", {
+        p_category_id: "c1",
+        p_tracked_balance_id: "b-car",
+      });
+    });
+
+    const toysRow = screen.getByText("Toys").closest("li")!;
+    const picker = within(toysRow).getByLabelText("Counts toward");
+    expect(picker).toHaveValue("b-car");
+    await user.selectOptions(picker, "Everyday");
+
+    await waitFor(() => {
+      expect(rpcMock).toHaveBeenCalledWith("set_category_balance", {
+        p_category_id: "c2",
+        p_tracked_balance_id: null,
+      });
     });
   });
 
