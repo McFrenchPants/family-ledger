@@ -1,15 +1,17 @@
 import { Navigate } from "react-router-dom";
 
+import { Card } from "../components/ui/Card";
 import { ChangePasswordForm } from "../features/auth/ChangePasswordForm";
 import { useSession } from "../features/auth/session-context";
+import { SubPageHeader } from "../features/settings/SettingsParts";
 
-/** `/account` -- any signed-in member (Parent or Child) can change their own password. */
+/** `/settings/account` -- any signed-in member (Parent or Child) can change their own password. */
 export function AccountPage() {
   const { session, loading } = useSession();
 
   if (loading) {
     return (
-      <p role="status" className="text-label text-ink-subtle">
+      <p role="status" className="text-label text-subtle">
         Checking session…
       </p>
     );
@@ -21,12 +23,11 @@ export function AccountPage() {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-title font-semibold">Change my password</h2>
-        <p className="mt-1 text-body text-ink-muted">Signed in as {email}.</p>
-      </div>
-      <ChangePasswordForm email={email} />
-    </section>
+    <div className="mx-auto flex w-full max-w-[560px] flex-col gap-4">
+      <SubPageHeader title="Change password" intro={`Signed in as ${email}.`} />
+      <Card>
+        <ChangePasswordForm email={email} />
+      </Card>
+    </div>
   );
 }

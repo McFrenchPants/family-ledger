@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { Button } from "../../components/ui/Button";
 import { decideInstallBannerState, isIOS, isStandalone } from "./install-prompt";
 import type { BeforeInstallPromptEvent } from "./install-prompt";
 
@@ -48,29 +49,31 @@ export function InstallRow() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <h4 className="text-label font-semibold text-ink">Install Family Ledger</h4>
+    <div className="flex flex-col gap-1">
+      <h3 className="font-semibold text-ink">Install Family Ledger</h3>
       {standalone ? (
-        <p className="text-label text-ink-muted">Installed on this device.</p>
+        <p className="text-label text-subtle">Installed on this device.</p>
       ) : state === "ios-instructions" ? (
-        <p className="text-label text-ink-muted">
+        <p className="text-label text-subtle">
           Tap Share, then Add to Home Screen, to install this app on your device.
         </p>
       ) : state === "install-button" ? (
         <>
-          <p className="text-label text-ink-muted">
+          <p className="text-label text-subtle">
             Install this app on your device for quicker, full-screen access.
           </p>
-          <button
-            type="button"
+          <Button
+            size="sm"
+            variant="primary"
+            icon="download"
             onClick={() => void handleInstallClick()}
-            className="inline-flex min-h-touch items-center justify-center self-start rounded-card bg-accent px-4 text-body font-medium text-on-accent"
+            className="self-start"
           >
             Install
-          </button>
+          </Button>
         </>
       ) : (
-        <p className="text-label text-ink-muted">
+        <p className="text-label text-subtle">
           Your browser has not offered an install option yet. You can also look for Install or Add
           to Home Screen in the browser menu.
         </p>
