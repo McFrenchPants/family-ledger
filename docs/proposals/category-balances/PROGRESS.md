@@ -18,7 +18,7 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 | --- | --- | --- | --- |
 | CB1 | Tracked balances and per-balance read path | done | Migration `20261003130000`; pgTAP 013 (84, suite 420), 18 mutations all red. Verifier pass. Everyday identified by `is_everyday` (renamable, never archivable); archiving a balance still fed by categories is rejected; Everyday id normalizes to NULL in `categories.tracked_balance_id`; that column writable only via `set_category_balance` (categories INSERT/UPDATE grants narrowed to column lists). Breakdown is SECURITY DEFINER mirroring `household_member_balances`; relies on the Everyday row existing. |
 | CB2 | Payment/adjustment allocation parts | done | Migration `20261003140000`; pgTAP 014 (89, suite 509), mutations red. Verifier pass. Parts tied to payment/adjustment rows by composite FK (new unique key on ledger_transactions incl. type); deferred SECURITY DEFINER sum triggers; guard blocks update/delete except cascade; validation errors all 23514; audit new_values = row + `allocations`. Breakdown sends any uncovered remainder to Everyday (always 0 when triggers are on). Notes: `service_role` keeps Supabase-default writes on the new tables (server-only key, triggers still bind; accepted); no pgTAP for household-delete cascade with parts (verified by hand); backup export lacks the new tables (CB9). |
-| CB3 | Move-money transfers | todo | Depends CB2. Verifier. |
+| CB3 | Move-money transfers | done | Migration `20261003150000`; pgTAP 015 (80, suite 589), mutations red. Verifier pass. **Direction:** a transfer from X to Y moves *paid credit*: X's balance goes up, Y's goes down ("move $150 from Everyday to Car" = from Everyday, to Car). New unique key `household_members (id, household_id)` for composite FKs. Notes for UI (CB6/CB8): a balance can be archived while it still carries live transfers, and the breakdown keeps showing its amount -- surface it, don't hide it. No test asserts transfers leave `payment_period_status` alone (true by construction). |
 | CB4 | Plans per balance | todo | Depends CB2. Verifier. |
 | CB5 | Child payment suggestions | todo | Depends CB2. Verifier. Phase A ends here. |
 | CB6 | Settings: tracked balances | todo | Phase B. Depends CB1. |
@@ -29,6 +29,13 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-03 — CB3 done; run stopped at task budget
+
+Verifier pass, test:db 589, unit 816. This run completed 5 tasks (PF1, PF2
+on period-fixes; CB1-CB3 here), the configured per-run maximum. Next:
+CB4 (plans per balance), then CB5 (suggestions), which ends Phase A.
+Nothing on this branch is merged; the front end is unaffected so far.
 
 ### 2026-10-03 — CB2 done
 
