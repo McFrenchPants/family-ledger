@@ -16,7 +16,7 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| CB1 | Tracked balances and per-balance read path | todo | Phase A. Verifier. |
+| CB1 | Tracked balances and per-balance read path | done | Migration `20261003130000`; pgTAP 013 (84, suite 420), 18 mutations all red. Verifier pass. Everyday identified by `is_everyday` (renamable, never archivable); archiving a balance still fed by categories is rejected; Everyday id normalizes to NULL in `categories.tracked_balance_id`; that column writable only via `set_category_balance` (categories INSERT/UPDATE grants narrowed to column lists). Breakdown is SECURITY DEFINER mirroring `household_member_balances`; relies on the Everyday row existing. |
 | CB2 | Payment/adjustment allocation parts | todo | Depends CB1. Verifier. |
 | CB3 | Move-money transfers | todo | Depends CB2. Verifier. |
 | CB4 | Plans per balance | todo | Depends CB2. Verifier. |
@@ -29,6 +29,10 @@ Branch `feature/category-balances`. See `DESIGN_SPEC.md` and
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-03 — CB1 done
+
+Verifier pass, test:db 420, unit 816. Next: CB2 (allocation parts).
 
 ### 2026-10-03 — Design signed off, plan written
 
