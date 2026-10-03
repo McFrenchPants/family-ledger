@@ -345,7 +345,7 @@ reset role;
 -- ---------------------------------------------------------------------------
 
 select is(
-  has_function_privilege('anon', 'public.create_payment_plan(uuid, bigint, integer, date, date)', 'execute'),
+  has_function_privilege('anon', 'public.create_payment_plan(uuid, bigint, integer, date, date, uuid)', 'execute'),
   false,
   'Case 7a: anon cannot execute create_payment_plan'
 );
