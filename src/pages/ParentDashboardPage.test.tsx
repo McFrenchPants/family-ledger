@@ -372,12 +372,10 @@ describe("ParentDashboardPage", () => {
     expect(screen.getByText("No activity yet")).toBeInTheDocument();
   });
 
-  it("keeps the household tools reachable and drops the old big buttons", () => {
+  it("leaves household tools to Settings and drops the old big buttons", () => {
     renderHome();
-    const tools = screen.getByRole("navigation", { name: "Household tools" });
-    expect(within(tools).getByRole("link", { name: "Export ledger" })).toHaveAttribute("href", "/settings/export");
-    expect(within(tools).getByRole("link", { name: "Categories" })).toHaveAttribute("href", "/settings/categories");
-    expect(within(tools).getByRole("link", { name: "Presets" })).toHaveAttribute("href", "/settings/presets");
+    expect(screen.queryByRole("navigation", { name: "Household tools" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Export ledger" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Manage" })).toHaveAttribute("href", "/family");
     expect(screen.queryByRole("link", { name: "+ Expense" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Manage members" })).not.toBeInTheDocument();

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ManagePresetsPage } from "./ManagePresetsPage";
@@ -147,7 +148,9 @@ const loadedParent: MembershipState = {
 function renderPage() {
   return render(
     <MembershipContext.Provider value={loadedParent}>
-      <ManagePresetsPage />
+      <MemoryRouter>
+        <ManagePresetsPage />
+      </MemoryRouter>
     </MembershipContext.Provider>,
   );
 }
@@ -250,5 +253,15 @@ describe("ManagePresetsPage", () => {
     await waitFor(() => {
       expect(presetsTableMock.update).toHaveBeenCalledWith({ active: true });
     });
+  });
+
+  it("has one page heading and a back arrow to Settings", async () => {
+    renderPage();
+    expect(await screen.findByRole("heading", { level: 1, name: "Quick-add presets" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Back to Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
   });
 });

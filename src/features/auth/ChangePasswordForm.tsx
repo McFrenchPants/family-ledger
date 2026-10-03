@@ -1,6 +1,8 @@
 import { useId, useState } from "react";
 import type { FormEvent } from "react";
 
+import { Button } from "../../components/ui/Button";
+import { Icon } from "../../components/ui/Icon";
 import { supabase } from "../../lib/supabase";
 import {
   describeUpdatePasswordError,
@@ -12,7 +14,7 @@ import {
 } from "./password-errors";
 
 const fieldClass =
-  "min-h-touch rounded-card border border-surface-border bg-surface px-3 text-body text-ink outline-none focus:border-accent";
+  "min-h-touch-lg rounded-control border border-border-strong bg-surface px-3 text-body text-ink";
 
 /**
  * Change-own-password form for any signed-in member. It re-checks the current
@@ -87,13 +89,13 @@ export function ChangePasswordForm({ email }: { email: string }) {
   const describedBy = error ? errorId : undefined;
 
   return (
-    <form className="flex flex-col gap-3" onSubmit={(event) => void handleSubmit(event)} noValidate>
-      <p className="text-label text-ink-muted">
+    <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)} noValidate>
+      <p className="text-label text-muted">
         Changing your password signs you out on your other devices.
       </p>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor={currentId} className="text-label font-medium text-ink">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={currentId} className="text-label font-semibold text-ink">
           Current password
         </label>
         <input
@@ -108,8 +110,8 @@ export function ChangePasswordForm({ email }: { email: string }) {
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor={newId} className="text-label font-medium text-ink">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={newId} className="text-label font-semibold text-ink">
           New password
         </label>
         <input
@@ -122,11 +124,11 @@ export function ChangePasswordForm({ email }: { email: string }) {
           aria-describedby={describedBy}
           className={fieldClass}
         />
-        <span className="text-label text-ink-subtle">At least {MIN_PASSWORD_LENGTH} characters.</span>
+        <span className="text-label text-muted">At least {MIN_PASSWORD_LENGTH} characters.</span>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor={confirmId} className="text-label font-medium text-ink">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={confirmId} className="text-label font-semibold text-ink">
           Confirm new password
         </label>
         <input
@@ -142,24 +144,21 @@ export function ChangePasswordForm({ email }: { email: string }) {
       </div>
 
       {error ? (
-        <p id={errorId} role="alert" className="text-label text-owed">
+        <p id={errorId} role="alert" className="text-label font-semibold text-danger">
           {error}
         </p>
       ) : null}
 
       {success ? (
-        <p role="status" className="text-label text-settled">
+        <p role="status" className="flex items-center gap-2 rounded-control bg-ok-soft px-3 py-2.5 text-label font-semibold text-ok">
+          <Icon name="checkc" size={18} />
           Your password was changed.
         </p>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="min-h-touch rounded-card bg-accent px-3 text-body font-medium text-on-accent disabled:opacity-50"
-      >
+      <Button type="submit" variant="primary" fullWidth disabled={submitting}>
         {submitting ? "Changing…" : "Change password"}
-      </button>
+      </Button>
     </form>
   );
 }

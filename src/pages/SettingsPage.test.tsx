@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { Session } from "@supabase/supabase-js";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SettingsPage } from "./SettingsPage";
 import { MembershipContext } from "../features/auth/membership-context";
 import type { MembershipState } from "../features/auth/membership-context";
 import { SessionContext } from "../features/auth/session-context";
 import type { SessionState } from "../features/auth/session-context";
+import { supabase } from "../lib/supabase";
 
 vi.mock("../lib/supabase", () => ({
   supabase: { auth: { signOut: vi.fn() } },
@@ -23,6 +25,8 @@ vi.mock("../features/push/PushTestSendButton", () => ({
   PushTestSendButton: () => <p>test push control</p>,
 }));
 
+const signOutMock = vi.mocked(supabase.auth.signOut);
+
 const signedIn: SessionState = {
   session: { user: { email: "sam@example.com" } } as Session,
   loading: false,
@@ -30,7 +34,7 @@ const signedIn: SessionState = {
 
 const member = (role: "parent" | "child"): MembershipState => ({
   status: "loaded",
-  membership: { memberId: "m1", householdId: "h1", role, name: "X", status: "active" },
+  membership: { memberId: "m1", householdId: "h1", role, name: "Sam", status: "active" },
 });
 
 function renderSettings(session: SessionState, membership: MembershipState) {
@@ -48,40 +52,151 @@ function renderSettings(session: SessionState, membership: MembershipState) {
   );
 }
 
+function section(name: string) {
+  return screen.getByRole("region", { name });
+}
+
+beforeEach(() => {
+  signOutMock.mockReset();
+  window.localStorage.clear();
+  document.documentElement.removeAttribute("data-theme");
+});
+afterEach(() => {
+  window.localStorage.clear();
+  document.documentElement.removeAttribute("data-theme");
+});
+
 describe("SettingsPage", () => {
-  it("shows device, reminders, account and the advanced test control to a parent", () => {
+  it("shows a parent every section, under one page heading", () => {
     renderSettings(signedIn, member("parent"));
 
-    expect(screen.getByRole("heading", { name: "This device" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Install Family Ledger" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Payment reminders" })).toBeInTheDocument();
-    expect(screen.getByText("reminders control")).toBeInTheDocument();
-    expect(screen.getByText(/sam@example.com/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Change my password" })).toHaveAttribute(
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+
+    // Account: who you are, password, appearance, sign out.
+    const account = section("Account");
+    expect(within(account).getByText("Sam")).toBeInTheDocument();
+    expect(within(account).getByText("sam@example.com · Parent")).toBeInTheDocument();
+    expect(within(account).getByRole("link", { name: "Change password" })).toHaveAttribute(
       "href",
       "/settings/account",
     );
-    expect(screen.getByRole("heading", { name: "Advanced" })).toBeInTheDocument();
-    expect(screen.getByText("test push control")).toBeInTheDocument();
+    expect(within(account).getByRole("radiogroup", { name: "Appearance" })).toBeInTheDocument();
+    expect(within(account).getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+
+    // This device: install and reminders.
+    const device = section("This device");
+    expect(within(device).getByRole("heading", { name: "Install Family Ledger" })).toBeInTheDocument();
+    expect(within(device).getByRole("heading", { name: "Payment reminders" })).toBeInTheDocument();
+    expect(within(device).getByText("reminders control")).toBeInTheDocument();
+
+    // Household links.
+    const household = section("Household");
+    expect(within(household).getByRole("link", { name: "Members & roles" })).toHaveAttribute(
+      "href",
+      "/family",
+    );
+    expect(within(household).getByRole("link", { name: "Categories" })).toHaveAttribute(
+      "href",
+      "/settings/categories",
+    );
+    expect(within(household).getByRole("link", { name: "Quick-add presets" })).toHaveAttribute(
+      "href",
+      "/settings/presets",
+    );
+
+    // Export and backup.
+    const exportSection = section("Export & backup");
+    expect(
+      within(exportSection).getByRole("link", { name: "Ledger spreadsheet (CSV)" }),
+    ).toHaveAttribute("href", "/settings/export");
+    expect(within(exportSection).getByRole("link", { name: "Full backup (JSON)" })).toHaveAttribute(
+      "href",
+      "/settings/export",
+    );
+
+    // Advanced: collapsed by default, holding the test-push control.
+    const advanced = screen.getByText("Advanced").closest("details");
+    expect(advanced).not.toBeNull();
+    expect(advanced).not.toHaveAttribute("open");
+    expect(within(advanced!).getByText("test push control")).toBeInTheDocument();
   });
 
-  it("gives a child everything except the Advanced test control", () => {
+  it("opens Advanced on request", async () => {
+    const user = userEvent.setup();
+    renderSettings(signedIn, member("parent"));
+    const advanced = screen.getByText("Advanced").closest("details")!;
+    await user.click(screen.getByText("Advanced"));
+    expect(advanced).toHaveAttribute("open");
+  });
+
+  it("gives a child only Account and This device", () => {
     renderSettings(signedIn, member("child"));
 
-    expect(screen.getByRole("heading", { name: "Payment reminders" })).toBeInTheDocument();
+    expect(section("Account")).toBeInTheDocument();
+    expect(screen.getByText("sam@example.com · Child")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Change password" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Appearance" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Advanced" })).not.toBeInTheDocument();
+    expect(section("This device")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Payment reminders" })).toBeInTheDocument();
+
+    expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-labelledby")))
+      .toEqual(["account-heading", "device-heading"]);
+    expect(screen.queryByRole("heading", { name: "Household" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Export & backup" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced")).not.toBeInTheDocument();
     expect(screen.queryByText("test push control")).not.toBeInTheDocument();
+    for (const href of ["/family", "/settings/categories", "/settings/presets", "/settings/export"]) {
+      expect(document.querySelector(`a[href="${href}"]`)).toBeNull();
+    }
   });
 
-  it("does not show Advanced while membership is still loading", () => {
+  it("does not show parent sections while membership is still loading", () => {
     renderSettings(signedIn, { status: "loading" });
+    expect(section("Account")).toBeInTheDocument();
+    expect(screen.getByText("sam@example.com")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Household" })).not.toBeInTheDocument();
     expect(screen.queryByText("test push control")).not.toBeInTheDocument();
   });
 
   it("redirects a signed-out visitor to /sign-in", () => {
     renderSettings({ session: null, loading: false }, { status: "signed-out" });
     expect(screen.getByText("sign-in page")).toBeInTheDocument();
+  });
+
+  it("signs out when asked", async () => {
+    const user = userEvent.setup();
+    signOutMock.mockResolvedValue({ error: null });
+    renderSettings(signedIn, member("child"));
+
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows why sign-out failed and lets you try again", async () => {
+    const user = userEvent.setup();
+    signOutMock.mockResolvedValueOnce({
+      error: { message: "Auth session missing" },
+    } as Awaited<ReturnType<typeof supabase.auth.signOut>>);
+    signOutMock.mockRejectedValueOnce(new Error("Failed to fetch"));
+    renderSettings(signedIn, member("parent"));
+
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Auth session missing");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled());
+
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not sign out: Failed to fetch");
+  });
+
+  it("switches the theme from the Appearance control", async () => {
+    const user = userEvent.setup();
+    renderSettings(signedIn, member("child"));
+
+    await user.click(screen.getByRole("radio", { name: "Dark" }));
+    expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+    expect(screen.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
   });
 });

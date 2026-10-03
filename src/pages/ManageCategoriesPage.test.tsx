@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ManageCategoriesPage } from "./ManageCategoriesPage";
@@ -99,7 +100,9 @@ const loadedParent: MembershipState = {
 function renderPage() {
   return render(
     <MembershipContext.Provider value={loadedParent}>
-      <ManageCategoriesPage />
+      <MemoryRouter>
+        <ManageCategoriesPage />
+      </MemoryRouter>
     </MembershipContext.Provider>,
   );
 }
@@ -188,5 +191,15 @@ describe("ManageCategoriesPage", () => {
     await waitFor(() => {
       expect(tableMock.update).toHaveBeenCalledWith({ active: true });
     });
+  });
+
+  it("has one page heading and a back arrow to Settings", async () => {
+    renderPage();
+    expect(await screen.findByRole("heading", { level: 1, name: "Categories" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Back to Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
   });
 });

@@ -136,7 +136,6 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
 
         <div className="flex flex-col gap-3 min-[900px]:[grid-area:recent]">
           <RecentActivityCard activity={activity} roster={children} />
-          <HouseholdTools />
         </div>
       </div>
 
@@ -565,35 +564,5 @@ function ActivityRow({
         className={cx(transaction.isVoided && "text-subtle line-through")}
       />
     </li>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Household tools                                                      */
-/* ------------------------------------------------------------------ */
-
-/**
- * Export, categories and presets have no other way in yet (Settings does not
- * link them), so they stay reachable here as one quiet line. Each route is
- * Parent-only in the router and server-side regardless of this link.
- */
-function HouseholdTools() {
-  const links = [
-    { to: "/settings/export", label: "Export ledger" },
-    { to: "/settings/categories", label: "Categories" },
-    { to: "/settings/presets", label: "Presets" },
-  ];
-  return (
-    <nav aria-label="Household tools" className="flex flex-wrap items-center gap-x-1 text-label text-muted">
-      {links.map((link) => (
-        <Link
-          key={link.to}
-          to={link.to}
-          className="inline-flex min-h-touch items-center rounded-control px-2 font-semibold text-accent-text"
-        >
-          {link.label}
-        </Link>
-      ))}
-    </nav>
   );
 }
