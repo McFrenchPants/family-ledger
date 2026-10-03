@@ -212,6 +212,30 @@ export function addDays(date: CalendarDate, days: number): CalendarDate {
 }
 
 /**
+ * Add (or subtract) whole calendar months, clamping to the target month's last
+ * day exactly as PostgreSQL's `date + interval 'N months'` does -- so a plan
+ * anchored on the 31st lands on Feb 28 (or 29), not in March.
+ *
+ * @example addMonths("2026-01-31", 1) // "2026-02-28"
+ */
+export function addMonths(date: CalendarDate, months: number): CalendarDate {
+  assertCalendarDate(date, "Date");
+  if (!Number.isInteger(months)) {
+    throw new TypeError(`months must be a whole number, received ${String(months)}.`);
+  }
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  const monthIndex = year * 12 + (month - 1) + months;
+  const y = Math.floor(monthIndex / 12);
+  const m = monthIndex - y * 12 + 1;
+  // Day 0 of the following month is the last day of month `m` (UTC, zone-less).
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const d = Math.min(day, lastDay);
+  return `${y.toString().padStart(4, "0")}-${m.toString().padStart(2, "0")}-${d
+    .toString()
+    .padStart(2, "0")}`;
+}
+
+/**
  * Whole days from `from` to `to` (positive when `to` is later). Calendar
  * labels only -- UTC arithmetic on zone-less dates, so no DST skew.
  *

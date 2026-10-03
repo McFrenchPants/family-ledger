@@ -234,7 +234,7 @@ sequential except where noted.
     merged into `main`. Not yet on `production`: the owner must first run the
     hosted steps in `docs/DEPLOYMENT_RUNBOOK.md` section 7a.
 
-11. **UI redesign** — status: `done on main, final polish (UI10) awaiting production` — analysis: analysis/11-ui-redesign.md
+11. **UI redesign** — status: `done` — analysis: analysis/11-ui-redesign.md
     Requested by the owner 2026-10-02: the interface looks hastily assembled and
     leads with install/notification prompts. A research agent produced an
     approved design and mockups; the owner answered all open questions.
@@ -246,27 +246,32 @@ sequential except where noted.
     The manual "Remind" button is deliberately out of scope until push is
     confirmed on real devices and Phase 5 exists.
 
-12. **Home improvements and payment-period rule fix** — status: `done on main, awaiting production` — analysis: none (small; owner-chosen 2026-10-03)
+12. **Home improvements and payment-period rule fix** — status: `done` (production a24651e; migration 20261003090000 confirmed applied on the hosted project 2026-10-03) — analysis: none (small; owner-chosen 2026-10-03)
     Tracking: `docs/proposals/home-improvements/PROGRESS.md`. Payments now
     count toward the period month they fall in (migration
     `20261003090000`, needs `npx supabase db push --linked` by the owner when
     promoted); Parent/Child Home tidy. Items 13-15 are follow-ups it found.
 
-13. **Record payment confirmation ignores a backdated payment's month** — status: `idea` — analysis: not yet written
+13. **Record payment confirmation ignores a backdated payment's month** — status: `done (on main; not yet in production)` — analysis: analysis/13-payment-confirmation-backdated-month.md
+    Tracking: `docs/proposals/period-fixes/PROGRESS.md` (task PF2).
     After recording a payment, the confirmation always shows the effect on
     the *current* payment period, even when the payment's date falls in an
     earlier month (`src/pages/RecordPaymentPage.tsx`, period-effect block
     around the `payment_period_status` call). Found 2026-10-03 during H1.
     Display only; the stored payment and balances are correct.
 
-14. **A payment can count toward two plans when a plan is replaced mid-month** — status: `idea` — analysis: not yet written
+14. **A payment can count toward two plans when a plan is replaced mid-month** — status: `deferred` — analysis: analysis/14-payment-counted-twice-on-plan-swap.md
+    Deferred 2026-10-03 with the owner: no screen shows an inactive plan's
+    periods, so the double count is invisible today. Revisit if one ever does.
     `payment_period_status` stops overlap within one plan, but ignores a
     plan's `ends_on`. If a child's plan is replaced partway through a month,
     one payment can count toward the old plan's last period and the new
     plan's first. Affects old-plan history only; Home uses the current plan.
     Verifier finding on H1, 2026-10-03.
 
-15. **Plans starting on the 29th-31st get a due date before the period starts** — status: `idea` — analysis: not yet written
+15. **Plans starting on the 29th-31st get a due date before the period starts** — status: `done (on main; not yet in production; owner db push needed)` — analysis: analysis/15-due-date-before-period-start.md
+    Tracking: `docs/proposals/period-fixes/PROGRESS.md` (task PF1). Wider than
+    first noted: any plan whose start day is after its due day.
     `ensure_current_payment_period` puts the due date on `due_day` of the
     period-start month, so a plan starting Jan 31 with due day 15 has a
     period starting Jan 31 that was "due" Jan 15 and reads overdue

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "678418d0bd6993b94bed156e16dfbd11e2f117ea",
+  "approved_at": "2026-10-03T15:20:14Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "\"fixed the deployment, please make sure the latest changes are promoted\"",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-03T15:21:35Z",
+  "consumed_by": "supervisor (release operator) via /continue-development, session 63495c00",
+  "notes": "Promotes home-improvements (H1 payment-period rule, H2 Home tidy) and backlog items 12-15. Includes migration 20261003090000 (create or replace payment_period_status, same signature/return shape), which the OWNER applies with `npx supabase db push --linked` -- agents never target the linked project. Front end does not depend on it: with the old function live, Home just keeps the old counting rule until the push. Previous release c6c2d81 confirmed live (Workers Builds success, bundle index-D1wpJ89i.js). | CONSUMED: gate on main @678418d green (typecheck, lint, test 48 files/803 tests, build). Ran: git push origin main (52fd5fc..678418d); git checkout production; git pull --ff-only origin production (already up to date at c6c2d81); git merge --no-ff main -m \"Merge main into production: payment-period rule fix (H1) and Home tidy (H2)\" -> a24651ee8751c96280d43849be2237b5a89fb348; git push origin production (c6c2d81..a24651e). No wrangler deploy (Cloudflare Workers Builds deploys on push). Migration 20261003090000 NOT applied -- owner applies it."
+}

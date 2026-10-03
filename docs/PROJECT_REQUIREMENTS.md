@@ -256,6 +256,7 @@ A payment reduces the child's overall balance and counts toward the applicable p
 Adopted rule:
 
 - A non-voided payment counts toward the period whose month it falls in: on or after that period's start date and before the next period's start date (each period starts on the plan's start date plus a whole number of months). Consecutive periods therefore cover every day with no gap or overlap, so a payment on the first day of a period, or a late payment after the due date, still counts toward its own month. Expenses and adjustments never count.
+- A period's due date is the first date on or after the period's start date that falls on the plan's due day — in the same month if the due day is not earlier than the start day, otherwise in the following month — and is always before the next period starts (in the rare month-end case where that date would be the next period's start date, it is the day before). A period is therefore never due before it begins, so a newly created plan is never overdue on day one.
 - Parent adjustments may override/waive a period when necessary.
 
 The exact rule must be documented in code and covered by automated tests.
