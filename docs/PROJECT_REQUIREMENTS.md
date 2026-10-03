@@ -392,6 +392,8 @@ Phone                   +$60.00
 
 A child should not be shown controls that imply they can record a repayment themselves.
 
+In the current app the Child Home (`/home`) also has an `Add an expense` button, and the same action is the `+` in the navigation (section 11.7).
+
 ### 11.3 Parent home screen
 
 The Parent dashboard should give a household-level overview.
@@ -423,6 +425,8 @@ Each child card should show:
 - Current payment-plan status.
 - Due/overdue state.
 - Quick access to the child's ledger.
+
+In the current app the Parent Home (`/home`) shows a `Needs attention` list, the family total owed, recent activity, and a card per child (opening that child's page under `Family`). Each child card has its own `Expense` and `Payment` shortcuts (pre-filled with that child), `Needs attention` items have a `Record payment` shortcut, and the general entry point for both is the `+` in the navigation (section 11.7).
 
 ### 11.4 Add Expense flow
 
@@ -464,6 +468,8 @@ The confirmation screen should show both:
 
 ### 11.6 History
 
+In the current app this screen is called `Activity` (`/activity`): a Parent sees all children, a Child sees only their own, newest first, 50 entries at a time with `Load more`. Parents void an entry from its expanded row.
+
 Ledger history should display newest entries first and clearly identify:
 
 - Expenses.
@@ -474,6 +480,21 @@ Ledger history should display newest entries first and clearly identify:
 - Description/category.
 
 Filtering by category/date/type is useful but not required for the earliest MVP.
+
+### 11.7 Navigation and where things live
+
+This describes the current app's layout; it adds no permissions (every rule above is still enforced server-side).
+
+- Phones get a bottom tab bar; wide screens get a sidebar with the same items.
+  - Parent: `Home`, `Activity`, `+`, `Family`, `Settings`.
+  - Child: `Home`, `Activity`, `+`, `Settings`.
+- `+` opens `Add expense` (`/new/expense`, everyone) or `Record payment` (`/new/payment`, Parent only).
+- `Family` (`/family`, Parent only) lists members and adds new ones; each person's page (`/family/<id>`) holds their payment plan, role/email/name changes, set-password links, archive/restore, and whether they have reminders turned on.
+- `Settings` (`/settings`):
+  - `Account`: `Change password` (`/settings/account`), `Appearance` (Auto / Light / Dark, remembered per device; Auto follows the phone's setting), and sign out.
+  - `This device`: install the app, and turn on payment reminders (push notifications) for this phone or computer (there is no in-app switch to turn them off yet). Both roles.
+  - Parent only: `Household` (`Members & roles` link to `Family`, `Categories` at `/settings/categories`, `Quick-add presets` at `/settings/presets`), `Export & backup` (`/settings/export`), and `Advanced`, which holds the send-a-test-notification tool.
+- `/` takes each person to their Home. Addresses from before the redesign (`/parent`, `/child`, `/add-expense`, `/record-payment`, `/members`, `/account`, `/export`, the old per-child history and payment-plan pages) redirect to their new places. Sign-in and `/set-password` are unchanged.
 
 ---
 

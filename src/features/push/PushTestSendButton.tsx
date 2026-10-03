@@ -13,10 +13,10 @@ import { supabase } from "../../lib/supabase";
  * dashed border, uppercase "Debug" label, muted styling distinct from
  * `PushSubscribeButton`'s primary-accent button just above it.
  *
- * Rendered from `RootLayout` next to `PushSubscribeButton` so any signed-in
- * member -- Parent or Child -- can trigger a test send to their OWN
- * subscription(s), matching push-test's case (a) authorization (any member
- * may test their own subscription; only a Parent may additionally test
+ * Rendered only for Parents, under Settings > Advanced (owner decision,
+ * UI redesign). It sends a test to the caller's OWN subscription(s),
+ * matching push-test's case (a) authorization (the server still lets any
+ * member test their own subscription; only a Parent may additionally test
  * another member's, which is push-test's case (b) and is NOT built here --
  * see this task's final report for the scope call).
  *

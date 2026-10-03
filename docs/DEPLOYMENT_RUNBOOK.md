@@ -116,7 +116,7 @@ Parent is required to add anyone else.
 - **Authentication → URL Configuration → Site URL:** set to
   `https://family-ledger.mcfrench.workers.dev`.
 - **Database → Backups:** the Free plan does not give you restorable backups.
-  Use the app's own **Export → full backup** regularly (monthly is sensible)
+  Use the app's own **Settings → Export & backup → full backup** regularly (monthly is sensible)
   and keep the file somewhere safe.
 
 ## 7a. Releasing account management (one-time hosted steps)
@@ -144,8 +144,8 @@ screens will call things that do not exist yet):
    as long as this setting; the app tells people 24 hours.)
 5. Then ask the agent to promote `main` to `production`.
 
-Until step 1 is done the old Manage Members page's Archive/Restore buttons
-stop working (the database no longer allows direct status edits), so do not
+Until step 1 is done the Archive/Restore buttons (on each person's page under
+**Family**) stop working (the database no longer allows direct status edits), so do not
 promote first.
 
 ## 8. Costs
@@ -168,12 +168,15 @@ Things that could change that:
 | Blank page or an environment-variable error on the live site | Cloudflare build variables missing/stale (section 4) | Add them, **Retry deployment** |
 | Sign-in says wrong password / can't connect | Project paused, or the first Parent was never created | Dashboard → Restore; or section 6 |
 | A page returns 404 when opened directly | Should not happen (`wrangler.jsonc` handles it); check the latest build succeeded | Cloudflare → Deployments |
-| "Add member" or "Test push" fails | Functions not deployed, or secrets missing | Section 2 step 5; section 5 |
+| "Add member" (on **Family**) or "Send test push" (Parent only, **Settings → Advanced**) fails | Functions not deployed, or secrets missing | Section 2 step 5; section 5 |
+| No payment reminders arrive on a phone | Reminders not turned on for that device | On that phone: **Settings → This device → Payment reminders**. A Parent can then check delivery with **Settings → Advanced → Send test push** |
 | Phone stuck on an old version | Installed app caches itself | Close fully and reopen; if stuck, remove and reinstall |
 | A bad release is live | — | Cloudflare → Deployments → pick a previous good one → **Rollback**. Then tell the agent so the code is fixed |
 
 ## 10. Known gaps (as of 2026-10-01)
 
 - The first login was created with a placeholder password. Once account
-  management is released, change it at **Change my password** (`/account`).
-- iPhone push validation still needs doing against the live site.
+  management is released, change it at **Settings → Change password**
+  (`/settings/account`).
+- iPhone push validation still needs doing against the live site (install the
+  app and turn on reminders from **Settings → This device**).
