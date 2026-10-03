@@ -24,7 +24,7 @@ _Newest entries on top._
 
 ### 2026-10-03 — H1 and H2 done
 
-H1 (payment rule) verifier pass; H2 (Home tidy) orchestrator spot-check, typecheck/lint/803 tests clean, seen on Parent Home at 375 px dark with Sam now reading "October paid". Follow-up spotted by H1 agent, not done: Record payment's confirmation always shows the current period's effect even for a backdated payment. Next: owner promotes; the hosted DB needs the new migration pushed (`npx supabase db push --linked`, owner step) at the same time.
+H1 (payment rule) verifier pass; H2 (Home tidy) orchestrator spot-check, typecheck/lint/803 tests clean, seen on Parent Home at 375 px dark with Sam now reading "October paid". Follow-up spotted by H1 agent, not done: Record payment's confirmation always shows the current period's effect even for a backdated payment. UI10 promotion (production `c6c2d81`) was pushed but Cloudflare's build reported failure (build 0b1448e1, logs only in the dashboard); live site still serves the previous release. The same commit builds and `wrangler deploy --dry-run`s cleanly from a fresh `npm ci` checkout locally, so the cause is on Cloudflare's side or in its build settings -- owner to read the log / retry. Next: owner promotes; the hosted DB needs the new migration pushed (`npx supabase db push --linked`, owner step) at the same time.
 
 ### 2026-10-03 — Scaffolded
 
