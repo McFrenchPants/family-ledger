@@ -1,6 +1,6 @@
 # Design spec: Separate balances by category, with payment splitting
 
-Status: **draft, awaiting owner sign-off** (see Open questions). No
+Status: **signed off by the owner 2026-10-03.** Open questions resolved: (1) only Parent-marked categories get a balance, several may share one; (2) move-money adjustment; (3) suggestions on Parent Home only, no push yet. No
 file/class-level detail on purpose; that belongs in the implementation plan.
 
 Backlog item 16. Owner decisions 2026-10-03 (live, in the orchestrator
@@ -146,7 +146,7 @@ month's progress separately.
   the total never moves, but it must be explained in the UI when a Parent
   changes the mapping.
 
-## Open questions (for owner sign-off)
+## Open questions (resolved 2026-10-03, proposed answers adopted)
 
 1. **Which categories get their own balance?** Proposed: only ones a Parent
    marks "track separately"; everything else is pooled as Everyday. The

@@ -279,7 +279,7 @@ sequential except where noted.
     test: calling `payment_period_status` for another household's period
     returns zero rows (currently covered by reasoning, not by a test).
 
-16. **Separate balances by category, with payment splitting** — status: `in progress` (design spec awaiting owner sign-off) — analysis: analysis/16-category-balances.md
+16. **Separate balances by category, with payment splitting** — status: `in progress` (design signed off 2026-10-03) — analysis: analysis/16-category-balances.md
     Requested by the owner 2026-10-03: keep a child's debts separate (e.g. a
     car with a $300/month minimum and $1,000 of college) and choose how each
     payment is divided between them. Owner decisions: allocate to category
