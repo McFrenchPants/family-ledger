@@ -253,9 +253,9 @@ For the initial version, payments do not need to be allocated to specific expens
 
 A payment reduces the child's overall balance and counts toward the applicable payment period according to deterministic business rules.
 
-Recommended rule:
+Adopted rule:
 
-- Payments made after the start of the current payment period and on/before its due date count toward that period.
+- A non-voided payment counts toward the period whose month it falls in: on or after that period's start date and before the next period's start date (each period starts on the plan's start date plus a whole number of months). Consecutive periods therefore cover every day with no gap or overlap, so a payment on the first day of a period, or a late payment after the due date, still counts toward its own month. Expenses and adjustments never count.
 - Parent adjustments may override/waive a period when necessary.
 
 The exact rule must be documented in code and covered by automated tests.
