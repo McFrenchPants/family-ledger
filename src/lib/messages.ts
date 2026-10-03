@@ -94,6 +94,14 @@ export const NO_ACTIVITY_TITLE = "No activity yet";
 export const NO_ACTIVITY_HINT =
   "When a parent pays for something of yours, like gas or a phone bill, add it as an expense. Payments show up here once a parent records them.";
 
+/** Parent-side empty activity (Home's Recent activity card and the Activity page). */
+export const NO_ACTIVITY_HINT_PARENT =
+  "Expenses and payments show up here as soon as anyone records them.";
+
+/** Empty Recent card on one member's page. */
+export const noActivityForMember = (name: string): string =>
+  `Nothing recorded for ${name} yet. Expenses and payments show up here as they happen.`;
+
 /** Device nudges at the bottom of Home. */
 export const PUSH_NUDGE_TEXT = "Get a nudge when a payment is due.";
 export const PUSH_NUDGE_ACTION = "Turn on";

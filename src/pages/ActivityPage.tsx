@@ -10,13 +10,13 @@ import { cx } from "../components/ui/cx";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Field } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
-import type { IconName } from "../components/ui/icon-paths";
+import { LoadError } from "../components/ui/LoadError";
+import { transactionLook } from "../components/ui/transaction-look";
 import { Segmented } from "../components/ui/Segmented";
 import { Sheet, SheetClose } from "../components/ui/Sheet";
 import { TONE_CLASSES } from "../components/ui/status";
 import { MembershipGate } from "../features/auth/MembershipGate";
 import type { Membership } from "../features/auth/membership-context";
-import type { ChildBalance } from "../features/ledger/household-balances";
 import type { ActivityTransaction } from "../features/ledger/history";
 import { validateVoidReason } from "../features/ledger/record-transaction";
 import { useActivity } from "../features/ledger/useActivity";
@@ -25,9 +25,10 @@ import { useHouseholdBalances } from "../features/ledger/useHouseholdBalances";
 import type { HouseholdBalancesState } from "../features/ledger/useHouseholdBalances";
 import { useHouseholdCategories } from "../features/ledger/useHouseholdCategories";
 import { useHouseholdTimezone } from "../features/ledger/useHouseholdTimezone";
+import { useHouseholdMembers } from "../features/members/useHouseholdMembers";
 import { addDays, formatCalendarDate, todayInZone } from "../lib/dates";
 import type { CalendarDate } from "../lib/dates";
-import { NO_ACTIVITY_HINT, NO_ACTIVITY_TITLE } from "../lib/messages";
+import { NO_ACTIVITY_HINT, NO_ACTIVITY_HINT_PARENT, NO_ACTIVITY_TITLE } from "../lib/messages";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -63,6 +64,17 @@ function ParentActivity({ membership }: { membership: Membership }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const child = searchParams.get("child") || null;
   const balances = useHouseholdBalances(membership.householdId);
+  // Every member, archived included, so an archived child's rows still carry
+  // a name in the Everyone view. The chips stay active children only.
+  const members = useHouseholdMembers(membership.householdId);
+  const names = new Map<string, string>([
+    ...(members.status === "loaded"
+      ? members.members.map((member) => [member.id, member.name] as const)
+      : []),
+    ...(balances.status === "loaded"
+      ? balances.children.map((child) => [child.memberId, child.name] as const)
+      : []),
+  ]);
 
   function chooseChild(next: string) {
     setSearchParams(next === EVERYONE ? {} : { child: next }, { replace: true });
@@ -72,7 +84,7 @@ function ParentActivity({ membership }: { membership: Membership }) {
     <Activity
       membership={membership}
       memberId={child ?? undefined}
-      roster={balances.status === "loaded" ? balances.children : null}
+      names={names}
       childChips={<ChildChips balances={balances} value={child ?? EVERYONE} onChange={chooseChild} />}
       onShowEveryone={child ? () => chooseChild(EVERYONE) : undefined}
     />
@@ -90,12 +102,10 @@ function ChildChips({
 }) {
   if (balances.status === "error") {
     return (
-      <div role="alert" className="flex flex-wrap items-center gap-2">
-        <p className="text-label text-danger">Could not load children: {balances.message}</p>
-        <Button size="sm" onClick={balances.retry}>
-          Retry
-        </Button>
-      </div>
+      <LoadError
+        message={`Could not load children: ${balances.message}`}
+        onRetry={balances.retry}
+      />
     );
   }
   const options = [
@@ -128,15 +138,15 @@ type SegmentKind = (typeof KIND_OPTIONS)[number]["value"];
 function Activity({
   membership,
   memberId,
-  roster = null,
+  names = null,
   childChips,
   onShowEveryone,
 }: {
   membership: Membership;
   /** One member's rows, or undefined for the whole household (Parent "Everyone"). */
   memberId: string | undefined;
-  /** Active children, for naming rows in the Everyone view. */
-  roster?: readonly ChildBalance[] | null;
+  /** Member id to name (archived members included), for naming rows in the Everyone view. */
+  names?: ReadonlyMap<string, string> | null;
   childChips?: ReactNode;
   onShowEveryone?: () => void;
 }) {
@@ -169,10 +179,7 @@ function Activity({
   }
 
   // Each row names its child only when several children are in view.
-  const nameOf =
-    isParent && memberId === undefined
-      ? new Map((roster ?? []).map((child) => [child.memberId, child.name]))
-      : null;
+  const nameOf = isParent && memberId === undefined ? (names ?? new Map<string, string>()) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -225,12 +232,10 @@ function Activity({
       )}
 
       {activity.status === "error" && (
-        <div role="alert" className="flex flex-col items-start gap-2">
-          <p className="text-label text-danger">Could not load activity: {activity.message}</p>
-          <Button size="sm" onClick={activity.retry}>
-            Retry
-          </Button>
-        </div>
+        <LoadError
+          message={`Could not load activity: ${activity.message}`}
+          onRetry={activity.retry}
+        />
       )}
 
       {activity.status === "loaded" && (
@@ -278,9 +283,7 @@ function Activity({
                     onShowEveryone ? <Button onClick={onShowEveryone}>Show everyone</Button> : undefined
                   }
                 >
-                  {isParent
-                    ? "Expenses and payments show up here as soon as anyone records them."
-                    : NO_ACTIVITY_HINT}
+                  {isParent ? NO_ACTIVITY_HINT_PARENT : NO_ACTIVITY_HINT}
                 </EmptyState>
               )}
             </Card>
@@ -309,7 +312,7 @@ function Activity({
           {activity.loadMoreError && (
             <div role="alert" className="flex flex-col items-start gap-2">
               <p className="text-label text-danger">Could not load more: {activity.loadMoreError}</p>
-              <Button size="sm" onClick={activity.loadMore}>
+              <Button size="sm" icon="undo" onClick={activity.loadMore}>
                 Try again
               </Button>
             </div>
@@ -360,7 +363,7 @@ function FiltersForm({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={categoryFieldId} className="text-label font-semibold text-ink">
+        <label htmlFor={categoryFieldId} className="text-label font-semibold text-muted">
           Category
         </label>
         <select
@@ -451,12 +454,6 @@ function enteredAt(instant: string, zone: string): string {
   }).format(new Date(instant));
 }
 
-const TYPE_LOOK: Record<string, { icon: IconName; box: string; label: string }> = {
-  payment: { icon: "check", box: "bg-ok-soft text-ok", label: "Payment" },
-  adjustment: { icon: "edit", box: "bg-accent-soft text-accent-text", label: "Adjustment" },
-  expense: { icon: "tag", box: "bg-sunken text-muted", label: "Expense" },
-};
-
 function ActivityItem({
   transaction,
   childName,
@@ -472,7 +469,7 @@ function ActivityItem({
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  const look = TYPE_LOOK[transaction.type] ?? TYPE_LOOK.expense!;
+  const look = transactionLook(transaction.type);
   const detail =
     transaction.type === "expense" ? (transaction.categoryName ?? "Expense") : look.label;
   const subline = [

@@ -17,9 +17,9 @@
  *
  * This module is the pure, DOM-event-free half of that: types, environment
  * detection, and the branching logic that decides which of the banner's
- * three render states applies. `InstallBanner.tsx` is the thin component
- * that wires this to the actual `beforeinstallprompt` listener and
- * `localStorage` dismissal.
+ * three render states applies. `InstallRow.tsx` (the Settings row) is the
+ * thin component that wires this to the actual `beforeinstallprompt`
+ * listener.
  */
 
 /**
@@ -32,9 +32,6 @@ export interface BeforeInstallPromptEvent extends Event {
   readonly userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
   prompt(): Promise<void>;
 }
-
-/** localStorage key for "the user dismissed the install banner". */
-export const INSTALL_BANNER_DISMISSED_KEY = "family-ledger:install-banner-dismissed";
 
 /**
  * Is the app already running installed/standalone? Checked two ways because
@@ -118,25 +115,4 @@ export function decideInstallBannerState(inputs: InstallBannerInputs): InstallBa
     return "ios-instructions";
   }
   return inputs.installEvent !== null ? "install-button" : "hidden";
-}
-
-/** Has the user previously dismissed the install banner on this device? */
-export function isInstallBannerDismissed(): boolean {
-  try {
-    return window.localStorage.getItem(INSTALL_BANNER_DISMISSED_KEY) === "1";
-  } catch {
-    // Private-browsing mode or disabled storage: fail safe to "not
-    // dismissed" rather than throwing and breaking the page.
-    return false;
-  }
-}
-
-/** Persist "the user dismissed the install banner" for this device. */
-export function setInstallBannerDismissed(): void {
-  try {
-    window.localStorage.setItem(INSTALL_BANNER_DISMISSED_KEY, "1");
-  } catch {
-    // Same fail-safe as isInstallBannerDismissed: if storage is unavailable
-    // the banner will simply reappear next load, which is acceptable.
-  }
 }

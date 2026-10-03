@@ -9,8 +9,7 @@ import { useMembership } from "../auth/membership-context";
 import { supabase } from "../../lib/supabase";
 
 /**
- * N4.4 subscribe-to-push affordance. Rendered from the Settings page (previously `RootLayout`, like
- * `InstallBanner`) so it's available from both the Parent and Child
+ * N4.4 subscribe-to-push affordance. Rendered from the Settings page so it's available from both the Parent and Child
  * dashboards without duplicating a per-page component -- this is a per-
  * device opt-in any active member should be able to trigger from wherever
  * their own dashboard is, not a Parent-only control and not a dedicated

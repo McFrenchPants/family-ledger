@@ -18,12 +18,17 @@
  * media query and one outside it, so the dark list appears twice below. The
  * contrast test asserts the two dark blocks are byte-for-byte identical, so
  * they cannot drift apart (whitespace aside): edit one, copy it to the other.
+ *
+ * --raised is the fill of a selected item sitting on a --sunken track (the
+ * Segmented control). In light it is plain white like a card; in dark a card
+ * surface is barely lighter than sunken, so it gets its own lighter fill.
  */
 
 :root {
   --bg: 245 246 248; /* #f5f6f8 */
   --surface: 255 255 255; /* #ffffff */
   --sunken: 236 239 243; /* #eceff3 */
+  --raised: 255 255 255; /* #ffffff */
   --border: 221 225 231; /* #dde1e7 */
   --border-strong: 196 202 211; /* #c4cad3 */
   --ink: 20 24 31; /* #14181f */
@@ -53,6 +58,7 @@
     --bg: 13 16 21; /* #0d1015 */
     --surface: 21 26 33; /* #151a21 */
     --sunken: 16 20 26; /* #10141a */
+    --raised: 46 54 66; /* #2e3642 */
     --border: 38 45 55; /* #262d37 */
     --border-strong: 56 65 77; /* #38414d */
     --ink: 238 241 245; /* #eef1f5 */
@@ -83,6 +89,7 @@
   --bg: 13 16 21; /* #0d1015 */
   --surface: 21 26 33; /* #151a21 */
   --sunken: 16 20 26; /* #10141a */
+  --raised: 46 54 66; /* #2e3642 */
   --border: 38 45 55; /* #262d37 */
   --border-strong: 56 65 77; /* #38414d */
   --ink: 238 241 245; /* #eef1f5 */

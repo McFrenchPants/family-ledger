@@ -415,6 +415,39 @@ describe("adding a member", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("keeps the success message and the list when the follow-up re-read fails, with a retry", async () => {
+    const user = userEvent.setup();
+    mockFunctions({
+      "add-household-member": {
+        data: { id: "new-1", user_id: "u-1", set_password_url: null, set_password_link_failed: true },
+        error: null,
+      },
+    });
+    renderPage();
+
+    await screen.findByText("Alex");
+    membersResult = { data: null, error: { message: "db down" } };
+    await openAndSubmit(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not refresh the member list: db down",
+    );
+    expect(screen.getByText("Riley was added.")).toBeInTheDocument();
+    // The last list stays on screen rather than being replaced by the error.
+    expect(screen.getByRole("region", { name: "Members" })).toBeInTheDocument();
+    expect(screen.getByText("Sam")).toBeInTheDocument();
+    expect(screen.queryByText(/Could not load members/)).not.toBeInTheDocument();
+
+    membersResult = {
+      data: [row("m1", "Alex", "parent"), row("m2", "Sam", "child"), row("new-1", "Riley", "child")],
+      error: null,
+    };
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByText("Riley was added.")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Members" })).getByText("Riley")).toBeInTheDocument();
+  });
+
   it("shows the Edge Function's error message on failure and allows retry", async () => {
     const user = userEvent.setup();
     mockFunctions({

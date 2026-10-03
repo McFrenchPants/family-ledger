@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 
 import { AmountText } from "../components/ui/AmountText";
 import { Avatar } from "../components/ui/Avatar";
-import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cx } from "../components/ui/cx";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
-import type { IconName } from "../components/ui/icon-paths";
+import { transactionLook } from "../components/ui/transaction-look";
+import { LinkButton } from "../components/ui/LinkButton";
+import { LoadError } from "../components/ui/LoadError";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { StatusChip } from "../components/ui/StatusChip";
 import { useMembership } from "../features/auth/membership-context";
@@ -41,7 +42,7 @@ import {
 } from "../features/payment-plans/useHouseholdPaymentProgress";
 import { DeviceNudge } from "../features/push/DeviceNudge";
 import { formatCalendarDate, todayInZone, type CalendarDate } from "../lib/dates";
-import { EVERYONE_UP_TO_DATE, NO_ACTIVITY_TITLE } from "../lib/messages";
+import { EVERYONE_UP_TO_DATE, NO_ACTIVITY_HINT_PARENT, NO_ACTIVITY_TITLE } from "../lib/messages";
 
 /**
  * `/home` for a Parent. `HomePage` (via `MembershipGate`) guarantees the
@@ -148,46 +149,6 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
 /* Shared bits                                                          */
 /* ------------------------------------------------------------------ */
 
-function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-2">
-      <p className="text-label text-danger">{message}</p>
-      <Button size="sm" onClick={onRetry}>
-        Retry
-      </Button>
-    </div>
-  );
-}
-
-/** A link styled like a small Button (Button itself renders a <button>). */
-function LinkButton({
-  to,
-  icon,
-  variant = "secondary",
-  children,
-}: {
-  to: string;
-  icon: IconName;
-  variant?: "secondary" | "ok";
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      to={to}
-      className={cx(
-        "inline-flex min-h-touch flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-control border px-3.5 text-label font-semibold",
-        "transition-colors duration-toggle motion-reduce:transition-none",
-        variant === "ok"
-          ? "border-ok-btn bg-ok-btn text-on-ok"
-          : "border-border-strong bg-surface text-ink hover:bg-sunken",
-      )}
-    >
-      <Icon name={icon} />
-      {children}
-    </Link>
-  );
-}
-
 const childParam = (memberId: string) => `?child=${encodeURIComponent(memberId)}`;
 
 /* ------------------------------------------------------------------ */
@@ -277,7 +238,11 @@ function AttentionCard({ item }: { item: AttentionItem }) {
         <StatusChip kind={overdue ? "overdue" : "due"} label={item.chipLabel} />
       </div>
       <div className="flex">
-        <LinkButton to={`/new/payment${childParam(item.memberId)}`} icon="check">
+        <LinkButton
+          to={`/new/payment${childParam(item.memberId)}`}
+          icon="check"
+          className="flex-1"
+        >
           Record payment<span className="sr-only"> for {item.name}</span>
         </LinkButton>
       </div>
@@ -341,12 +306,9 @@ function ChildrenSection({
           icon="users"
           title="No children yet"
           action={
-            <Link
-              to="/family"
-              className="inline-flex min-h-touch items-center rounded-control px-2 text-label font-semibold text-accent-text"
-            >
+            <LinkButton to="/family" icon="users" size="md">
               Add a child in Family
-            </Link>
+            </LinkButton>
           }
         >
           Once a child is added, their balance and plan show up here.
@@ -444,12 +406,17 @@ function ChildCard({
       )}
 
       <div className="mt-3 flex gap-2">
-        <LinkButton to={`/new/expense${childParam(child.memberId)}`} icon="plus">
+        <LinkButton
+          to={`/new/expense${childParam(child.memberId)}`}
+          icon="plus"
+          className="flex-1"
+        >
           Expense<span className="sr-only"> for {child.name}</span>
         </LinkButton>
         <LinkButton
           to={`/new/payment${childParam(child.memberId)}`}
           icon="check"
+          className="flex-1"
           variant={progress?.periodStatus === "overdue" && child.balanceCents > 0 ? "ok" : "secondary"}
         >
           Payment<span className="sr-only"> from {child.name}</span>
@@ -502,7 +469,9 @@ function RecentActivityCard({
       )}
 
       {activity.status === "loaded" && activity.transactions.length === 0 && (
-        <p className="mt-2 text-label text-muted">{NO_ACTIVITY_TITLE}</p>
+        <EmptyState icon="list" title={NO_ACTIVITY_TITLE}>
+          {NO_ACTIVITY_HINT_PARENT}
+        </EmptyState>
       )}
 
       {activity.status === "loaded" && activity.transactions.length > 0 && (
@@ -520,12 +489,6 @@ function RecentActivityCard({
   );
 }
 
-const TYPE_LOOK: Record<string, { icon: IconName; box: string; label: string }> = {
-  payment: { icon: "dollar", box: "bg-ok-soft text-ok", label: "Payment" },
-  adjustment: { icon: "edit", box: "bg-accent-soft text-accent-text", label: "Adjustment" },
-  expense: { icon: "tag", box: "bg-sunken text-muted", label: "Expense" },
-};
-
 function ActivityRow({
   transaction,
   childName,
@@ -533,7 +496,7 @@ function ActivityRow({
   transaction: HouseholdRecentTransaction;
   childName: string | null;
 }) {
-  const look = TYPE_LOOK[transaction.type] ?? TYPE_LOOK.expense!;
+  const look = transactionLook(transaction.type);
   const detail = transaction.type === "expense" ? transaction.categoryName : look.label;
   const subline = [
     formatCalendarDate(transaction.occurredOn, "short"),

@@ -75,7 +75,7 @@ export function DeviceNudge({ needsAttention }: { needsAttention: boolean }) {
         type="button"
         onClick={dismiss}
         aria-label="Not now, dismiss"
-        className="ml-auto grid min-h-touch min-w-touch place-items-center rounded-control text-subtle"
+        className="ml-auto grid min-h-touch min-w-touch place-items-center rounded-control text-subtle transition-colors hover:bg-sunken hover:text-ink motion-reduce:transition-none"
       >
         <Icon name="x" size={18} />
       </button>

@@ -1,8 +1,8 @@
 import type { Cents } from "../../lib/currency";
 
 /**
- * Row shape for the full ledger history view (`/child/:memberId/history`,
- * S2.7). A sibling module to `recent-activity.ts` rather than an extension of
+ * Row shape for the full ledger history (S2.7; today the base of the
+ * Activity page's rows, `ActivityTransactionRow` below). A sibling module to `recent-activity.ts` rather than an extension of
  * it: the Child dashboard's recent-activity list (`RecentTransactionRow`/
  * `toRecentTransactions`) is a *different* consumer with no need for voided
  * state or creator/voider identity, and bolting those fields onto that type

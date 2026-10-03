@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 
 import { Button } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/Icon";
+import { INPUT_CLASS, LABEL_CLASS } from "../../components/ui/styles";
 import { supabase } from "../../lib/supabase";
 import {
   describeUpdatePasswordError,
@@ -12,9 +13,6 @@ import {
   NETWORK_ERROR_MESSAGE,
   PASSWORD_MISMATCH_MESSAGE,
 } from "./password-errors";
-
-const fieldClass =
-  "min-h-touch-lg rounded-control border border-border-strong bg-surface px-3 text-body text-ink";
 
 /**
  * Change-own-password form for any signed-in member. It re-checks the current
@@ -95,7 +93,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
       </p>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={currentId} className="text-label font-semibold text-ink">
+        <label htmlFor={currentId} className={LABEL_CLASS}>
           Current password
         </label>
         <input
@@ -106,12 +104,12 @@ export function ChangePasswordForm({ email }: { email: string }) {
           value={current}
           onChange={(event) => setCurrent(event.target.value)}
           aria-describedby={describedBy}
-          className={fieldClass}
+          className={INPUT_CLASS}
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={newId} className="text-label font-semibold text-ink">
+        <label htmlFor={newId} className={LABEL_CLASS}>
           New password
         </label>
         <input
@@ -122,13 +120,13 @@ export function ChangePasswordForm({ email }: { email: string }) {
           value={next}
           onChange={(event) => setNext(event.target.value)}
           aria-describedby={describedBy}
-          className={fieldClass}
+          className={INPUT_CLASS}
         />
         <span className="text-label text-muted">At least {MIN_PASSWORD_LENGTH} characters.</span>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={confirmId} className="text-label font-semibold text-ink">
+        <label htmlFor={confirmId} className={LABEL_CLASS}>
           Confirm new password
         </label>
         <input
@@ -139,7 +137,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
           aria-describedby={describedBy}
-          className={fieldClass}
+          className={INPUT_CLASS}
         />
       </div>
 

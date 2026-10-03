@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 
 import { AmountText } from "../components/ui/AmountText";
 import { Avatar } from "../components/ui/Avatar";
-import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cx } from "../components/ui/cx";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
-import type { IconName } from "../components/ui/icon-paths";
+import { LoadError } from "../components/ui/LoadError";
+import { transactionLook } from "../components/ui/transaction-look";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { StatusChip } from "../components/ui/StatusChip";
 import { useMembership } from "../features/auth/membership-context";
@@ -175,17 +175,6 @@ function PaymentReceivedCard({ message, onDismiss }: { message: string; onDismis
 /* ------------------------------------------------------------------ */
 /* You owe                                                              */
 /* ------------------------------------------------------------------ */
-
-function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-2">
-      <p className="text-label text-danger">{message}</p>
-      <Button size="sm" onClick={onRetry}>
-        Retry
-      </Button>
-    </div>
-  );
-}
 
 function OweCard({
   balance,
@@ -404,14 +393,8 @@ function RecentActivityCard({ activity }: { activity: RecentActivityState }) {
   );
 }
 
-const TYPE_LOOK: Record<string, { icon: IconName; box: string; label: string }> = {
-  payment: { icon: "dollar", box: "bg-ok-soft text-ok", label: "Payment" },
-  adjustment: { icon: "edit", box: "bg-accent-soft text-accent-text", label: "Adjustment" },
-  expense: { icon: "tag", box: "bg-sunken text-muted", label: "Expense" },
-};
-
 function ActivityRow({ transaction }: { transaction: RecentTransaction }) {
-  const look = TYPE_LOOK[transaction.type] ?? TYPE_LOOK.expense!;
+  const look = transactionLook(transaction.type);
   const detail = transaction.type === "expense" ? transaction.categoryName : look.label;
   const subline = [
     formatCalendarDate(transaction.occurredOn, "short"),

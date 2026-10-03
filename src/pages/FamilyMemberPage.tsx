@@ -6,8 +6,9 @@ import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cx } from "../components/ui/cx";
+import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
-import type { IconName } from "../components/ui/icon-paths";
+import { transactionLook } from "../components/ui/transaction-look";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { StatusChip } from "../components/ui/StatusChip";
 import { useMembership } from "../features/auth/membership-context";
@@ -47,7 +48,7 @@ import { useChildPaymentProgress } from "../features/payment-plans/useChildPayme
 import { usePaymentPlan } from "../features/payment-plans/usePaymentPlan";
 import { formatCents } from "../lib/currency";
 import { formatCalendarDate, todayInZone, type CalendarDate } from "../lib/dates";
-import { NO_ACTIVITY_TITLE } from "../lib/messages";
+import { NO_ACTIVITY_TITLE, noActivityForMember } from "../lib/messages";
 
 /** How many recent rows a member's page shows before "See all". */
 const RECENT_ON_PAGE = 5;
@@ -105,7 +106,7 @@ function MemberPage({
   const member = family.members?.find((row) => row.id === memberId) ?? null;
 
   let body;
-  if (family.state.status === "error") {
+  if (family.state.status === "error" && family.members === null) {
     body = (
       <LoadError
         message={`Could not load this person: ${family.state.message}`}
@@ -173,6 +174,12 @@ function MemberPage({
   return (
     <div className="mx-auto flex w-full max-w-[960px] flex-col gap-4">
       <BackToFamily />
+      {family.refreshError && (
+        <LoadError
+          message={`Could not refresh this person's details: ${family.refreshError.message}`}
+          onRetry={family.refreshError.retry}
+        />
+      )}
       {body}
     </div>
   );
@@ -462,12 +469,6 @@ function PlanTerms({
   );
 }
 
-const TYPE_LOOK: Record<string, { icon: IconName; box: string; label: string }> = {
-  payment: { icon: "dollar", box: "bg-ok-soft text-ok", label: "Payment" },
-  adjustment: { icon: "edit", box: "bg-accent-soft text-accent-text", label: "Adjustment" },
-  expense: { icon: "tag", box: "bg-sunken text-muted", label: "Expense" },
-};
-
 function RecentCard({ member }: { member: HouseholdMemberRow }) {
   const activity = useRecentActivity(member.id);
 
@@ -498,7 +499,9 @@ function RecentCard({ member }: { member: HouseholdMemberRow }) {
       )}
 
       {activity.status === "loaded" && activity.transactions.length === 0 && (
-        <p className="mt-2 text-label text-muted">{NO_ACTIVITY_TITLE}</p>
+        <EmptyState icon="list" title={NO_ACTIVITY_TITLE}>
+          {noActivityForMember(member.name)}
+        </EmptyState>
       )}
 
       {activity.status === "loaded" && activity.transactions.length > 0 && (
@@ -513,7 +516,7 @@ function RecentCard({ member }: { member: HouseholdMemberRow }) {
 }
 
 function RecentRow({ transaction }: { transaction: RecentTransaction }) {
-  const look = TYPE_LOOK[transaction.type] ?? TYPE_LOOK.expense!;
+  const look = transactionLook(transaction.type);
   const detail = transaction.type === "expense" ? transaction.categoryName : look.label;
   const subline = [
     formatCalendarDate(transaction.occurredOn, "short"),
@@ -529,7 +532,7 @@ function RecentRow({ transaction }: { transaction: RecentTransaction }) {
       className="flex min-h-[60px] items-center gap-3 border-t border-border py-2.5 first:border-t-0"
     >
       <span className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-control", look.box)}>
-        <Icon name={transaction.isVoided ? "ban" : look.icon} />
+        <Icon name={look.icon} />
       </span>
       <span className="min-w-0 grow">
         <span className="block truncate font-semibold">{transaction.description}</span>

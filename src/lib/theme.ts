@@ -9,6 +9,11 @@
  * so the stored choice applies before React mounts (no flash). A test checks
  * that index.html still uses this key.
  *
+ * The browser/status bar colour (the two `<meta name="theme-color">` tags in
+ * index.html, one per OS scheme) follows the same rule: an explicit choice
+ * points both tags at that theme's page background, "auto" restores each
+ * tag to its own scheme's colour. The pre-paint script mirrors this too.
+ *
  * Storage can throw (private mode, blocked site data, quota). Every access is
  * wrapped: a failed read means "auto"; a failed write still applies the
  * choice for this page load, it just is not remembered.
@@ -19,6 +24,24 @@ export type ThemePreference = "auto" | "light" | "dark";
 export const THEME_STORAGE_KEY = "family-ledger.theme";
 
 const THEME_ATTRIBUTE = "data-theme";
+
+/**
+ * Page background (--bg in src/styles/tokens.css) per theme, used as the
+ * browser bar colour. index.html repeats these; a test keeps them in step.
+ */
+export const THEME_BAR_COLORS = { light: "#f5f6f8", dark: "#0d1015" } as const;
+
+/** Point the theme-color metas at the chosen theme, or back at their own scheme for auto. */
+function applyBarColor(preference: ThemePreference, doc: Document): void {
+  doc.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
+    const scheme = isExplicit(preference)
+      ? preference
+      : (meta.media ?? "").includes("dark")
+        ? "dark"
+        : "light";
+    meta.content = THEME_BAR_COLORS[scheme];
+  });
+}
 
 /** Minimal storage surface, so tests can pass a throwing fake. */
 export type ThemeStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -48,7 +71,10 @@ export function getStoredTheme(
   }
 }
 
-/** Put the preference on <html>: explicit choices set data-theme, auto removes it. */
+/**
+ * Put the preference on <html> (explicit choices set data-theme, auto
+ * removes it) and match the browser bar colour to it.
+ */
 export function applyTheme(
   preference: ThemePreference,
   root: HTMLElement = document.documentElement,
@@ -58,6 +84,7 @@ export function applyTheme(
   } else {
     root.removeAttribute(THEME_ATTRIBUTE);
   }
+  applyBarColor(preference, root.ownerDocument);
 }
 
 /**

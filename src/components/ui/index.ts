@@ -5,6 +5,8 @@ export { Card } from "./Card";
 export { ChoiceChips, type ChoiceOption } from "./ChoiceChips";
 export { EmptyState } from "./EmptyState";
 export { Field } from "./Field";
+export { LinkButton } from "./LinkButton";
+export { LoadError } from "./LoadError";
 export { Icon } from "./Icon";
 export { ICON_NAMES, ICON_PATHS, type IconName } from "./icon-paths";
 export { InlineStatus } from "./InlineStatus";
@@ -16,3 +18,4 @@ export { STATUS_KINDS, TONE_CLASSES, type StatusKind, type StatusTone } from "./
 export { StatusChip } from "./StatusChip";
 export { StickyActionBar } from "./StickyActionBar";
 export { spokenAmount, splitFraction } from "./money-speech";
+export { buttonClass, INPUT_BASE_CLASS, INPUT_CLASS, LABEL_CLASS } from "./styles";
