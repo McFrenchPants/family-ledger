@@ -28,18 +28,21 @@ export interface PushSupportInputs {
  * Decides between the three "can't proceed normally" states this task
  * specifies and "idle" (ready to show the subscribe button):
  *
- *  1. No `Notification`/`PushManager`/`serviceWorker` support at all -> a
- *     plain informational state, never a button that can only fail.
- *  2. iOS Safari not running standalone -> explain the home-screen-install
+ *  1. iOS Safari not running standalone -> explain the home-screen-install
  *     requirement (ARCHITECTURE.md §12.3) instead of offering a button.
+ *     Checked first: iOS hides `PushManager` in a normal Safari tab, so the
+ *     support check below would wrongly report "unsupported" there
+ *     (seen on a real iPhone, 2026-10-02).
+ *  2. No `Notification`/`PushManager`/`serviceWorker` support at all -> a
+ *     plain informational state, never a button that can only fail.
  *  3. Otherwise -> "idle", the normal subscribe-button state.
  */
 export function decideInitialPushState(inputs: PushSupportInputs): PushSubscribeState {
-  if (!inputs.supported) {
-    return "unsupported";
-  }
   if (inputs.ios && !inputs.standalone) {
     return "ios-install-required";
+  }
+  if (!inputs.supported) {
+    return "unsupported";
   }
   return "idle";
 }

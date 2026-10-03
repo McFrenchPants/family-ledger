@@ -20,11 +20,15 @@ Branch: `feature/phase-4-push-spike` (off `main`).
 | N4.3 | Edge Function: `push-test` | done | Verifier-routed (auth floor + credential handling). Passed, no blocking findings. Commit `76fc6b9`. |
 | N4.4 | Subscribe UI and persistence | done | Default tier, spot-checked. Commit `8c3ee75`. |
 | N4.5 | Test-send trigger | done | Default tier, spot-checked. Commit `7ceb666`. |
-| N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable. Android AC1 (subscribe + real notification) confirmed 2026-09-29 on a real Pixel 7 Pro, after fixing a real bug this testing surfaced (see session log). iPhone deferred indefinitely — the only iPhone on hand is activation-locked to an unknown old account, not a project blocker. AC3 (dead-subscription status) attempted but inconclusive on Android; not retried before local testing was paused. Phase's hard exit criterion — still not met. Decision: pause further local-environment testing and resume validation after a production deploy (see session log). |
+| N4.6 | Real-device validation (Android + iPhone) | blocked | Not delegable. Android AC1 (subscribe + real notification) confirmed 2026-09-29 on a real Pixel 7 Pro, after fixing a real bug this testing surfaced (see session log). iPhone: on 2026-10-02 the owner confirmed on a real iPhone (daughter's, production site) that after Add to Home Screen the installed app offers and accepts turning on notifications — AC2's subscribe half; receiving a real test notification on the iPhone is not yet confirmed (the test-send button is Parent-only and sends only to the caller's own devices, so it needs a Parent account signed in on that iPhone). AC3 (dead-subscription status) attempted but inconclusive on Android; not retried before local testing was paused. Phase's hard exit criterion — still not met. Decision: pause further local-environment testing and resume validation after a production deploy (see session log). |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — iPhone: subscribing confirmed on a real device; Safari-tab message fixed
+
+Owner tested on a real iPhone (a Child account, production site). In a normal Safari tab, Settings said "This browser does not support push notifications" — wrong: iOS hides the push feature in Safari tabs until the app is installed, and the support check ran before the iPhone check. After Add to Home Screen, the installed app let the owner turn on notifications, so AC2's subscribe half is confirmed. Fixed the order in `decideInitialPushState` (iPhone-not-installed now shows the install instructions; test updated, it fails if the order is reverted), on branch `feature/push-ios-safari-message`. Still open for AC2: a real notification arriving on the iPhone (needs a Parent signed in on an installed iPhone to use Settings > Advanced > test send). AC3 still open. N4.6 stays blocked until both.
 
 ### 2026-09-29 — Real-device testing session: one real bug found and fixed, Android confirmed working, iPhone and the dead-subscription check deferred to a production deploy
 

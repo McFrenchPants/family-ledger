@@ -3,13 +3,20 @@ import { describe, expect, it } from "vitest";
 import { base64UrlToUint8Array, decideInitialPushState } from "./push-subscribe";
 
 describe("decideInitialPushState", () => {
-  it("is unsupported when the required APIs are missing, regardless of platform", () => {
+  it("is unsupported when the required APIs are missing outside an iOS Safari tab", () => {
     expect(
       decideInitialPushState({ supported: false, ios: false, standalone: false }),
     ).toBe("unsupported");
+    // Installed on an iOS version too old for web push.
+    expect(
+      decideInitialPushState({ supported: false, ios: true, standalone: true }),
+    ).toBe("unsupported");
+  });
+
+  it("asks for home-screen install in an iOS Safari tab, where PushManager is hidden", () => {
     expect(
       decideInitialPushState({ supported: false, ios: true, standalone: false }),
-    ).toBe("unsupported");
+    ).toBe("ios-install-required");
   });
 
   it("requires home-screen install first on iOS Safari not running standalone", () => {
