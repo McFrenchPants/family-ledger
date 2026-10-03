@@ -26,11 +26,15 @@ for the design, `mockups/index.html` for the visual target.
 | UI7 | Activity page | done | Branch `feature/ui-redesign-p6-activity`. `HistoryPage`/`useHistory` replaced by `ActivityPage` + `useActivity` (pages of 50, `.range()`, id tiebreak). Mockup's monthly totals line dropped on purpose (would sum only loaded rows); shows "Showing N". Adjustments reachable via "Only adjustments" in the Filters sheet. Verifier: pass. Load more covered by tests only (fixture has 6 rows). For UI10: in "Everyone", rows of an archived child show no child name (names come from the active-children list); dark-mode selected state of shared `Segmented` is low-contrast. |
 | UI8 | Family and child page | done | Branch `feature/ui-redesign-p7-family`. `ManageMembersPage`/`PaymentPlanPage` replaced by `FamilyPage` + `FamilyMemberPage`; pieces in `src/features/family/`; reminder state via new `useMemberPushStatus` (yes/no only, so no device count). Previous/upcoming periods from the mockup dropped (no existing data source). Old `/child/:id/payment-plan`: Parent to `/family/:id`, anyone else to `/home`. Verifier: pass. Browser: Parent only, 375 px dark (list, Alex's page, replace-plan confirm then cancel, not-found); Child exclusion by router tests only. For UI10: a failed list re-read after a member change drops the success notice. |
 | UI9 | Settings completion | done | Branch `feature/ui-redesign-p8-settings`. Pieces in `src/features/settings/`; sign-out logic now `useSignOut` (`SessionStatus` deleted). Parent Home "Household tools" line removed. Reminders kept as the existing Enable button, not the mockup's switch (no turn-off exists). Child page titled "Settings" (matches tab), not the mockup's "Account". Verifier: pass. For UI10: Settings' CSV and JSON rows both open the export page (could be one row); Advanced looks empty on a device without reminders; Categories/Presets with data and Parent desktop not seen in browser. |
-| UI10 | Polish, cleanup, final verification | todo | |
+| UI10 | Polish, cleanup, final verification | todo | Review skill `web-design-guidelines` installed (owner-approved 2026-10-03). Priority: functionality and visual consistency over accessibility (see plan). |
 
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-03 — Promoted to production; review skill installed
+
+Owner approved promoting `main` (1487f53, UI6-UI9 plus iPhone push message) to production: merge `84c2297`, approval record `.sdlc/approvals/20261003T053052Z--deploy_release--main.json`; Cloudflare's new build confirmed live (old "Household tools" links gone, `/settings/presets` 200). Owner approved installing `web-design-guidelines` (user-level) for UI10 and set the priority: functionality and visual consistency first, accessibility not a priority. Next: UI10.
 
 ### 2026-10-03 — UI9 done
 
