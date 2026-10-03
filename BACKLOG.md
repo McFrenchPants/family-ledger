@@ -252,7 +252,7 @@ sequential except where noted.
     `20261003090000`, needs `npx supabase db push --linked` by the owner when
     promoted); Parent/Child Home tidy. Items 13-15 are follow-ups it found.
 
-13. **Record payment confirmation ignores a backdated payment's month** — status: `done (on main; not yet in production)` — analysis: analysis/13-payment-confirmation-backdated-month.md
+13. **Record payment confirmation ignores a backdated payment's month** — status: `done` (live, production 572a80a) — analysis: analysis/13-payment-confirmation-backdated-month.md
     Tracking: `docs/proposals/period-fixes/PROGRESS.md` (task PF2).
     After recording a payment, the confirmation always shows the effect on
     the *current* payment period, even when the payment's date falls in an
@@ -269,7 +269,7 @@ sequential except where noted.
     plan's first. Affects old-plan history only; Home uses the current plan.
     Verifier finding on H1, 2026-10-03.
 
-15. **Plans starting on the 29th-31st get a due date before the period starts** — status: `done (on main; not yet in production; owner db push needed)` — analysis: analysis/15-due-date-before-period-start.md
+15. **Plans starting on the 29th-31st get a due date before the period starts** — status: `live (production 572a80a); owner to run db push for migration 20261003120000` — analysis: analysis/15-due-date-before-period-start.md
     Tracking: `docs/proposals/period-fixes/PROGRESS.md` (task PF1). Wider than
     first noted: any plan whose start day is after its due day.
     `ensure_current_payment_period` puts the due date on `due_day` of the
