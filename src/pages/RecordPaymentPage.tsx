@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -43,11 +43,33 @@ import { useHouseholdPaymentProgress } from "../features/payment-plans/useHouseh
 import { useMembership } from "../features/auth/membership-context";
 import type { Membership } from "../features/auth/membership-context";
 import { supabase } from "../lib/supabase";
-import { addMonths, compareCalendarDates, formatCalendarDate, todayInZone } from "../lib/dates";
-import type { CalendarDate } from "../lib/dates";
+import { formatCalendarDate, todayInZone } from "../lib/dates";
 import { formatCents, toDecimalString } from "../lib/currency";
 import type { Cents } from "../lib/currency";
 import type { PaymentPeriodStatus } from "../features/payment-plans/useChildPaymentProgress";
+import { fetchPeriodEffects } from "../features/payment-plans/period-effect";
+import type { PeriodEffect } from "../features/payment-plans/period-effect";
+import { useMemberPlanTargets } from "../features/payment-plans/useMemberPlanTargets";
+import { MoveMoneyForm } from "../features/ledger/MoveMoneyForm";
+import {
+  balancesAfter,
+  creditedBalanceIds,
+  largestPartBalanceId,
+  owedWords,
+  planEffects,
+  rowsFromParts,
+  suggestSplit,
+  validateSplit,
+} from "../features/ledger/payment-split";
+import type { SplitRow } from "../features/ledger/payment-split";
+import { SplitEditor } from "../features/ledger/SplitEditor";
+import {
+  fetchBreakdown,
+  useMemberBreakdown,
+  useTrackedBalances,
+} from "../features/ledger/useBalanceSplitData";
+import { usePaymentSuggestion } from "../features/ledger/usePaymentSuggestion";
+import { readLastUsedBalance, writeLastUsedBalance } from "../features/ledger/last-used-balance";
 
 /**
  * `/new/payment`. Parent-only, end to end -- there is no legitimate Child
@@ -103,15 +125,6 @@ export function RecordPaymentPage() {
   }
 }
 
-type PeriodEffect = {
-  /** The period the payment counted toward; its month names the panel. */
-  periodStart: CalendarDate;
-  status: PaymentPeriodStatus;
-  minimumCents: Cents;
-  paidCents: Cents;
-  remainingCents: Cents;
-};
-
 type SubmitState =
   | { status: "idle" }
   | { status: "submitting" }
@@ -121,16 +134,16 @@ type SubmitState =
       type: RecordTransactionType;
       amountCents: Cents;
       balanceCents: Cents | null;
+      /** Each balance's amount owed after the write (split households only). */
+      balanceLines: { name: string; cents: Cents }[] | null;
       /**
        * Only ever populated for a `payment` (never an `adjustment` -- see
-       * module comment on S3.4). `null` covers every "nothing to show" case
-       * uniformly: no active plan for this child, the type was `adjustment`,
-       * a backdated payment no stored period covers, or the best-effort
-       * secondary fetch failed. The confirmation panel treats them all
-       * identically -- just render the plain balance
-       * confirmation, unchanged from Phase 1.
+       * module comment on S3.4), one entry per affected plan. An empty list
+       * covers every "nothing to show" case uniformly: no active plan on
+       * the balances paid, the type was `adjustment`, a backdated payment no
+       * stored period covers, or the best-effort secondary fetch failed.
        */
-      periodEffect: PeriodEffect | null;
+      periodEffects: PeriodEffect[];
       /** A light "nice one" line; payments only, null for an adjustment. */
       encouragement: string | null;
     };
@@ -170,25 +183,6 @@ function periodEffectCopy(effect: PeriodEffect): string {
     default:
       return `${formatCents(effect.remainingCents)} remaining due.`;
   }
-}
-
-/**
- * The start of the period after the one starting `periodStart`, mirroring
- * `payment_period_status`'s `next_period_start`: the smallest
- * `startsOn + k months` strictly after `periodStart`, always anchored to
- * `startsOn` (never compounded month to month, so a 31st-anchored plan stays
- * on the 31st where it can). Only used to decide *which* stored period a
- * backdated payment fell in -- every paid/remaining number still comes from
- * the server.
- */
-function nextPeriodStart(startsOn: CalendarDate, periodStart: CalendarDate): CalendarDate {
-  const [startYear, startMonth] = startsOn.split("-").map(Number) as [number, number];
-  const [periodYear, periodMonth] = periodStart.split("-").map(Number) as [number, number];
-  const months = (periodYear - startYear) * 12 + (periodMonth - startMonth);
-  const candidate = addMonths(startsOn, months);
-  return compareCalendarDates(candidate, periodStart) > 0
-    ? candidate
-    : addMonths(startsOn, months + 1);
 }
 
 const TYPE_COPY: Record<
@@ -268,6 +262,39 @@ function RecordForm({ membership }: { membership: Membership }) {
   const [occurredOn, setOccurredOn] = useState("");
   const [fieldErrors, setFieldErrors] = useState<RecordFormErrors>({});
   const [submitState, setSubmitState] = useState<SubmitState>({ status: "idle" });
+  const [mode, setMode] = useState<"record" | "move">("record");
+  // The split the Parent edited by hand; null while the suggested split is in use.
+  const [manualRows, setManualRows] = useState<SplitRow[] | null>(null);
+  // Which set of credit-creating balances the Parent has confirmed.
+  const [creditAckedFor, setCreditAckedFor] = useState("");
+
+  const balancesState = useTrackedBalances(membership.householdId);
+  const { breakdown, refetch: refetchBreakdown } = useMemberBreakdown(membership.householdId);
+  const planTargets = useMemberPlanTargets(memberId);
+  const suggestionId = searchParams.get("suggestion");
+  const suggestionState = usePaymentSuggestion(suggestionId);
+  // Set once a pending suggestion has been copied into the form.
+  const appliedSuggestion = useRef<string | null>(null);
+
+  const splitBalances = balancesState.status === "loaded" ? balancesState.balances : [];
+  const splitMode = splitBalances.length > 1;
+  const typedAmount = typedAmountCents(amountInput);
+  const suggestedRows = useMemo(
+    () =>
+      typedAmount === null || !splitMode
+        ? []
+        : rowsFromParts(
+            suggestSplit({
+              amountCents: typedAmount,
+              balances: splitBalances,
+              targets: planTargets ?? [],
+              lastUsedBalanceId: memberId === "" ? null : readLastUsedBalance(memberId),
+            }),
+          ),
+    // `splitBalances` is derived from `balancesState` alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [typedAmount, splitMode, balancesState, planTargets, memberId],
+  );
 
   // Seed the member selector's default and today's date once form data has
   // loaded, mirroring AddExpensePage's effect -- see its comment for why this
@@ -294,6 +321,26 @@ function RecordForm({ membership }: { membership: Membership }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.status]);
 
+  // `?suggestion=<id>` (from a child's payment suggestion): copy its child,
+  // amount, date, note and parts into the form once. Declared after the
+  // seeding effect so its values win when both run on the same render.
+  useEffect(() => {
+    if (formData.status !== "loaded" || suggestionState.status !== "loaded") return;
+    const { suggestion } = suggestionState;
+    if (suggestion.status !== "pending" || appliedSuggestion.current === suggestion.id) return;
+    appliedSuggestion.current = suggestion.id;
+
+    if (buildRecordMemberOptions(formData.activeMembers).some((o) => o.id === suggestion.memberId)) {
+      setMemberId(suggestion.memberId);
+    }
+    setType("payment");
+    setAmountInput(toDecimalString(suggestion.amountCents));
+    setOccurredOn(suggestion.suggestedOn);
+    setNote(suggestion.note ?? "");
+    setManualRows(rowsFromParts(suggestion.parts));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.status, suggestionState]);
+
   if (formData.status === "loading") {
     return (
       <p role="status" className="text-label text-subtle">
@@ -313,6 +360,18 @@ function RecordForm({ membership }: { membership: Membership }) {
 
   const options = buildRecordMemberOptions(formData.activeMembers);
   const copy = TYPE_COPY[type];
+  const today = todayInZone(formData.timezone);
+  const balanceNameOf = (id: string) =>
+    splitBalances.find((balance) => balance.id === id)?.name ?? "Balance";
+  const rows = manualRows ?? suggestedRows;
+  const owedByBalance = breakdown ? (breakdown.get(memberId) ?? new Map<string, Cents>()) : null;
+  const split = splitMode && typedAmount !== null ? validateSplit(typedAmount, rows) : null;
+  const creditedIds =
+    split?.ok === true ? creditedBalanceIds(split.parts, owedByBalance) : [];
+  const creditKey = creditedIds.join(",");
+  const creditPending = creditedIds.length > 0 && creditAckedFor !== creditKey;
+  const splitBlocked =
+    balancesState.status !== "loaded" || (split !== null && (!split.ok || creditPending));
 
   if (submitState.status === "done") {
     const doneCopy = TYPE_COPY[submitState.type];
@@ -346,25 +405,35 @@ function RecordForm({ membership }: { membership: Membership }) {
               ? "unavailable"
               : formatCents(submitState.balanceCents)}
           </p>
+          {submitState.balanceLines && (
+            <ul className="list-disc pl-5 text-body text-ink tabular-nums">
+              {submitState.balanceLines.map((line) => (
+                <li key={line.name}>
+                  {line.name}: {owedWords(line.cents)}
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
-        {submitState.periodEffect && (
-          <Card className="flex flex-col gap-1.5">
+        {submitState.periodEffects.map((effect) => (
+          <Card key={effect.balanceId} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-head">
-                {formatCalendarDate(submitState.periodEffect.periodStart, "month")} payment period
+                {submitState.balanceLines
+                  ? `${balanceNameOf(effect.balanceId)}: ${formatCalendarDate(effect.periodStart, "month")} payment period`
+                  : `${formatCalendarDate(effect.periodStart, "month")} payment period`}
               </h2>
               <StatusChip
-                kind={PERIOD_STATUS_KIND[submitState.periodEffect.status]}
-                label={PERIOD_STATUS_LABELS[submitState.periodEffect.status]}
+                kind={PERIOD_STATUS_KIND[effect.status]}
+                label={PERIOD_STATUS_LABELS[effect.status]}
               />
             </div>
-            <p className="text-body text-ink">{periodEffectCopy(submitState.periodEffect)}</p>
+            <p className="text-body text-ink">{periodEffectCopy(effect)}</p>
             <p className="text-label text-subtle tabular-nums">
-              {formatCents(submitState.periodEffect.paidCents)} of{" "}
-              {formatCents(submitState.periodEffect.minimumCents)} paid
+              {formatCents(effect.paidCents)} of {formatCents(effect.minimumCents)} paid
             </p>
           </Card>
-        )}
+        ))}
         <Button variant="ok" size="lg" fullWidth onClick={() => navigate("/home")}>
           Done
         </Button>
@@ -381,10 +450,14 @@ function RecordForm({ membership }: { membership: Membership }) {
       setFieldErrors(result.errors);
       return;
     }
+    if (splitBlocked) return;
     setFieldErrors({});
     setSubmitState({ status: "submitting" });
 
     const rpcName = type === "payment" ? "record_payment" : "record_adjustment";
+    // Parts the Parent chose; null (wholly Everyday) when there is nothing to split.
+    const parts = split?.ok === true ? split.parts : null;
+    const everydayId = splitBalances.find((balance) => balance.isEveryday)?.id ?? null;
 
     try {
       const { data: recorded, error } = await supabase.rpc(rpcName, {
@@ -394,14 +467,35 @@ function RecordForm({ membership }: { membership: Membership }) {
         p_occurred_on: occurredOn,
         p_category_id: categoryId === "" ? null : categoryId,
         p_note: note.trim() === "" ? null : note.trim(),
+        p_allocations: parts
+          ? parts.map((part) => ({
+              tracked_balance_id: part.balanceId,
+              amount_cents: part.cents,
+            }))
+          : null,
+        // Only a payment can come from a child's suggestion.
+        // Dropped if the Parent switched to a different child afterwards.
+        ...(type === "payment" &&
+        appliedSuggestion.current &&
+        suggestionState.status === "loaded" &&
+        suggestionState.suggestion.id === appliedSuggestion.current &&
+        suggestionState.suggestion.memberId === memberId
+          ? { p_suggestion_id: appliedSuggestion.current }
+          : {}),
       });
 
       if (error) {
         // A rejected write (e.g. a stale session that lost Parent status, or
-        // any other server-side check) surfaces here as a retry-able error
-        // state. Never queued for later replay -- ADR-007.
+        // any other server-side check such as a split that does not add up)
+        // surfaces here as a retry-able error state. Never queued for later
+        // replay -- ADR-007.
         setSubmitState({ status: "error", message: error.message });
         return;
+      }
+
+      if (parts) {
+        const largest = largestPartBalanceId(parts);
+        if (largest) writeLastUsedBalance(memberId, largest);
       }
 
       // Fetch the resulting balance for the confirmation panel. A failure
@@ -415,99 +509,38 @@ function RecordForm({ membership }: { membership: Membership }) {
         (row) => row.member_id === memberId,
       );
 
+      // Per-balance amounts owed now, for households with more than Everyday.
+      let balanceLines: { name: string; cents: Cents }[] | null = null;
+      if (splitMode) {
+        const fresh = await fetchBreakdown(membership.householdId);
+        const owedNow = fresh?.get(memberId);
+        if (owedNow) {
+          balanceLines = splitBalances.map((balance) => ({
+            name: balance.name,
+            cents: owedNow.get(balance.id) ?? 0,
+          }));
+        }
+        refetchBreakdown();
+      }
+
       // Period effect (S3.4) is a payment-only concern -- an adjustment never
       // counts toward a period's paid amount (the allocation rule excludes
       // adjustments entirely), so showing period-shaped UI for one would be
-      // misleading rather than helpful. `periodEffect` stays `null` for any
-      // adjustment, with no RPC calls made at all.
-      let periodEffect: PeriodEffect | null = null;
-
-      if (type === "payment") {
-        try {
-          const { data: planData } = await supabase
-            .from("payment_plans")
-            .select("id, starts_on")
-            .eq("member_id", memberId)
-            .eq("active", true)
-            .maybeSingle<{ id: string; starts_on: CalendarDate }>();
-
-          let target: { id: string; period_start: CalendarDate } | null = null;
-
-          if (planData) {
-            const { data: periodRaw, error: periodError } = await supabase.rpc(
-              "ensure_current_payment_period",
-              { p_plan_id: planData.id },
-            );
-
-            const current = periodRaw as { id: string; period_start: CalendarDate } | null;
-
-            if (!periodError && current) {
-              if (compareCalendarDates(occurredOn, current.period_start) >= 0) {
-                target = current;
-              } else {
-                // A backdated payment counts toward the period whose month
-                // [period_start, next_period_start) holds its date, not the
-                // current one. Only periods already stored can be shown; one
-                // never materialized (or a date before the plan began) gets
-                // no panel rather than a misleading one.
-                const { data: earlier, error: earlierError } = await supabase
-                  .from("payment_periods")
-                  .select("id, period_start")
-                  .eq("payment_plan_id", planData.id)
-                  .lte("period_start", occurredOn)
-                  .order("period_start", { ascending: false })
-                  .limit(1)
-                  .maybeSingle<{ id: string; period_start: CalendarDate }>();
-
-                if (
-                  !earlierError &&
-                  earlier &&
-                  compareCalendarDates(
-                    occurredOn,
-                    nextPeriodStart(planData.starts_on, earlier.period_start),
-                  ) < 0
-                ) {
-                  target = earlier;
-                }
-              }
-            }
-          }
-
-          if (target) {
-            const { data: statusData, error: statusError } = await supabase.rpc(
-              "payment_period_status",
-              { p_period_id: target.id },
-            );
-
-            const statusRow = (
-              (statusData ?? []) as {
-                period_id: string;
-                status: PaymentPeriodStatus;
-                minimum_cents: number;
-                paid_cents: number;
-                remaining_cents: number;
-              }[]
-            )[0];
-
-            if (!statusError && statusRow) {
-              periodEffect = {
-                periodStart: target.period_start,
-                status: statusRow.status,
-                minimumCents: statusRow.minimum_cents,
-                paidCents: statusRow.paid_cents,
-                remainingCents: Math.max(0, statusRow.remaining_cents),
-              };
-            }
-          }
-        } catch {
-          // Best-effort secondary read: the payment RPC above already
-          // succeeded and the write is final, so a failure here must not
-          // surface as a second error state (that would read as the payment
-          // itself having failed). Fall back to no period-effect display --
-          // the existing plain balance confirmation still stands on its own.
-          periodEffect = null;
-        }
-      }
+      // misleading rather than helpful. No RPC calls at all for an adjustment.
+      // Only plans on the balances actually paid are shown (Everyday when no
+      // split was sent).
+      const periodEffects =
+        type === "payment"
+          ? await fetchPeriodEffects(
+              memberId,
+              occurredOn,
+              parts
+                ? new Set(parts.map((part) => part.balanceId))
+                : everydayId
+                  ? new Set([everydayId])
+                  : null,
+            )
+          : [];
 
       // The RPC returns the new ledger row; its id seeds the line so it stays
       // put for this payment. Without one, the amount and child still give a
@@ -526,7 +559,8 @@ function RecordForm({ membership }: { membership: Membership }) {
         type,
         amountCents: result.amountCents,
         balanceCents: balanceRow?.balance_cents ?? null,
-        periodEffect,
+        balanceLines,
+        periodEffects,
         encouragement,
       });
     } catch (caught) {
@@ -540,7 +574,6 @@ function RecordForm({ membership }: { membership: Membership }) {
     }
   }
 
-  const today = todayInZone(formData.timezone);
   const progressOf = (id: string): KnownProgress =>
     progressState.status === "loaded" ? (progressState.progressByMemberId.get(id) ?? null) : undefined;
   const balanceOf = (id: string): Cents | null => balances?.get(id) ?? null;
@@ -553,6 +586,58 @@ function RecordForm({ membership }: { membership: Membership }) {
     type === "payment" && chosen ? paymentShortcuts(chosenBalance, progressOf(chosen.id)) : [];
   const submitting = submitState.status === "submitting";
   const errorMessages = FIELD_ORDER.flatMap((key) => (fieldErrors[key] ? [fieldErrors[key]] : []));
+
+  const splitAfter =
+    split?.ok === true && owedByBalance ? balancesAfter(split.parts, owedByBalance) : null;
+  const planLines =
+    type === "payment" && split?.ok === true
+      ? planEffects({ parts: split.parts, targets: planTargets ?? [], occurredOn }).map((effect) =>
+          effect.remainingAfterCents === 0
+            ? `${balanceNameOf(effect.balanceId)} plan: this period's minimum will be met.`
+            : `${balanceNameOf(effect.balanceId)} plan: ${formatCents(effect.remainingAfterCents)} will still be due this period.`,
+        )
+      : [];
+  const suggestionNote =
+    suggestionState.status === "loaded" && suggestionState.suggestion.status !== "pending"
+      ? "That payment suggestion has already been handled, so nothing was filled in."
+      : suggestionState.status === "error"
+        ? `Could not load that payment suggestion: ${suggestionState.message}`
+        : null;
+
+  const modeSwitch = splitMode && (
+    <Segmented
+      label="What would you like to do?"
+      value={mode}
+      onValueChange={setMode}
+      options={[
+        { value: "record", label: "Record payment" },
+        { value: "move", label: "Move money" },
+      ]}
+    />
+  );
+
+  if (mode === "move") {
+    return (
+      <section
+        aria-labelledby="record-heading"
+        className="mx-auto flex w-full max-w-[560px] flex-col gap-4"
+      >
+        <h1 id="record-heading" className="text-title">
+          Move money
+        </h1>
+        {modeSwitch}
+        <MoveMoneyForm
+          householdId={membership.householdId}
+          children={options}
+          balances={splitBalances}
+          breakdown={breakdown}
+          initialMemberId={memberId}
+          today={today}
+          onMoved={refetchBreakdown}
+        />
+      </section>
+    );
+  }
 
   return (
     <section
@@ -567,6 +652,14 @@ function RecordForm({ membership }: { membership: Membership }) {
           This lowers what a child owes. It is separate from adding an expense.
         </p>
       </div>
+
+      {modeSwitch}
+
+      {suggestionNote && (
+        <p role="status" className="text-label text-muted">
+          {suggestionNote}
+        </p>
+      )}
 
       <Segmented
         label="Entry type"
@@ -596,7 +689,10 @@ function RecordForm({ membership }: { membership: Membership }) {
               variant="row"
               describedBy={fieldErrors.memberId ? "record-member-error" : undefined}
               value={memberId}
-              onValueChange={setMemberId}
+              onValueChange={(next) => {
+                setMemberId(next);
+                setManualRows(null);
+              }}
               options={options.map((option) => {
                 const balance = balanceOf(option.id);
                 const chip =
@@ -670,6 +766,36 @@ function RecordForm({ membership }: { membership: Membership }) {
             </div>
           )}
         </div>
+
+        {balancesState.status === "error" && (
+          <div
+            role="alert"
+            className="flex flex-col items-start gap-2 rounded-control bg-danger-soft px-3 py-2.5 text-label font-medium text-danger"
+          >
+            <p>Could not load the child&rsquo;s balances: {balancesState.message}</p>
+            <Button size="sm" onClick={balancesState.retry}>
+              Try again
+            </Button>
+          </div>
+        )}
+
+        {splitMode && typedAmount !== null && (
+          <SplitEditor
+            rows={rows}
+            balances={splitBalances}
+            amountCents={typedAmount}
+            validation={split ?? { ok: false, message: "" }}
+            isManual={manualRows !== null}
+            onRowsChange={setManualRows}
+            onReset={() => setManualRows(null)}
+            after={splitAfter}
+            planLines={planLines}
+            showPlanEffects={type === "payment"}
+            creditNames={creditedIds.map(balanceNameOf)}
+            creditAcknowledged={!creditPending && creditedIds.length > 0}
+            onCreditAcknowledgedChange={(checked) => setCreditAckedFor(checked ? creditKey : "")}
+          />
+        )}
 
         <TextInput
           id="record-description"
@@ -751,6 +877,7 @@ function RecordForm({ membership }: { membership: Membership }) {
             size="lg"
             fullWidth
             loading={submitting}
+            disabled={splitBlocked}
             icon="check"
             className="whitespace-normal text-center"
           >
