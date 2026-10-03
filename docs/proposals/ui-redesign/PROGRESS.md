@@ -23,7 +23,7 @@ for the design, `mockups/index.html` for the visual target.
 | UI4 | Child Home (playful overdue text, encouragement) | done | Branch `feature/ui-redesign-p4a-child-home`. Copy in `src/lib/messages.ts`; logic in `src/features/home/child-home.ts`; nudge rules in `src/features/push/device-nudge.ts` (reuse in UI5). Recent activity now reads `voided_at`. Browser-checked only the "due later", payment-received and empty states; overdue/due-soon/paid-off/satisfied covered by component tests only. Nudge not seen in browser (pane's notification permission is denied). |
 | UI5 | Parent Home | done | Branch `feature/ui-redesign-p4b-parent-home`. Logic in `src/features/home/parent-home.ts`; household recent activity hook `useHouseholdRecentActivity`. Add expense / Record payment accept `?child=` as the starting choice. Export, Categories, Presets kept as a quiet "Household tools" line on Home because Settings doesn't link them yet -- remove in UI9. Overdue/due-soon attention cards and the payment encouragement line covered by component tests only (fixture had nobody due; no real payment recorded). |
 | UI6 | Add expense and Record payment | done | Branch `feature/ui-redesign-p5-entry-forms`. Preview/shortcut maths in `src/features/ledger/entry-preview.ts`; shared pieces in `EntryFormParts.tsx`, `ui/ChoiceChips.tsx`, `ui/StickyActionBar.tsx`; balances via `useMemberBalances` (missing = no preview, never $0). Verifier: pass. Catch-up shortcut and the success screens covered by tests only (local Alex data is "Due Oct 15", not overdue). Presets/category tiles seen only with browser-faked data (local households have none). Sticky bar above the keyboard depends on the browser resizing the page; check on a real iPhone. |
-| UI7 | Activity page | todo | |
+| UI7 | Activity page | done | Branch `feature/ui-redesign-p6-activity`. `HistoryPage`/`useHistory` replaced by `ActivityPage` + `useActivity` (pages of 50, `.range()`, id tiebreak). Mockup's monthly totals line dropped on purpose (would sum only loaded rows); shows "Showing N". Adjustments reachable via "Only adjustments" in the Filters sheet. Verifier: pass. Load more covered by tests only (fixture has 6 rows). For UI10: in "Everyone", rows of an archived child show no child name (names come from the active-children list); dark-mode selected state of shared `Segmented` is low-contrast. |
 | UI8 | Family and child page | todo | |
 | UI9 | Settings completion | todo | |
 | UI10 | Polish, cleanup, final verification | todo | |
@@ -31,6 +31,10 @@ for the design, `mockups/index.html` for the visual target.
 ## Session log
 
 _Newest entries on top._
+
+### 2026-10-02 — UI7 done
+
+Activity page rebuilt to the mockups and the old History page removed. Parent: Everyone + one chip per child (kept in step with `?child=`), rows name their child in Everyone, Payment plan link when one child is selected, Export link. Type control All/Expenses/Payments/Voided (Voided = any voided row, asked of the server); Filters sheet with category, from/to and "Only adjustments", count badge. Rows grouped by day in the household time zone (Today/Yesterday), tap to expand: entered time, note, void details, and for Parents "Void this entry…" (same RPC and reason validation as before). Voided rows stay, struck through with a Voided chip. Child: own rows only, no chips/export/void, `?child=` ignored. Pages of 50 with Load more; failures on first load or load more show retry; empty and no-match states. No client money sums (monthly totals from the mockup deliberately dropped). typecheck, lint, 713 tests, build clean (orchestrator re-ran). Verifier routed (void control, household-wide read): pass. Browser: Parent and Child on the local Test Family at 375 px and desktop, light and dark (not every combination); one Test Family row ("Concert ticket") voided locally to see the voided state. Next: UI8 (Family and child page).
 
 ### 2026-10-02 — UI6 done
 

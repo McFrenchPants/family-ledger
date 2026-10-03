@@ -88,3 +88,31 @@ export function toHistoryTransactions(rows: readonly HistoryTransactionRow[]): H
     voidedByName: row.voided_at !== null ? (row.voided_by_member?.name ?? UNKNOWN_MEMBER_NAME) : null,
   }));
 }
+
+/**
+ * Row shape for the Activity page (`useActivity`): the history select plus
+ * `member_id` (so a Parent's all-children view can name each row's child),
+ * `note`, and `created_at` for the expanded row's "Entered ..." timestamp.
+ */
+export type ActivityTransactionRow = HistoryTransactionRow & {
+  member_id: string;
+  note: string | null;
+};
+
+/** One Activity row, ready to render. */
+export type ActivityTransaction = HistoryTransaction & {
+  memberId: string;
+  note: string | null;
+  /** When the row was entered (`created_at`, an ISO instant). */
+  createdAt: string;
+};
+
+/** `toHistoryTransactions` plus the Activity-only fields. Pure. */
+export function toActivityTransactions(
+  rows: readonly ActivityTransactionRow[],
+): ActivityTransaction[] {
+  return toHistoryTransactions(rows).map((transaction, index) => {
+    const row = rows[index] as ActivityTransactionRow;
+    return { ...transaction, memberId: row.member_id, note: row.note, createdAt: row.created_at };
+  });
+}
