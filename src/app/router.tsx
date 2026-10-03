@@ -14,12 +14,12 @@ import { AccountPage } from "../pages/AccountPage";
 import { ActivityPage } from "../pages/ActivityPage";
 import { AddExpensePage } from "../pages/AddExpensePage";
 import { ExportPage } from "../pages/ExportPage";
+import { FamilyMemberPage } from "../pages/FamilyMemberPage";
+import { FamilyPage } from "../pages/FamilyPage";
 import { HomePage } from "../pages/HomePage";
 import { ManageCategoriesPage } from "../pages/ManageCategoriesPage";
-import { ManageMembersPage } from "../pages/ManageMembersPage";
 import { ManagePresetsPage } from "../pages/ManagePresetsPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
-import { PaymentPlanPage } from "../pages/PaymentPlanPage";
 import { RecordPaymentPage } from "../pages/RecordPaymentPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { SetPasswordPage } from "../pages/SetPasswordPage";
@@ -78,7 +78,7 @@ export const routes: RouteObject[] = [
         path: "family",
         element: (
           <RequireRole role="parent">
-            <ManageMembersPage />
+            <FamilyPage />
           </RequireRole>
         ),
       },
@@ -86,7 +86,7 @@ export const routes: RouteObject[] = [
         path: "family/:memberId",
         element: (
           <RequireRole role="parent">
-            <PaymentPlanPage />
+            <FamilyMemberPage />
           </RequireRole>
         ),
       },
@@ -129,8 +129,8 @@ export const routes: RouteObject[] = [
       { path: "parent/categories", element: <LegacyRedirect to="/settings/categories" /> },
       { path: "parent/presets", element: <LegacyRedirect to="/settings/presets" /> },
       { path: "child/:memberId/history", element: <LegacyChildHistoryRedirect /> },
-      // A Parent is sent on to /family/:memberId; a Child keeps the old
-      // address (see LegacyPaymentPlanRoute).
+      // A Parent is sent on to /family/:memberId; anyone else to /home
+      // (see LegacyPaymentPlanRoute).
       { path: "child/:memberId/payment-plan", element: <LegacyPaymentPlanRoute /> },
 
       { path: "*", element: <NotFoundPage /> },

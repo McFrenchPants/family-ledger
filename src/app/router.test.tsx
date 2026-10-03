@@ -16,8 +16,10 @@ vi.mock("../pages/AddExpensePage", () => ({ AddExpensePage: () => <p>stub: add e
 vi.mock("../pages/RecordPaymentPage", () => ({
   RecordPaymentPage: () => <p>stub: record payment</p>,
 }));
-vi.mock("../pages/ManageMembersPage", () => ({ ManageMembersPage: () => <p>stub: family</p> }));
-vi.mock("../pages/PaymentPlanPage", () => ({ PaymentPlanPage: () => <p>stub: payment plan</p> }));
+vi.mock("../pages/FamilyPage", () => ({ FamilyPage: () => <p>stub: family</p> }));
+vi.mock("../pages/FamilyMemberPage", () => ({
+  FamilyMemberPage: () => <p>stub: family member</p>,
+}));
 vi.mock("../pages/SettingsPage", () => ({ SettingsPage: () => <p>stub: settings</p> }));
 vi.mock("../pages/AccountPage", () => ({ AccountPage: () => <p>stub: account</p> }));
 vi.mock("../pages/ExportPage", () => ({ ExportPage: () => <p>stub: export</p> }));
@@ -52,7 +54,7 @@ describe("route map: new addresses", () => {
     ["/new/expense", "stub: add expense"],
     ["/new/payment", "stub: record payment"],
     ["/family", "stub: family"],
-    ["/family/c1", "stub: payment plan"],
+    ["/family/c1", "stub: family member"],
     ["/settings", "stub: settings"],
     ["/settings/account", "stub: account"],
     ["/settings/export", "stub: export"],
@@ -154,13 +156,21 @@ describe("route map: old addresses redirect with the query string kept", () => {
     const router = renderAt("/child/c7/payment-plan?x=1", PARENT);
     expect(router.state.location.pathname).toBe("/family/c7");
     expect(router.state.location.search).toBe("?x=1");
-    expect(screen.getByText("stub: payment plan")).toBeInTheDocument();
+    expect(router.state.historyAction).toBe("REPLACE");
+    expect(screen.getByText("stub: family member")).toBeInTheDocument();
   });
 
-  it("/child/:memberId/payment-plan stays put for a child", () => {
+  it("/child/:memberId/payment-plan sends a child to /home", () => {
     const router = renderAt("/child/m1/payment-plan", CHILD);
-    expect(router.state.location.pathname).toBe("/child/m1/payment-plan");
-    expect(screen.getByText("stub: payment plan")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/home");
+    expect(router.state.historyAction).toBe("REPLACE");
+    expect(screen.getByText("stub: home")).toBeInTheDocument();
+  });
+
+  it("/child/:memberId/payment-plan waits while the account is still loading", () => {
+    const router = renderAt("/child/c7/payment-plan", { status: "loading" });
+    expect(router.state.location.pathname).toBe("/child/c7/payment-plan");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading your account…");
   });
 
   it("an old Parent-only address still ends at /home for a child", () => {

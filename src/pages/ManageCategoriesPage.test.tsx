@@ -11,7 +11,7 @@ type QueryResult<T> = { data: T | null; error: { message: string; code?: string 
 
 /**
  * A minimal chainable stand-in for supabase-js's `PostgrestFilterBuilder`,
- * mirroring `ManageMembersPage.test.tsx`'s convention exactly: every
+ * mirroring `FamilyPage.test.tsx`'s convention exactly: every
  * filter/order method returns the same object, and it resolves via `.then`
  * the way the real (thenable) builder does when `await`ed.
  */
