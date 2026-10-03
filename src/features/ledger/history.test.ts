@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toHistoryTransactions } from "./history";
+import { toActivityTransactions, toHistoryTransactions } from "./history";
 
 describe("toHistoryTransactions", () => {
   it("maps an active (non-voided) row, including embedded category and creator name", () => {
@@ -127,5 +127,38 @@ describe("toHistoryTransactions", () => {
 
   it("returns an empty list for an empty result set", () => {
     expect(toHistoryTransactions([])).toEqual([]);
+  });
+});
+
+describe("toActivityTransactions", () => {
+  it("adds the member, note and entry time to the history mapping", () => {
+    const [result] = toActivityTransactions([
+      {
+        id: "tx-5",
+        member_id: "kid-1",
+        description: "Phone bill",
+        note: "October plan share.",
+        amount_cents: 6000,
+        type: "expense",
+        occurred_on: "2026-09-30",
+        created_at: "2026-09-30T16:14:00Z",
+        voided_at: null,
+        void_reason: null,
+        category: { name: "Phone" },
+        created_by_member: { name: "Dana" },
+        voided_by_member: null,
+      },
+    ]);
+
+    expect(result).toMatchObject({
+      id: "tx-5",
+      memberId: "kid-1",
+      note: "October plan share.",
+      createdAt: "2026-09-30T16:14:00Z",
+      amountCents: 6000,
+      categoryName: "Phone",
+      createdByName: "Dana",
+      isVoided: false,
+    });
   });
 });

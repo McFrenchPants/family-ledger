@@ -76,8 +76,7 @@ export function PaymentPlanPage() {
       }
       if (!memberId) {
         // Unreachable via the registered route (which always supplies the
-        // param), but keeps this exhaustive without a non-null assertion --
-        // mirrors HistoryPage's identical fallback.
+        // param), but keeps this exhaustive without a non-null assertion.
         return <p className="text-label text-ink-subtle">No payment plan to show.</p>;
       }
       return <PlanManager memberId={memberId} />;
@@ -242,7 +241,7 @@ type ReplaceState =
  * supersession, not an ordinary create: `create_payment_plan` deactivates the
  * existing active plan and creates the new one atomically. This control makes
  * that explicit in the UI (acceptance criterion 2) with a two-step confirm,
- * mirroring `HistoryPage`'s `VoidControl` state-machine shape: collapsed (the
+ * mirroring `ActivityPage`'s `VoidControl` state-machine shape: collapsed (the
  * plan summary above, plus an "Edit plan" button) -> editing (the form) ->
  * confirming (an explicit "this will replace the current plan" message plus a
  * confirm/cancel pair) -> submitting -> error (the RPC's own message,

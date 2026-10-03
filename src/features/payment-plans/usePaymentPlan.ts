@@ -6,7 +6,7 @@ import { toPaymentPlanRow } from "./payment-plans";
 
 /**
  * Discriminated union so a failed fetch cannot be silently treated as "no
- * plan" -- mirrors `useHouseholdBalances`/`useHistory`'s shape. `plan: null`
+ * plan" -- mirrors `useHouseholdBalances`/`useActivity`'s shape. `plan: null`
  * in the `loaded` state is a normal, non-error outcome (the member has no
  * active plan right now), distinct from `error`.
  */
@@ -26,7 +26,7 @@ export type PaymentPlanState =
  * the initial fetch and any manual `retry`/`refetch` call (the same
  * `Retry` used on an error is reused as `refetch` after a successful
  * create/deactivate RPC, per this project's "refetch, don't hand-roll
- * optimistic state" convention -- see `HistoryPage`'s `onVoided`).
+ * optimistic state" convention -- see `ActivityPage`'s `onVoided`).
  */
 export function usePaymentPlan(memberId: string): PaymentPlanState {
   const [state, setState] = useState<PaymentPlanState>({ status: "loading" });
