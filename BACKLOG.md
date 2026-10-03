@@ -245,3 +245,31 @@ sequential except where noted.
     `docs/proposals/ui-redesign/PROGRESS.md`. Branches `feature/ui-redesign-pN-*`.
     The manual "Remind" button is deliberately out of scope until push is
     confirmed on real devices and Phase 5 exists.
+
+12. **Home improvements and payment-period rule fix** — status: `done on main, awaiting production` — analysis: none (small; owner-chosen 2026-10-03)
+    Tracking: `docs/proposals/home-improvements/PROGRESS.md`. Payments now
+    count toward the period month they fall in (migration
+    `20261003090000`, needs `npx supabase db push --linked` by the owner when
+    promoted); Parent/Child Home tidy. Items 13-15 are follow-ups it found.
+
+13. **Record payment confirmation ignores a backdated payment's month** — status: `idea` — analysis: not yet written
+    After recording a payment, the confirmation always shows the effect on
+    the *current* payment period, even when the payment's date falls in an
+    earlier month (`src/pages/RecordPaymentPage.tsx`, period-effect block
+    around the `payment_period_status` call). Found 2026-10-03 during H1.
+    Display only; the stored payment and balances are correct.
+
+14. **A payment can count toward two plans when a plan is replaced mid-month** — status: `idea` — analysis: not yet written
+    `payment_period_status` stops overlap within one plan, but ignores a
+    plan's `ends_on`. If a child's plan is replaced partway through a month,
+    one payment can count toward the old plan's last period and the new
+    plan's first. Affects old-plan history only; Home uses the current plan.
+    Verifier finding on H1, 2026-10-03.
+
+15. **Plans starting on the 29th-31st get a due date before the period starts** — status: `idea` — analysis: not yet written
+    `ensure_current_payment_period` puts the due date on `due_day` of the
+    period-start month, so a plan starting Jan 31 with due day 15 has a
+    period starting Jan 31 that was "due" Jan 15 and reads overdue
+    immediately. Pre-existing; spotted during H1, 2026-10-03. Also worth a
+    test: calling `payment_period_status` for another household's period
+    returns zero rows (currently covered by reasoning, not by a test).
