@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "e50a83e900c6b59046964e821923b54b7df8fc8c",
+  "approved_at": "2026-10-03T23:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "standing authorization: CLAUDE.md release policy (owner, 2026-10-03)",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-03T23:10:00Z",
+  "consumed_by": "orchestrator",
+  "notes": "Promotes backlog 18: Parents can add a category from the Add expense form. Front-end only; no migrations, no functions. typecheck, lint, test, test:db green."
+}

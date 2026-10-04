@@ -297,3 +297,15 @@ sequential except where noted.
     with that item already expanded (and scrolled into view). Front-end only,
     expected; check that the Activity page can find an item that is older than
     what it first loads, and that a Child only ever reaches their own items.
+
+18. **Add a new category while adding an expense (Parents only)** — status: `ready` — analysis: none (small; owner-requested 2026-10-03)
+    Requested by the owner 2026-10-03: on the Add/Edit Expense form the category
+    picker only lists existing categories; new ones can only be made on the
+    Categories settings page. Add an "Add new category" option to the picker
+    that creates the category and selects it without leaving the form.
+    Owner decision: **Parents only** — Children never see the option and keep
+    choosing from the existing list. The existing Parent-only RLS on
+    `categories` already enforces this, so expect no migration; confirm that a
+    Child's direct write to `categories` is still refused. A new category counts
+    toward Everyday until a Parent marks it as tracked (`PROJECT_REQUIREMENTS.md`
+    §6.5/§8). Front-end only, expected.
