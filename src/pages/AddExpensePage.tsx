@@ -8,7 +8,10 @@ import { ChoiceChips } from "../components/ui/ChoiceChips";
 import { Icon } from "../components/ui/Icon";
 import { LoadError } from "../components/ui/LoadError";
 import { StickyActionBar } from "../components/ui/StickyActionBar";
-import { buildExpenseMemberSelector, validateExpenseForm } from "../features/ledger/add-expense";
+import {
+  buildExpenseMemberSelector,
+  validateExpenseForm,
+} from "../features/ledger/add-expense";
 import type { ExpenseFormErrors } from "../features/ledger/add-expense";
 import {
   AmountEntry,
@@ -27,6 +30,8 @@ import {
   typedAmountCents,
 } from "../features/ledger/entry-preview";
 import type { EntryPerson } from "../features/ledger/entry-preview";
+import { NewCategoryInline } from "../features/ledger/NewCategoryInline";
+import type { CategoryOption } from "../features/ledger/add-expense";
 import { useAddExpenseFormData } from "../features/ledger/useAddExpenseFormData";
 import { useExpensePresets } from "../features/ledger/useExpensePresets";
 import type { ExpensePreset } from "../features/ledger/useExpensePresets";
@@ -75,8 +80,8 @@ export function AddExpensePage() {
     case "no-membership":
       return (
         <p role="alert" className="text-label text-danger">
-          Your account is not linked to a household yet. Ask a parent in your household to invite
-          you.
+          Your account is not linked to a household yet. Ask a parent in your household to
+          invite you.
         </p>
       );
 
@@ -114,6 +119,8 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
   const [memberId, setMemberId] = useState("");
   const [amountInput, setAmountInput] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  // Categories a Parent created from this form, shown without refetching.
+  const [addedCategories, setAddedCategories] = useState<readonly CategoryOption[]>([]);
   const [description, setDescription] = useState("");
   const [note, setNote] = useState("");
   const [occurredOn, setOccurredOn] = useState("");
@@ -196,8 +203,15 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
     : null;
   const balanceCents = chosen ? (balances?.get(chosen.id) ?? null) : null;
   const previewLine = expensePreviewLine(balanceCents, amountCents, person);
+  const categories = [
+    ...formData.categories,
+    ...addedCategories.filter(
+      (added) => !formData.categories.some((c) => c.id === added.id),
+    ),
+  ];
+  const isParent = membership.role === "parent";
   const categoryName = (id: string | null) =>
-    formData.categories.find((category) => category.id === id)?.name ?? null;
+    categories.find((category) => category.id === id)?.name ?? null;
 
   // Prefills the form's amount/category/description from a preset (C4). Never
   // submits -- the Parent or Child can still change any field afterward, the
@@ -214,7 +228,12 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
     event.preventDefault();
     if (submitState.status === "submitting") return;
 
-    const result = validateExpenseForm({ memberId, amountInput, description, occurredOn });
+    const result = validateExpenseForm({
+      memberId,
+      amountInput,
+      description,
+      occurredOn,
+    });
     if (!result.ok) {
       setFieldErrors(result.errors);
       return;
@@ -253,7 +272,9 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
   }
 
   const submitting = submitState.status === "submitting";
-  const errorMessages = FIELD_ORDER.flatMap((key) => (fieldErrors[key] ? [fieldErrors[key]] : []));
+  const errorMessages = FIELD_ORDER.flatMap((key) =>
+    fieldErrors[key] ? [fieldErrors[key]] : [],
+  );
 
   return (
     <section
@@ -275,8 +296,12 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
                 onClick={() => handlePresetClick(preset)}
                 className="inline-flex min-h-touch shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border-strong bg-surface px-3.5 text-[0.9375rem] font-medium text-ink transition-colors hover:bg-sunken motion-reduce:transition-none"
               >
-                <Icon name={categoryIcon(categoryName(preset.categoryId) ?? preset.label)} size={18} />
-                {preset.label} <span className="tabular-nums">{formatCents(preset.amountCents)}</span>
+                <Icon
+                  name={categoryIcon(categoryName(preset.categoryId) ?? preset.label)}
+                  size={18}
+                />
+                {preset.label}{" "}
+                <span className="tabular-nums">{formatCents(preset.amountCents)}</span>
               </button>
             ))}
           </div>
@@ -328,29 +353,41 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
           <FieldError id="expense-member-error">{fieldErrors.memberId}</FieldError>
         </div>
 
-        {formData.categories.length > 0 && (
+        {(categories.length > 0 || isParent) && (
           <div className="flex flex-col gap-1.5">
             <GroupLabel id="expense-category-label">
               Category <span className="font-normal text-subtle">(optional)</span>
             </GroupLabel>
-            <ChoiceChips
-              label="Category (optional)"
-              labelledBy="expense-category-label"
-              variant="tile"
-              allowEmpty
-              value={categoryId}
-              onValueChange={setCategoryId}
-              options={formData.categories.map((category) => ({
-                value: category.id,
-                label: category.name,
-                content: (
-                  <>
-                    <Icon name={categoryIcon(category.name)} size={22} />
-                    <span className="max-w-full truncate">{category.name}</span>
-                  </>
-                ),
-              }))}
-            />
+            {categories.length > 0 && (
+              <ChoiceChips
+                label="Category (optional)"
+                labelledBy="expense-category-label"
+                variant="tile"
+                allowEmpty
+                value={categoryId}
+                onValueChange={setCategoryId}
+                options={categories.map((category) => ({
+                  value: category.id,
+                  label: category.name,
+                  content: (
+                    <>
+                      <Icon name={categoryIcon(category.name)} size={22} />
+                      <span className="max-w-full truncate">{category.name}</span>
+                    </>
+                  ),
+                }))}
+              />
+            )}
+            {isParent && (
+              <NewCategoryInline
+                householdId={membership.householdId}
+                existing={categories}
+                onCreated={(category, isNew) => {
+                  if (isNew) setAddedCategories((current) => [...current, category]);
+                  setCategoryId(category.id);
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -372,7 +409,12 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
         />
 
         <OptionalDetails label="Add a note (optional)">
-          <TextInput id="expense-note" label="Note (optional)" value={note} onChange={setNote} />
+          <TextInput
+            id="expense-note"
+            label="Note (optional)"
+            value={note}
+            onChange={setNote}
+          />
         </OptionalDetails>
 
         {submitState.status === "error" && (
@@ -394,7 +436,10 @@ function AddExpenseForm({ membership }: { membership: Membership }) {
             {submitting ? "Saving…" : addExpenseButtonLabel(amountCents, person)}
           </Button>
           {previewLine && (
-            <p data-testid="expense-balance-preview" className="mt-1.5 text-center text-label text-subtle tabular-nums">
+            <p
+              data-testid="expense-balance-preview"
+              className="mt-1.5 text-center text-label text-subtle tabular-nums"
+            >
               {previewLine}
             </p>
           )}
