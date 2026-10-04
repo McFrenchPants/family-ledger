@@ -545,6 +545,10 @@ function RecentActivityCard({
   );
 }
 
+/** A Home recent-activity row: the whole row opens that entry on the Activity page. */
+const ROW_LINK_CLASS =
+  "-mx-2 flex min-h-[60px] items-center gap-3 rounded-control px-2 py-2.5 hover:bg-sunken";
+
 function ActivityRow({
   transaction,
   childName,
@@ -556,24 +560,27 @@ function ActivityRow({
   const subline = activitySubline(transaction, look.label, childName);
 
   return (
-    <li
-      data-voided={transaction.isVoided ? "true" : undefined}
-      className="flex min-h-[60px] items-center gap-3 border-t border-border py-2.5 first:border-t-0"
-    >
-      <span className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-control", look.box)}>
-        <Icon name={look.icon} />
-      </span>
-      <span className="min-w-0 grow">
-        <span className="block truncate font-semibold">{transaction.description}</span>
-        <span className="block text-label text-subtle">{subline}</span>
-      </span>
-      <AmountText
-        cents={transaction.amountCents}
-        kind={transaction.amountCents > 0 ? "expense" : "payment"}
-        tone={transaction.isVoided ? "inherit" : transaction.type === "payment" ? "ok" : "ink"}
-        srContext={transaction.isVoided ? "voided" : undefined}
-        className={cx(transaction.isVoided && "text-subtle line-through")}
-      />
+    <li data-voided={transaction.isVoided ? "true" : undefined} className="border-t border-border first:border-t-0">
+      <Link
+        to={`/activity?open=${encodeURIComponent(transaction.id)}`}
+        className={ROW_LINK_CLASS}
+      >
+        <span className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-control", look.box)}>
+          <Icon name={look.icon} />
+        </span>
+        <span className="min-w-0 grow">
+          <span className="block truncate font-semibold">{transaction.description}</span>
+          <span className="block text-label text-subtle">{subline}</span>
+        </span>
+        <AmountText
+          cents={transaction.amountCents}
+          kind={transaction.amountCents > 0 ? "expense" : "payment"}
+          tone={transaction.isVoided ? "inherit" : transaction.type === "payment" ? "ok" : "ink"}
+          srContext={transaction.isVoided ? "voided" : undefined}
+          className={cx(transaction.isVoided && "text-subtle line-through")}
+        />
+        <Icon name="chev" className="text-subtle" />
+      </Link>
     </li>
   );
 }
