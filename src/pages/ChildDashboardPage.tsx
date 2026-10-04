@@ -21,6 +21,7 @@ import {
   type PlanView,
 } from "../features/home/child-home";
 import { BalanceOwed } from "../features/ledger/BalanceBreakdownList";
+import { ChildSuggestionsCard } from "../features/ledger/SuggestionCards";
 import {
   breakdownLines,
   type BalanceInfo,
@@ -134,6 +135,16 @@ function ChildHome({
         <Icon name="plus" />
         Add an expense
       </Link>
+
+      <Link
+        to="/new/suggestion"
+        className="inline-flex min-h-touch-lg w-full items-center justify-center gap-2 rounded-control border border-border-strong bg-surface px-5 text-body font-semibold text-ink"
+      >
+        <Icon name="check" />
+        Tell a parent about a payment
+      </Link>
+
+      <ChildSuggestionsCard memberId={memberId} balances={balanceInfos} />
 
       <RecentActivityCard activity={activity} />
 

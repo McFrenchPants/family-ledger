@@ -141,8 +141,9 @@ function Export({ householdId }: { householdId: string }) {
           <>
             <p className="text-label text-muted">
               A complete JSON snapshot of this household&apos;s settings, members, ledger
-              transactions, payment plans and periods, categories, and audit history, suitable
-              for backup or re-import, not for reading.
+              transactions, payment plans and periods, categories, balances (and how payments were
+              split and moved between them), payment suggestions, and audit history, suitable for
+              backup or re-import, not for reading.
             </p>
             <Button
               variant="primary"

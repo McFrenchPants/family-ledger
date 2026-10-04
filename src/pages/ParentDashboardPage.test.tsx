@@ -18,6 +18,11 @@ import type { HouseholdPaymentProgressState } from "../features/payment-plans/us
 
 vi.mock("../lib/supabase", () => ({ supabase: {} }));
 
+// Payment suggestions have their own tests (SuggestionCards.test.tsx); here none are waiting.
+vi.mock("../features/ledger/usePaymentSuggestions", () => ({
+  usePendingPaymentSuggestions: () => ({ status: "loaded", suggestions: [], refetch: () => undefined }),
+}));
+
 let balances: HouseholdBalancesState;
 let progress: HouseholdPaymentProgressState;
 let activity: HouseholdRecentActivityState;

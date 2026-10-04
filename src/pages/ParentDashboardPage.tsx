@@ -22,6 +22,7 @@ import {
   type AttentionItem,
 } from "../features/home/parent-home";
 import { BalanceBreakdownList } from "../features/ledger/BalanceBreakdownList";
+import { ParentSuggestionsCard } from "../features/ledger/SuggestionCards";
 import {
   balanceLabeler,
   breakdownLines,
@@ -100,6 +101,7 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
   const today: CalendarDate | null = timezone ? todayInZone(timezone) : null;
 
   const children = balances.status === "loaded" ? balances.children : null;
+  const childNames = new Map((children ?? []).map((child) => [child.memberId, child.name]));
   // The progress hook answers "loaded, empty" for the empty pre-roster id
   // list, and keeps that answer for one render after the roster arrives;
   // only a map covering every child counts, so nobody flashes as "No plan".
@@ -147,7 +149,12 @@ function ParentHome({ householdId, name }: { householdId: string; name: string }
           </div>
         )}
 
-        <div className="empty:hidden min-[900px]:[grid-area:attention]">
+        <div className="flex flex-col gap-4 empty:hidden min-[900px]:[grid-area:attention]">
+          <ParentSuggestionsCard
+            householdId={householdId}
+            names={childNames}
+            balances={balanceInfos}
+          />
           <NeedsAttention
             hasChildren={children !== null && children.length > 0}
             attention={attention}

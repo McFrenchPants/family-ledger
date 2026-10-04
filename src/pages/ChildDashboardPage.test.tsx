@@ -21,6 +21,11 @@ import type {
 
 vi.mock("../lib/supabase", () => ({ supabase: {} }));
 
+// Payment suggestions have their own tests (SuggestionCards.test.tsx); here none are waiting.
+vi.mock("../features/ledger/usePaymentSuggestions", () => ({
+  useOwnPaymentSuggestions: () => ({ status: "loaded", suggestions: [], refetch: () => undefined }),
+}));
+
 let balance: OwnBalanceState;
 let progress: ChildPaymentProgressState;
 let activity: RecentActivityState;
@@ -397,9 +402,14 @@ describe("ChildDashboardPage", () => {
     window.localStorage.setItem(SEEN_ACTIVITY_KEY_PREFIX + MEMBER, JSON.stringify(["e1"]));
     renderHome();
 
-    const allowedHrefs = new Set(["/new/expense", "/activity", "/settings"]);
+    const allowedHrefs = new Set(["/new/expense", "/new/suggestion", "/activity", "/settings"]);
     for (const link of screen.getAllByRole("link")) {
       expect(allowedHrefs).toContain(link.getAttribute("href"));
+      // The one deliberate exception: telling a parent about a payment is a note, not a payment.
+      if (link.getAttribute("href") === "/new/suggestion") {
+        expect(link).toHaveAccessibleName("Tell a parent about a payment");
+        continue;
+      }
       expect(link).not.toHaveAccessibleName(/pay|void|adjust|record|member|family/i);
     }
     for (const button of screen.queryAllByRole("button")) {
