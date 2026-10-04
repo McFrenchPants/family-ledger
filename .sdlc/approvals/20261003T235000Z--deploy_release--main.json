@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "b84664a3941e2a59f011b6180cec660b2490a761",
+  "approved_at": "2026-10-03T23:50:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "standing authorization: CLAUDE.md release policy (owner, 2026-10-03)",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-03T23:55:00Z",
+  "consumed_by": "orchestrator",
+  "notes": "Promotes backlog 17: Home recent-activity rows open on the Activity page. Front-end only; no migrations, no functions. typecheck, lint, test green; test:db not re-run (no database change)."
+}
