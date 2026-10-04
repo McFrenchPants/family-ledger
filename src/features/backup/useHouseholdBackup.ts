@@ -3,12 +3,17 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import type {
   HouseholdBackupAuditLogRow,
+  HouseholdBackupBalanceTransferRow,
   HouseholdBackupCategoryRow,
   HouseholdBackupHouseholdRow,
   HouseholdBackupMemberRow,
+  HouseholdBackupPaymentAllocationRow,
   HouseholdBackupPaymentPeriodRow,
   HouseholdBackupPaymentPlanRow,
+  HouseholdBackupPaymentSuggestionPartRow,
+  HouseholdBackupPaymentSuggestionRow,
   HouseholdBackupSnapshot,
+  HouseholdBackupTrackedBalanceRow,
   HouseholdBackupTransactionRow,
 } from "./household-backup";
 import { toHouseholdBackupSnapshot } from "./household-backup";
@@ -26,7 +31,7 @@ export type HouseholdBackupState =
  * Fetches every table S6.2's JSON snapshot export needs for one household,
  * in parallel, mirroring `useLedgerExport`'s `Promise.all` pattern.
  *
- * All seven queries are `.eq("household_id", householdId)` (or, for
+ * All twelve queries are `.eq("household_id", householdId)` (or, for
  * `households` itself, `.eq("id", householdId)`) against the RLS-scoped
  * `supabase` client from `lib/supabase.ts` -- no service-role client, no Edge
  * Function, no writes. That `.eq` shapes each query; it is not what makes it
@@ -63,6 +68,11 @@ export function useHouseholdBackup(householdId: string): HouseholdBackupState {
           paymentPlansResult,
           paymentPeriodsResult,
           categoriesResult,
+          trackedBalancesResult,
+          paymentAllocationsResult,
+          balanceTransfersResult,
+          paymentSuggestionsResult,
+          paymentSuggestionPartsResult,
           auditLogResult,
         ] = await Promise.all([
           supabase
@@ -87,7 +97,7 @@ export function useHouseholdBackup(householdId: string): HouseholdBackupState {
             .from("payment_plans")
             .select(
               "id, member_id, minimum_cents, frequency, due_day, starts_on, ends_on, " +
-                "active, created_by, created_at, updated_at",
+                "active, created_by, created_at, updated_at, tracked_balance_id",
             )
             .eq("household_id", householdId)
             .returns<HouseholdBackupPaymentPlanRow[]>(),
@@ -101,9 +111,44 @@ export function useHouseholdBackup(householdId: string): HouseholdBackupState {
             .returns<HouseholdBackupPaymentPeriodRow[]>(),
           supabase
             .from("categories")
-            .select("id, name, sort_order, active")
+            .select("id, name, sort_order, active, tracked_balance_id")
             .eq("household_id", householdId)
             .returns<HouseholdBackupCategoryRow[]>(),
+          supabase
+            .from("tracked_balances")
+            .select("id, name, sort_order, active, is_everyday, created_at")
+            .eq("household_id", householdId)
+            .returns<HouseholdBackupTrackedBalanceRow[]>(),
+          supabase
+            .from("payment_allocations")
+            .select(
+              "id, member_id, transaction_id, transaction_type, tracked_balance_id, " +
+                "amount_cents, created_at",
+            )
+            .eq("household_id", householdId)
+            .returns<HouseholdBackupPaymentAllocationRow[]>(),
+          supabase
+            .from("balance_transfers")
+            .select(
+              "id, member_id, from_tracked_balance_id, to_tracked_balance_id, amount_cents, " +
+                "occurred_on, note, created_by, created_at, voided_at, voided_by, void_reason",
+            )
+            .eq("household_id", householdId)
+            .returns<HouseholdBackupBalanceTransferRow[]>(),
+          supabase
+            .from("payment_suggestions")
+            .select(
+              "id, member_id, amount_cents, suggested_on, note, status, created_by, created_at, " +
+                "resolved_at, resolved_by, resolution_note, converted_transaction_id, " +
+                "converted_transaction_type",
+            )
+            .eq("household_id", householdId)
+            .returns<HouseholdBackupPaymentSuggestionRow[]>(),
+          supabase
+            .from("payment_suggestion_parts")
+            .select("id, member_id, suggestion_id, tracked_balance_id, amount_cents, created_at")
+            .eq("household_id", householdId)
+            .returns<HouseholdBackupPaymentSuggestionPartRow[]>(),
           supabase
             .from("audit_log")
             .select("id, actor_user_id, entity_type, entity_id, action, old_values, new_values, created_at")
@@ -122,6 +167,11 @@ export function useHouseholdBackup(householdId: string): HouseholdBackupState {
           paymentPlansResult,
           paymentPeriodsResult,
           categoriesResult,
+          trackedBalancesResult,
+          paymentAllocationsResult,
+          balanceTransfersResult,
+          paymentSuggestionsResult,
+          paymentSuggestionPartsResult,
           auditLogResult,
         ];
         const firstError = results.find((result) => result.error)?.error;
@@ -151,6 +201,11 @@ export function useHouseholdBackup(householdId: string): HouseholdBackupState {
             paymentPlans: paymentPlansResult.data ?? [],
             paymentPeriods: paymentPeriodsResult.data ?? [],
             categories: categoriesResult.data ?? [],
+            trackedBalances: trackedBalancesResult.data ?? [],
+            paymentAllocations: paymentAllocationsResult.data ?? [],
+            balanceTransfers: balanceTransfersResult.data ?? [],
+            paymentSuggestions: paymentSuggestionsResult.data ?? [],
+            paymentSuggestionParts: paymentSuggestionPartsResult.data ?? [],
             auditLog: auditLogResult.data ?? [],
           },
           new Date().toISOString(),

@@ -11,6 +11,7 @@ import {
 } from "./family-view";
 
 const progress = (over: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress => ({
+  balanceId: "everyday",
   periodStatus: "partially_paid",
   minimumCents: 4000,
   paidCents: 2500,
@@ -64,6 +65,7 @@ describe("planProgressView", () => {
 describe("planTermsLine", () => {
   const plan = {
     id: "p",
+    balanceId: "everyday",
     minimumCents: 4000,
     dueDay: 15,
     startsOn: "2026-06-15",

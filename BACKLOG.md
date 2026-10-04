@@ -278,3 +278,22 @@ sequential except where noted.
     immediately. Pre-existing; spotted during H1, 2026-10-03. Also worth a
     test: calling `payment_period_status` for another household's period
     returns zero rows (currently covered by reasoning, not by a test).
+
+16. **Separate balances by category, with payment splitting** — status: `in progress` (design signed off 2026-10-03) — analysis: analysis/16-category-balances.md
+    Requested by the owner 2026-10-03: keep a child's debts separate (e.g. a
+    car with a $300/month minimum and $1,000 of college) and choose how each
+    payment is divided between them. Owner decisions: allocate to category
+    balances (not individual expenses), per-balance monthly minimums,
+    suggested split the Parent can adjust, Child may suggest a split for a
+    Parent to confirm. Reverses `PROJECT_REQUIREMENTS.md` §3's "complex debt
+    allocation" non-goal in a limited form. Touches the money core: design
+    spec first. Branch `feature/category-balances`; spec at
+    `docs/proposals/category-balances/DESIGN_SPEC.md`.
+
+17. **Tap a Recent activity item on Home to open it on the Activity page** — status: `ready` — analysis: none (small; owner-requested 2026-10-03)
+    Requested by the owner 2026-10-03: the Recent activity list on Home (the
+    Parent and Child versions) is read-only. Each item should be tappable and
+    take the person straight to the Activity page (`src/pages/ActivityPage.tsx`)
+    with that item already expanded (and scrolled into view). Front-end only,
+    expected; check that the Activity page can find an item that is older than
+    what it first loads, and that a Child only ever reaches their own items.

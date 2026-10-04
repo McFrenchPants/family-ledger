@@ -19,7 +19,13 @@
  * module has no row type for them.
  */
 
-export const HOUSEHOLD_BACKUP_SCHEMA_VERSION = 1;
+/**
+ * Version 2 adds category balances: tracked balances, payment allocation
+ * parts, balance transfers, payment suggestions and their parts, plus
+ * `tracked_balance_id` on payment plans and categories (null = Everyday).
+ * A version 1 file simply lacks those keys.
+ */
+export const HOUSEHOLD_BACKUP_SCHEMA_VERSION = 2;
 
 export type HouseholdBackupHouseholdRow = {
   id: string;
@@ -65,6 +71,8 @@ export type HouseholdBackupPaymentPlanRow = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  /** The balance this plan counts payments toward; null reads as Everyday. */
+  tracked_balance_id: string | null;
 };
 
 export type HouseholdBackupPaymentPeriodRow = {
@@ -85,6 +93,67 @@ export type HouseholdBackupCategoryRow = {
   name: string;
   sort_order: number | null;
   active: boolean;
+  /** The balance expenses in this category count toward; null reads as Everyday. */
+  tracked_balance_id: string | null;
+};
+
+export type HouseholdBackupTrackedBalanceRow = {
+  id: string;
+  name: string;
+  sort_order: number | null;
+  active: boolean;
+  is_everyday: boolean;
+  created_at: string;
+};
+
+export type HouseholdBackupPaymentAllocationRow = {
+  id: string;
+  member_id: string;
+  transaction_id: string;
+  transaction_type: string;
+  tracked_balance_id: string;
+  amount_cents: number;
+  created_at: string;
+};
+
+export type HouseholdBackupBalanceTransferRow = {
+  id: string;
+  member_id: string;
+  from_tracked_balance_id: string;
+  to_tracked_balance_id: string;
+  amount_cents: number;
+  occurred_on: string;
+  note: string | null;
+  created_by: string;
+  created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+};
+
+export type HouseholdBackupPaymentSuggestionRow = {
+  id: string;
+  member_id: string;
+  amount_cents: number;
+  suggested_on: string;
+  note: string | null;
+  status: string;
+  created_by: string;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_note: string | null;
+  converted_transaction_id: string | null;
+  converted_transaction_type: string | null;
+};
+
+export type HouseholdBackupPaymentSuggestionPartRow = {
+  id: string;
+  member_id: string;
+  suggestion_id: string;
+  tracked_balance_id: string;
+  amount_cents: number;
+  created_at: string;
 };
 
 export type HouseholdBackupAuditLogRow = {
@@ -106,6 +175,11 @@ export type HouseholdBackupInput = {
   paymentPlans: readonly HouseholdBackupPaymentPlanRow[];
   paymentPeriods: readonly HouseholdBackupPaymentPeriodRow[];
   categories: readonly HouseholdBackupCategoryRow[];
+  trackedBalances: readonly HouseholdBackupTrackedBalanceRow[];
+  paymentAllocations: readonly HouseholdBackupPaymentAllocationRow[];
+  balanceTransfers: readonly HouseholdBackupBalanceTransferRow[];
+  paymentSuggestions: readonly HouseholdBackupPaymentSuggestionRow[];
+  paymentSuggestionParts: readonly HouseholdBackupPaymentSuggestionPartRow[];
   auditLog: readonly HouseholdBackupAuditLogRow[];
 };
 
@@ -119,6 +193,11 @@ export type HouseholdBackupSnapshot = {
   paymentPlans: readonly HouseholdBackupPaymentPlanRow[];
   paymentPeriods: readonly HouseholdBackupPaymentPeriodRow[];
   categories: readonly HouseholdBackupCategoryRow[];
+  trackedBalances: readonly HouseholdBackupTrackedBalanceRow[];
+  paymentAllocations: readonly HouseholdBackupPaymentAllocationRow[];
+  balanceTransfers: readonly HouseholdBackupBalanceTransferRow[];
+  paymentSuggestions: readonly HouseholdBackupPaymentSuggestionRow[];
+  paymentSuggestionParts: readonly HouseholdBackupPaymentSuggestionPartRow[];
   auditLog: readonly HouseholdBackupAuditLogRow[];
 };
 
@@ -143,6 +222,11 @@ export function toHouseholdBackupSnapshot(
     paymentPlans: input.paymentPlans,
     paymentPeriods: input.paymentPeriods,
     categories: input.categories,
+    trackedBalances: input.trackedBalances,
+    paymentAllocations: input.paymentAllocations,
+    balanceTransfers: input.balanceTransfers,
+    paymentSuggestions: input.paymentSuggestions,
+    paymentSuggestionParts: input.paymentSuggestionParts,
     auditLog: input.auditLog,
   };
 }

@@ -49,7 +49,7 @@ The initial product is not intended to provide:
 - Public registration.
 - Multiple unrelated households in the same UI.
 - A native iOS or Android application.
-- Complex debt allocation such as assigning a repayment to specific individual expenses.
+- Assigning a repayment to specific individual expenses. Repayment allocation is deliberately limited to category-level balances (section 6.5); it never goes down to a single expense.
 
 These can be reconsidered later if a real need develops.
 
@@ -194,6 +194,20 @@ A positive balance means the child owes the parents money.
 
 The UI should normally clamp display language around zero rather than presenting confusing negative debt. If overpayment is permitted, the system may show a credit balance explicitly.
 
+The balance is always derived this way, never stored. Section 6.5 only adds a breakdown of the same number; the total never changes because of it.
+
+### 6.5 Tracked balances
+
+A child's balance is split into **tracked balances** (for example `Car` or `College`) plus one **Everyday** balance for everything else. Everyday always exists and cannot be archived.
+
+- A Parent chooses which categories feed a tracked balance (section 8). Several categories may feed the same balance. An expense lands in exactly one balance, determined by its category; expenses with no category, or in a category not tracked separately, land in Everyday. An expense is never moved by editing it.
+- Every payment, and every balance-decreasing adjustment, is stored once as today plus its **allocation parts**: one or more positive amounts, each on one balance, that add up exactly to the payment. This is enforced by the database, not only the screen. Parts are immutable, and voiding a payment voids its parts with it.
+- A balance is the sum of its non-voided expenses minus its non-voided parts, adjusted by transfers. A child's total is the sum of all their balances and equals the single-number balance in section 6.4. A part may be larger than what that balance owes only if the Parent confirms it; the balance then shows as a credit.
+- A Parent can **move money** between two of a child's balances (for example after marking a category as tracked, when earlier payments sit on Everyday). This is a transfer: the child's total does not change and it is audited. The database can void a transfer; the app has no screen for that yet. It is not a payment, and the child cannot do it.
+- Existing data migrated to Everyday. Marking a category as tracked later moves its expenses into the new balance automatically, because an expense's balance is derived from its category; past payments stay where they were, which move money can correct.
+- A balance with nothing owed and no plan is hidden from the child's view, not deleted.
+- Money is integer cents throughout, including every split.
+
 ---
 
 ## 7. Payment Plans
@@ -253,10 +267,13 @@ For the initial version, payments do not need to be allocated to specific expens
 
 A payment reduces the child's overall balance and counts toward the applicable payment period according to deterministic business rules.
 
+Plans are per tracked balance (section 6.5): a child may have one active plan on each balance, and the plan a child had before tracked balances became the Everyday plan. A plan's period counts only the payment parts allocated to that plan's balance; everything else below applies to each plan on its own.
+
 Adopted rule:
 
-- A non-voided payment counts toward the period whose month it falls in: on or after that period's start date and before the next period's start date (each period starts on the plan's start date plus a whole number of months). Consecutive periods therefore cover every day with no gap or overlap, so a payment on the first day of a period, or a late payment after the due date, still counts toward its own month. Expenses and adjustments never count.
+- A non-voided payment part, allocated to the plan's balance, counts toward the period whose month it falls in: on or after that period's start date and before the next period's start date (each period starts on the plan's start date plus a whole number of months). Consecutive periods therefore cover every day with no gap or overlap, so a payment on the first day of a period, or a late payment after the due date, still counts toward its own month. Expenses and adjustments never count.
 - A period's due date is the first date on or after the period's start date that falls on the plan's due day — in the same month if the due day is not earlier than the start day, otherwise in the following month — and is always before the next period starts (in the rare month-end case where that date would be the next period's start date, it is the day before). A period is therefore never due before it begins, so a newly created plan is never overdue on day one.
+- A payment recorded without a split sends the whole amount to Everyday, so a household that does not use tracked balances sees no change.
 - Parent adjustments may override/waive a period when necessary.
 
 The exact rule must be documented in code and covered by automated tests.
@@ -283,6 +300,8 @@ Parents should be able to maintain configurable quick-add presets, for example:
 - `+$10 Food`
 
 A quick preset should prefill the form but still allow the amount or description to be changed before submission.
+
+A Parent may mark a category as counting toward a tracked balance (section 6.5), for example Auto and Gas toward `Car`. Categories left unmarked count toward Everyday. Only Parents can change this, and the screen explains that changing it moves that category's existing expenses between balances (the child's total does not change).
 
 ---
 
@@ -393,6 +412,10 @@ Phone                   +$60.00
 
 A child should not be shown controls that imply they can record a repayment themselves.
 
+When the household has tracked balances (section 6.5), the amount owed is shown with a breakdown by balance, each with its own plan progress; a child with only Everyday sees the single total as before.
+
+A child can instead tell a parent about a payment (`Tell a parent about a payment`): an amount, a date (the household's today by default), an optional note, and optionally how it should be split between balances (all Everyday unless they say otherwise; the split is not offered when there is only Everyday). The screen says plainly that this does not change what they owe until a parent confirms. This is a **payment suggestion**, never a ledger transaction. Below the action the child sees their own suggestions with the outcome in plain words (waiting for a parent, recorded, dismissed with the parent's reason if given, or withdrawn) and a `Withdraw` button on waiting ones. A suggestion cannot be edited after it is sent.
+
 In the current app the Child Home (`/home`) also has an `Add an expense` button, and the same action is the `+` in the navigation (section 11.7).
 
 ### 11.3 Parent home screen
@@ -418,6 +441,8 @@ All caught up
 
 [ + Expense ]    [ Record Payment ]
 ```
+
+Pending payment suggestions (section 11.2) appear as a `Payments to confirm` list above `Needs attention`, hidden when there are none. Each shows the child, amount, date, note and proposed split, with `Record this payment` (opens Record payment pre-filled from the suggestion) and `Dismiss` (with an optional reason the child sees). Suggestions change no balance.
 
 Each child card should show:
 
@@ -466,6 +491,8 @@ The confirmation screen should show both:
 
 - Resulting balance.
 - Effect on the current minimum payment period.
+
+When the household has tracked balances (section 6.5), the form also has a `Where does this go?` split, pre-filled and editable: first each plan's remaining minimum for its current period (earliest due date first), then the remainder to the balance last used for that child, or Everyday. Saving is blocked until the parts add up exactly to the amount; a part larger than its balance owes needs an explicit confirmation. The confirmation shows the effect on each balance and each affected plan. Opened from a child's payment suggestion, the form is pre-filled from it (child, amount, date, note, split), the Parent may change anything, and recording the payment closes the suggestion. A `Move money` mode on the same screen moves an amount from one of the child's balances to another (section 6.5).
 
 ### 11.6 History
 
@@ -543,7 +570,9 @@ Parents must be able to export household data.
 Initial export formats:
 
 - CSV for ledger transactions.
-- JSON for complete application backup/export.
+- JSON for complete application backup/export, including tracked balances, payment allocation parts, balance transfers, payment suggestions and their parts, and which balance each category and plan points to (backup format version 2). Amounts stay integer cents.
+
+The CSV lists ledger transactions only (one row per transaction, amounts as before); it does not carry the per-balance breakdown, which is in the JSON backup.
 
 The JSON export should be sufficient to reconstruct the important business data if the hosted database were lost.
 

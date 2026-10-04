@@ -24,6 +24,7 @@ import { RecordPaymentPage } from "../pages/RecordPaymentPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { SetPasswordPage } from "../pages/SetPasswordPage";
 import { SignInPage } from "../pages/SignInPage";
+import { SuggestPaymentPage } from "../pages/SuggestPaymentPage";
 
 /**
  * Exported (not just the router) so tests can mount the real route table in
@@ -71,6 +72,14 @@ export const routes: RouteObject[] = [
         element: (
           <RequireRole role="parent">
             <RecordPaymentPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: "new/suggestion",
+        element: (
+          <RequireRole role="child">
+            <SuggestPaymentPage />
           </RequireRole>
         ),
       },

@@ -53,7 +53,14 @@ function renderPage(path = "/new/payment", membership: MembershipState = parent)
 type PeriodRow = { status: string; minimum_cents: number; paid_cents: number; remaining_cents: number };
 
 /** Active plans by child, and each period's status (keyed by period id). */
-let plans: { id: string; member_id: string; starts_on?: string }[] = [];
+let plans: { id: string; member_id: string; starts_on?: string; tracked_balance_id?: string }[] = [];
+/** Active tracked balances; Everyday only unless a test adds more. */
+const EVERYDAY = { id: "b-every", name: "Everyday", sort_order: null, active: true, is_everyday: true };
+const CAR = { id: "b-car", name: "Car", sort_order: 1, active: true, is_everyday: false };
+let trackedBalances: { id: string; name: string; sort_order: number | null; active: boolean; is_everyday: boolean }[] = [EVERYDAY];
+/** Per-balance amounts owed (what `household_member_balance_breakdown` returns). */
+let suggestionRow: unknown = null;
+let breakdown: { member_id: string; tracked_balance_id: string; balance_cents: number }[] = [];
 let periods: Record<string, PeriodRow> = {};
 let balances: { member_id: string; balance_cents: number }[] = [];
 /** `period_start` of the period `ensure_current_payment_period` returns. */
@@ -103,11 +110,23 @@ function plansBuilder() {
     return builder;
   });
   builder.returns = vi.fn(() => builder);
-  builder.maybeSingle = vi.fn(() =>
-    Promise.resolve({ data: plans.find((p) => p.member_id === memberFilter) ?? null, error: null }),
-  );
+  const rows = () =>
+    plans
+      .filter((p) => memberFilter === null || p.member_id === memberFilter)
+      .map((p) => ({ tracked_balance_id: EVERYDAY.id, ...p }));
+  builder.maybeSingle = vi.fn(() => Promise.resolve({ data: rows()[0] ?? null, error: null }));
   builder.then = (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
-    Promise.resolve({ data: plans, error: null }).then(resolve, reject);
+    Promise.resolve({ data: rows(), error: null }).then(resolve, reject);
+  return builder;
+}
+
+/** Awaitable builder that ignores filters and resolves to `data`. */
+function simpleBuilder(data: unknown) {
+  const builder: Record<string, unknown> = {};
+  for (const method of ["eq", "order", "returns"]) builder[method] = vi.fn(() => builder);
+  builder.maybeSingle = vi.fn(() => Promise.resolve({ data, error: null }));
+  builder.then = (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+    Promise.resolve({ data, error: null }).then(resolve, reject);
   return builder;
 }
 
@@ -117,6 +136,10 @@ beforeEach(() => {
   periods = {};
   currentPeriodStart = "2026-10-01";
   storedPeriods = [];
+  trackedBalances = [EVERYDAY];
+  breakdown = [];
+  suggestionRow = null;
+  window.localStorage.clear();
   balances = [
     { member_id: "kid-a", balance_cents: 14732 },
     { member_id: "kid-s", balance_cents: 11240 },
@@ -127,6 +150,10 @@ beforeEach(() => {
     }
     if (name === "household_member_balances") {
       return Promise.resolve({ data: balances, error: null });
+    }
+    if (name === "record_balance_transfer") return Promise.resolve({ data: { id: "tr-1" }, error: null });
+    if (name === "household_member_balance_breakdown") {
+      return Promise.resolve({ data: breakdown, error: null });
     }
     if (name === "ensure_current_payment_period") {
       return Promise.resolve({
@@ -141,7 +168,12 @@ beforeEach(() => {
     throw new Error(`Unexpected rpc ${name}`);
   });
   fromMock.mockImplementation((table: string) => ({
-    select: vi.fn(() => (table === "payment_periods" ? periodsBuilder() : plansBuilder())),
+    select: vi.fn(() => {
+      if (table === "payment_periods") return periodsBuilder();
+      if (table === "tracked_balances") return simpleBuilder(trackedBalances);
+      if (table === "payment_suggestions") return simpleBuilder(suggestionRow);
+      return plansBuilder();
+    }),
   }));
 });
 
@@ -471,5 +503,204 @@ describe("RecordPaymentPage failures", () => {
     expect(summary).toHaveTextContent("Enter a description.");
     expect(screen.getByLabelText("Payment amount")).toHaveAttribute("aria-invalid", "true");
     expect(rpcMock).not.toHaveBeenCalledWith("record_payment", expect.anything());
+  });
+});
+
+describe("RecordPaymentPage split editor", () => {
+  const owe = (everyday: number, car: number) => [
+    { member_id: "kid-a", tracked_balance_id: EVERYDAY.id, balance_cents: everyday },
+    { member_id: "kid-a", tracked_balance_id: CAR.id, balance_cents: car },
+  ];
+
+  beforeEach(() => {
+    trackedBalances = [EVERYDAY, CAR];
+    breakdown = owe(10000, 8000);
+  });
+
+  it("single-balance households see no editor and send no allocations", async () => {
+    trackedBalances = [EVERYDAY];
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await fillAndSave(user);
+    expect(screen.queryByText("Where does this go?")).not.toBeInTheDocument();
+    expect(rpcMock).toHaveBeenCalledWith(
+      "record_payment",
+      expect.objectContaining({ p_allocations: null }),
+    );
+  });
+
+  it("pre-fills the plan's minimum first, sends the parts, and remembers the child's last balance", async () => {
+    plans = [{ id: "plan-car", member_id: "kid-a", tracked_balance_id: CAR.id }];
+    periods = {
+      "period-plan-car": { status: "due", minimum_cents: 3000, paid_cents: 0, remaining_cents: 3000 },
+    };
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("heading", { name: "Record payment" });
+    await user.type(screen.getByLabelText("Payment amount"), "50");
+
+    await waitFor(() =>
+      expect((screen.getByLabelText("Amount for part 1") as HTMLInputElement).value).toBe("30.00"),
+    );
+    expect(screen.getByLabelText("Balance for part 1")).toHaveValue(CAR.id);
+    expect(screen.getByLabelText("Balance for part 2")).toHaveValue(EVERYDAY.id);
+    expect((screen.getByLabelText("Amount for part 2") as HTMLInputElement).value).toBe("20.00");
+    expect(screen.getByTestId("split-after")).toHaveTextContent("Car goes from $80.00 to $50.00");
+    expect(screen.getByTestId("split-after")).toHaveTextContent(
+      "Car plan: this period's minimum will be met.",
+    );
+
+    await user.type(screen.getByLabelText("Description"), "Cash");
+    await user.click(screen.getByRole("button", { name: /Record \$50\.00 from Alex/ }));
+    await waitFor(() => expect(screen.getByText("Payment recorded")).toBeInTheDocument());
+    expect(rpcMock).toHaveBeenCalledWith(
+      "record_payment",
+      expect.objectContaining({
+        p_allocations: [
+          { tracked_balance_id: CAR.id, amount_cents: 3000 },
+          { tracked_balance_id: EVERYDAY.id, amount_cents: 2000 },
+        ],
+      }),
+    );
+    expect(window.localStorage.getItem("family-ledger:last-split-balance:kid-a")).toBe(CAR.id);
+  });
+
+  it("blocks saving until the parts add up exactly", async () => {
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("heading", { name: "Record payment" });
+    await user.type(screen.getByLabelText("Payment amount"), "50");
+    await user.type(screen.getByLabelText("Description"), "Cash");
+    const save = screen.getByRole("button", { name: /Record \$50\.00 from Alex/ });
+
+    const part1 = await screen.findByLabelText("Amount for part 1");
+    expect(save).toBeEnabled();
+    await user.clear(part1);
+    await user.type(part1, "40");
+    expect(screen.getByTestId("split-status")).toHaveTextContent("$10.00 still to assign.");
+    expect(save).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Add another balance" }));
+    expect(screen.getByLabelText("Amount for part 2")).toHaveValue("10.00");
+    expect(save).toBeEnabled();
+  });
+
+  it("asks for confirmation when a part is more than that balance owes", async () => {
+    breakdown = owe(10000, 1000);
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("heading", { name: "Record payment" });
+    await user.type(screen.getByLabelText("Payment amount"), "30");
+    await user.type(screen.getByLabelText("Description"), "Cash");
+    await screen.findByLabelText("Amount for part 1");
+    await user.selectOptions(screen.getByLabelText("Balance for part 1"), CAR.id);
+
+    const save = screen.getByRole("button", { name: /Record \$30\.00 from Alex/ });
+    expect(save).toBeDisabled();
+    await user.click(screen.getByLabelText(/I understand this creates a credit on Car/));
+    expect(save).toBeEnabled();
+    await user.click(save);
+    expect(rpcMock).toHaveBeenCalledWith(
+      "record_payment",
+      expect.objectContaining({ p_allocations: [{ tracked_balance_id: CAR.id, amount_cents: 3000 }] }),
+    );
+  });
+
+  it("shows the server's rejection inline for a split it refuses", async () => {
+    const base = rpcMock.getMockImplementation()!;
+    rpcMock.mockImplementation((name: string, args: Record<string, string>) =>
+      name === "record_payment"
+        ? Promise.resolve({ data: null, error: { message: "payment parts must add up" } })
+        : base(name, args),
+    );
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("heading", { name: "Record payment" });
+    await user.type(screen.getByLabelText("Payment amount"), "20");
+    await user.type(screen.getByLabelText("Description"), "Cash");
+    await screen.findByLabelText("Amount for part 1");
+    await user.click(screen.getByRole("button", { name: /Record \$20\.00 from Alex/ }));
+    expect(await screen.findByText(/payment parts must add up/)).toBeInTheDocument();
+  });
+
+  it("fills the form from a child's suggestion and passes its id", async () => {
+    suggestionRow = {
+      id: "sg-1",
+      member_id: "kid-s",
+      amount_cents: 2500,
+      suggested_on: "2026-10-02",
+      note: "Paid in cash",
+      status: "pending",
+      payment_suggestion_parts: [{ tracked_balance_id: CAR.id, amount_cents: 2500 }],
+    };
+    breakdown = [
+      { member_id: "kid-s", tracked_balance_id: EVERYDAY.id, balance_cents: 5000 },
+      { member_id: "kid-s", tracked_balance_id: CAR.id, balance_cents: 6000 },
+    ];
+    const user = userEvent.setup();
+    renderPage("/new/payment?suggestion=sg-1");
+    await waitFor(() =>
+      expect((screen.getByLabelText("Payment amount") as HTMLInputElement).value).toBe("25.00"),
+    );
+    expect(selectedChild()).toHaveTextContent("Sam");
+    expect(await screen.findByLabelText("Balance for part 1")).toHaveValue(CAR.id);
+
+    await user.type(screen.getByLabelText("Description"), "Cash");
+    await user.click(screen.getByRole("button", { name: /Record \$25\.00 from Sam/ }));
+    await waitFor(() => expect(screen.getByText("Payment recorded")).toBeInTheDocument());
+    expect(rpcMock).toHaveBeenCalledWith(
+      "record_payment",
+      expect.objectContaining({
+        p_member_id: "kid-s",
+        p_occurred_on: "2026-10-02",
+        p_suggestion_id: "sg-1",
+        p_allocations: [{ tracked_balance_id: CAR.id, amount_cents: 2500 }],
+      }),
+    );
+  });
+});
+
+describe("RecordPaymentPage move money", () => {
+  it("is only offered when there is more than one balance", async () => {
+    renderPage("/new/payment?child=kid-a");
+    await screen.findByRole("heading", { name: "Record payment" });
+    expect(screen.queryByRole("radio", { name: "Move money" })).not.toBeInTheDocument();
+  });
+
+  it("explains the direction, previews the result, and records the transfer", async () => {
+    trackedBalances = [EVERYDAY, CAR];
+    breakdown = [
+      { member_id: "kid-a", tracked_balance_id: EVERYDAY.id, balance_cents: 10000 },
+      { member_id: "kid-a", tracked_balance_id: CAR.id, balance_cents: 20000 },
+    ];
+    const user = userEvent.setup();
+    renderPage("/new/payment?child=kid-a");
+    await user.click(await screen.findByRole("radio", { name: "Move money" }));
+
+    await user.type(screen.getByLabelText("Amount to move"), "150");
+    await waitFor(() =>
+      expect(screen.getByTestId("move-preview")).toHaveTextContent(
+        "Everyday goes from $100.00 to $250.00, Car goes from $200.00 to $50.00.",
+      ),
+    );
+
+    // The same balance on both sides is refused before anything is sent.
+    await user.selectOptions(screen.getByLabelText("Move to"), EVERYDAY.id);
+    await user.click(screen.getByRole("button", { name: "Move money" }));
+    expect(screen.getByText("Choose two different balances.")).toBeInTheDocument();
+    expect(rpcMock).not.toHaveBeenCalledWith("record_balance_transfer", expect.anything());
+
+    await user.selectOptions(screen.getByLabelText("Move to"), CAR.id);
+    await user.click(screen.getByRole("button", { name: "Move money" }));
+    await waitFor(() => expect(screen.getByText("Money moved")).toBeInTheDocument());
+    expect(rpcMock).toHaveBeenCalledWith(
+      "record_balance_transfer",
+      expect.objectContaining({
+        p_member_id: "kid-a",
+        p_from_tracked_balance_id: EVERYDAY.id,
+        p_to_tracked_balance_id: CAR.id,
+        p_amount_cents: 15000,
+      }),
+    );
   });
 });

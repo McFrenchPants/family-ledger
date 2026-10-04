@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
+import { INPUT_CLASS, LABEL_CLASS } from "../../components/ui/styles";
 import { formatCents, toDecimalString } from "../../lib/currency";
 import { supabase } from "../../lib/supabase";
 import type {
@@ -35,7 +36,18 @@ function networkMessage(caught: unknown): string {
     : "Could not reach the ledger service.";
 }
 
-async function createPlan(memberId: string, plan: ValidatedPlan): Promise<string | null> {
+/** A balance a plan can be created on. */
+export type PlanBalanceChoice = { id: string; name: string; isEveryday: boolean };
+
+/**
+ * `balanceId` null means Everyday. The server only supersedes the plan on that
+ * same balance, so replacing the Car plan never touches the Everyday plan.
+ */
+async function createPlan(
+  memberId: string,
+  plan: ValidatedPlan,
+  balanceId: string | null,
+): Promise<string | null> {
   try {
     const { error } = await supabase.rpc("create_payment_plan", {
       p_member_id: memberId,
@@ -43,6 +55,7 @@ async function createPlan(memberId: string, plan: ValidatedPlan): Promise<string
       p_due_day: plan.dueDay,
       p_starts_on: plan.startsOn,
       p_ends_on: plan.endsOn,
+      p_tracked_balance_id: balanceId,
     });
     return error ? error.message : null;
   } catch (caught) {
@@ -69,13 +82,29 @@ type CreateState =
   | { status: "error"; message: string };
 
 /**
- * The create form for a child with no active plan. Nothing is being
+ * The create form for a balance with no active plan. Nothing is being
  * replaced, so it submits directly -- no confirmation step.
+ *
+ * `balances` are the active balances that have no plan yet; with more than
+ * one a "Balance" choice appears (Everyday first, and picked by default), with
+ * one it is implied. An empty list means the balances are unknown and the
+ * plan goes on Everyday.
  */
-export function CreatePlanForm({ memberId, onSaved }: { memberId: string; onSaved: () => void }) {
+export function CreatePlanForm({
+  memberId,
+  balances = [],
+  onSaved,
+}: {
+  memberId: string;
+  balances?: readonly PlanBalanceChoice[];
+  onSaved: () => void;
+}) {
   const [fields, setFields] = useState<PlanFormInput>(EMPTY_FORM);
   const [state, setState] = useState<CreateState>({ status: "idle", errors: {} });
-
+  const [balanceId, setBalanceId] = useState(
+    () => (balances.find((balance) => balance.isEveryday) ?? balances[0])?.id ?? "",
+  );
+  const balanceFieldId = useId();
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
@@ -86,7 +115,7 @@ export function CreatePlanForm({ memberId, onSaved }: { memberId: string; onSave
     }
 
     setState({ status: "submitting" });
-    const failure = await createPlan(memberId, result);
+    const failure = await createPlan(memberId, result, balanceId === "" ? null : balanceId);
     if (failure !== null) {
       setState({ status: "error", message: failure });
       return;
@@ -98,6 +127,26 @@ export function CreatePlanForm({ memberId, onSaved }: { memberId: string; onSave
 
   return (
     <form className="flex flex-col gap-3" onSubmit={(event) => void handleSubmit(event)}>
+      {balances.length > 1 && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor={balanceFieldId} className={LABEL_CLASS}>
+            Balance
+          </label>
+          <select
+            id={balanceFieldId}
+            value={balanceId}
+            disabled={submitting}
+            onChange={(event) => setBalanceId(event.target.value)}
+            className={INPUT_CLASS}
+          >
+            {balances.map((balance) => (
+              <option key={balance.id} value={balance.id}>
+                {balance.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <PlanFieldset
         idPrefix="create"
         fields={fields}
@@ -138,11 +187,14 @@ type ReplaceState =
 export function ReplacePlanForm({
   memberId,
   plan,
+  balanceName = null,
   onDone,
   onCancel,
 }: {
   memberId: string;
   plan: PaymentPlanRow;
+  /** Named in the confirmation when the household has more than one balance. */
+  balanceName?: string | null;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -187,7 +239,7 @@ export function ReplacePlanForm({
     const { validated } = state;
     setState({ status: "submitting", fields, validated });
 
-    const failure = await createPlan(memberId, validated);
+    const failure = await createPlan(memberId, validated, plan.balanceId);
     if (failure !== null) {
       setState({ status: "error", fields, message: failure });
       return;
@@ -219,8 +271,9 @@ export function ReplacePlanForm({
         {state.status === "confirming" || submitting ? (
           <div className="flex flex-col gap-2 rounded-control border border-danger/60 bg-danger-soft p-3">
             <p role="alert" className="text-label font-semibold text-danger">
-              This will replace the current plan of {formatCents(plan.minimumCents)}/month due on
-              day {plan.dueDay} -- the old plan will be deactivated.
+              This will replace the current {balanceName ? `${balanceName} ` : ""}plan of{" "}
+              {formatCents(plan.minimumCents)}/month due on day {plan.dueDay} -- the old plan will
+              be deactivated.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -267,10 +320,13 @@ type DeactivateState =
  */
 export function DeactivatePlanConfirm({
   planId,
+  balanceName = null,
   onDone,
   onCancel,
 }: {
   planId: string;
+  /** Named when the household has more than one balance: only that plan ends. */
+  balanceName?: string | null;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -300,7 +356,9 @@ export function DeactivatePlanConfirm({
   return (
     <div className="flex flex-col gap-2 rounded-control border border-danger/60 bg-danger-soft p-3">
       <p className="text-label font-semibold text-danger">
-        Deactivate this plan? The child will have no active plan afterward.
+        {balanceName
+          ? `Deactivate the ${balanceName} plan? Other balances keep their plans.`
+          : "Deactivate this plan? The child will have no active plan afterward."}
       </p>
       {state.status === "error" && (
         <p role="alert" className="text-label text-danger">

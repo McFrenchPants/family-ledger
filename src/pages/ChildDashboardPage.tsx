@@ -20,10 +20,20 @@ import {
   takeNewPayments,
   type PlanView,
 } from "../features/home/child-home";
+import { BalanceOwed } from "../features/ledger/BalanceBreakdownList";
+import { ChildSuggestionsCard } from "../features/ledger/SuggestionCards";
+import {
+  breakdownLines,
+  type BalanceInfo,
+  type BreakdownLine,
+} from "../features/ledger/balance-breakdown";
 import { activitySubline, type RecentTransaction } from "../features/ledger/recent-activity";
+import { useBalanceBreakdown } from "../features/ledger/useAllTrackedBalances";
+import type { MemberBreakdown } from "../features/ledger/useBalanceSplitData";
 import { useHouseholdTimezone } from "../features/ledger/useHouseholdTimezone";
 import { useOwnBalance } from "../features/ledger/useOwnBalance";
 import { useRecentActivity, type RecentActivityState } from "../features/ledger/useRecentActivity";
+import { headlineProgress } from "../features/payment-plans/plan-selection";
 import type { ChildPaymentProgress } from "../features/payment-plans/useChildPaymentProgress";
 import { useChildPaymentProgress } from "../features/payment-plans/useChildPaymentProgress";
 import { DeviceNudge } from "../features/push/DeviceNudge";
@@ -72,6 +82,7 @@ function ChildHome({
 }) {
   const balance = useOwnBalance(householdId, memberId);
   const progress = useChildPaymentProgress(memberId);
+  const { balances: balanceInfos, breakdown } = useBalanceBreakdown(householdId);
   // Home lists live rows only; voided ones stay visible under Activity.
   const activity = useRecentActivity(memberId, { excludeVoided: true });
   const zone = useHouseholdTimezone(householdId);
@@ -83,7 +94,9 @@ function ChildHome({
 
   const owes = balance.status === "loaded" && balance.balanceCents > 0;
   const overdue =
-    owes && progress.status === "loaded" && progress.progress?.periodStatus === "overdue";
+    owes &&
+    progress.status === "loaded" &&
+    progress.plans.some((plan) => plan.periodStatus === "overdue");
 
   return (
     <div className="flex flex-col gap-4">
@@ -109,6 +122,9 @@ function ChildHome({
         progress={progress}
         zone={zone}
         today={today}
+        memberId={memberId}
+        balanceInfos={balanceInfos}
+        breakdown={breakdown}
         hasHistory={activity.status === "loaded" && activity.transactions.length > 0}
       />
 
@@ -119,6 +135,16 @@ function ChildHome({
         <Icon name="plus" />
         Add an expense
       </Link>
+
+      <Link
+        to="/new/suggestion"
+        className="inline-flex min-h-touch-lg w-full items-center justify-center gap-2 rounded-control border border-border-strong bg-surface px-5 text-body font-semibold text-ink"
+      >
+        <Icon name="check" />
+        Tell a parent about a payment
+      </Link>
+
+      <ChildSuggestionsCard memberId={memberId} balances={balanceInfos} />
 
       <RecentActivityCard activity={activity} />
 
@@ -182,12 +208,18 @@ function OweCard({
   progress,
   zone,
   today,
+  memberId,
+  balanceInfos,
+  breakdown,
   hasHistory,
 }: {
   balance: ReturnType<typeof useOwnBalance>;
   progress: ReturnType<typeof useChildPaymentProgress>;
   zone: ReturnType<typeof useHouseholdTimezone>;
   today: CalendarDate | null;
+  memberId: string;
+  balanceInfos: readonly BalanceInfo[] | null;
+  breakdown: MemberBreakdown | null;
   hasHistory: boolean;
 }) {
   let body: ReactNode;
@@ -242,13 +274,34 @@ function OweCard({
           Loading your payment plan…
         </p>
       );
-    } else if (progress.progress) {
-      // No active plan (progress === null): nothing plan-related at all.
-      const view = planView(progress.progress, today);
-      if (view.callout?.tone !== "danger") {
-        headerChip = <StatusChip kind={view.chip.kind} label={view.chip.label} />;
+    } else if (progress.plans.length > 0) {
+      // No active plan: nothing plan-related at all.
+      const headline = headlineProgress(progress.plans)!;
+      const headlineView = planView(headline, today);
+      if (headlineView.callout?.tone !== "danger") {
+        headerChip = <StatusChip kind={headlineView.chip.kind} label={headlineView.chip.label} />;
       }
-      plan = <PlanSection view={view} progress={progress.progress} />;
+      // With a breakdown each balance carries its own plan section; with
+      // only Everyday (or no breakdown yet) the one plan reads as it always did.
+      const lines =
+        balanceInfos && breakdown
+          ? breakdownLines(
+              balanceInfos,
+              breakdown.get(memberId),
+              new Set(progress.plans.map((entry) => entry.balanceId)),
+            )
+          : [];
+      plan =
+        lines.length > 0 ? (
+          <BalanceSections lines={lines} plans={progress.plans} today={today} />
+        ) : (
+          <PlanSection view={headlineView} progress={headline} />
+        );
+    } else {
+      // Several balances but no plan anywhere: still show who owes what.
+      const lines =
+        balanceInfos && breakdown ? breakdownLines(balanceInfos, breakdown.get(memberId), new Set()) : [];
+      if (lines.length > 0) plan = <BalanceSections lines={lines} plans={[]} today={today} />;
     }
     body = (
       <>
@@ -276,6 +329,38 @@ function Hero({ cents }: { cents: number }) {
     <div className="mt-1">
       <AmountText cents={cents} variant="hero" srContext="owed" />
     </div>
+  );
+}
+
+/** One block per balance: its name and amount, then its own plan if it has one. */
+function BalanceSections({
+  lines,
+  plans,
+  today,
+}: {
+  lines: readonly BreakdownLine[];
+  plans: readonly ChildPaymentProgress[];
+  today: CalendarDate;
+}) {
+  return (
+    <>
+      {lines.map((line) => {
+        const plan = plans.find((entry) => entry.balanceId === line.balanceId);
+        return (
+          <div
+            key={line.balanceId}
+            data-balance={line.name}
+            className="flex flex-col gap-3 border-t border-border pt-3"
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="text-head">{line.name}</h3>
+              <BalanceOwed cents={line.cents} />
+            </div>
+            {plan && <PlanSection view={planView(plan, today)} progress={plan} />}
+          </div>
+        );
+      })}
+    </>
   );
 }
 

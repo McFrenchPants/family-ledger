@@ -21,6 +21,7 @@ const ME = { name: "Sam", self: true };
 
 function progress(overrides: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress {
   return {
+    balanceId: "everyday",
     periodStatus: "due",
     minimumCents: 4000,
     paidCents: 0,
@@ -138,12 +139,18 @@ describe("recordButtonLabel", () => {
   });
 });
 
+const shortcutsFor = (
+  balance: number | null,
+  one: ChildPaymentProgress | null | undefined,
+  locale?: string,
+) => paymentShortcuts(balance, one === undefined ? undefined : one === null ? [] : [one], locale);
+
 describe("paymentShortcuts", () => {
   const kinds = (list: ReturnType<typeof paymentShortcuts>) =>
     list.map((s) => [s.kind, s.cents, s.label]);
 
   it("overdue: catch up, then pay in full", () => {
-    expect(kinds(paymentShortcuts(18732, progress({ periodStatus: "overdue", remainingCents: 1500 }), L))).toEqual([
+    expect(kinds(shortcutsFor(18732, progress({ periodStatus: "overdue", remainingCents: 1500 }), L))).toEqual([
       ["catch-up", 1500, "Catch up $15.00"],
       ["full", 18732, "Pay in full $187.32"],
     ]);
@@ -152,7 +159,7 @@ describe("paymentShortcuts", () => {
   it.each(["due", "partially_paid", "upcoming"] as const)(
     "%s: minimum (what is left), then pay in full",
     (periodStatus) => {
-      expect(kinds(paymentShortcuts(11240, progress({ periodStatus, remainingCents: 3000 }), L))).toEqual([
+      expect(kinds(shortcutsFor(11240, progress({ periodStatus, remainingCents: 3000 }), L))).toEqual([
         ["minimum", 3000, "Minimum $30.00"],
         ["full", 11240, "Pay in full $112.40"],
       ]);
@@ -160,42 +167,65 @@ describe("paymentShortcuts", () => {
   );
 
   it.each(["satisfied", "waived"] as const)("%s: only pay in full", (periodStatus) => {
-    expect(kinds(paymentShortcuts(6381, progress({ periodStatus, remainingCents: 0 }), L))).toEqual([
+    expect(kinds(shortcutsFor(6381, progress({ periodStatus, remainingCents: 0 }), L))).toEqual([
       ["full", 6381, "Pay in full $63.81"],
     ]);
   });
 
   it("nothing left this period: only pay in full", () => {
-    expect(kinds(paymentShortcuts(6381, progress({ remainingCents: 0 }), L))).toEqual([
+    expect(kinds(shortcutsFor(6381, progress({ remainingCents: 0 }), L))).toEqual([
       ["full", 6381, "Pay in full $63.81"],
     ]);
   });
 
   it("caps a period shortcut at the balance and drops the duplicate", () => {
-    expect(kinds(paymentShortcuts(1000, progress({ periodStatus: "overdue", remainingCents: 4000 }), L))).toEqual([
+    expect(kinds(shortcutsFor(1000, progress({ periodStatus: "overdue", remainingCents: 4000 }), L))).toEqual([
       ["catch-up", 1000, "Catch up $10.00"],
     ]);
   });
 
   it("drops a duplicate when remaining equals the balance", () => {
-    expect(kinds(paymentShortcuts(4000, progress(), L))).toEqual([["minimum", 4000, "Minimum $40.00"]]);
+    expect(kinds(shortcutsFor(4000, progress(), L))).toEqual([["minimum", 4000, "Minimum $40.00"]]);
   });
 
   it("no plan, or plan status unknown: only pay in full", () => {
-    expect(kinds(paymentShortcuts(18732, null, L))).toEqual([["full", 18732, "Pay in full $187.32"]]);
-    expect(kinds(paymentShortcuts(18732, undefined, L))).toEqual([["full", 18732, "Pay in full $187.32"]]);
+    expect(kinds(shortcutsFor(18732, null, L))).toEqual([["full", 18732, "Pay in full $187.32"]]);
+    expect(kinds(shortcutsFor(18732, undefined, L))).toEqual([["full", 18732, "Pay in full $187.32"]]);
   });
 
   it("nothing owed, in credit, or balance unknown: no shortcuts", () => {
-    expect(paymentShortcuts(0, progress(), L)).toEqual([]);
-    expect(paymentShortcuts(-500, progress({ periodStatus: "overdue" }), L)).toEqual([]);
-    expect(paymentShortcuts(null, progress(), L)).toEqual([]);
+    expect(shortcutsFor(0, progress(), L)).toEqual([]);
+    expect(shortcutsFor(-500, progress({ periodStatus: "overdue" }), L)).toEqual([]);
+    expect(shortcutsFor(null, progress(), L)).toEqual([]);
   });
 
   it("every shortcut amount is integer cents", () => {
-    for (const s of paymentShortcuts(18732, progress({ periodStatus: "overdue", remainingCents: 1501 }), L)) {
+    for (const s of shortcutsFor(18732, progress({ periodStatus: "overdue", remainingCents: 1501 }), L)) {
       expect(Number.isInteger(s.cents)).toBe(true);
     }
+  });
+});
+
+describe("paymentShortcuts with a plan per balance", () => {
+  it("offers one named shortcut per plan, capped at what that balance owes, then pay in full", () => {
+    const plans = [
+      progress({ balanceId: "e", periodStatus: "overdue", remainingCents: 1500 }),
+      progress({ balanceId: "car", remainingCents: 5000 }),
+    ];
+    const list = paymentShortcuts(20000, plans, L, {
+      balanceLabel: (id) => (id === "car" ? "Car" : "Everyday"),
+      owedByBalance: new Map([["e", 3000], ["car", 3500]]),
+    });
+    expect(list.map((s) => [s.kind, s.cents, s.label])).toEqual([
+      ["catch-up", 1500, "Catch up $15.00 (Everyday)"],
+      ["minimum", 3500, "Minimum $35.00 (Car)"],
+      ["full", 20000, "Pay in full $200.00"],
+    ]);
+  });
+
+  it("keeps two plans' shortcuts even when their amounts match", () => {
+    const plans = [progress({ balanceId: "e" }), progress({ balanceId: "car" })];
+    expect(paymentShortcuts(20000, plans, L).filter((s) => s.kind === "minimum")).toHaveLength(2);
   });
 });
 

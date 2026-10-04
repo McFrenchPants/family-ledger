@@ -10,6 +10,8 @@ import type { MembershipState } from "../features/auth/membership-context";
 import type { HouseholdBalancesState } from "../features/ledger/useHouseholdBalances";
 import type { HouseholdTimezoneState } from "../features/ledger/useHouseholdTimezone";
 import type { MemberPushStatusState } from "../features/members/useMemberPushStatus";
+import type { BalanceInfo } from "../features/ledger/balance-breakdown";
+import type { MemberBreakdown } from "../features/ledger/useBalanceSplitData";
 import type { ChildPaymentProgress } from "../features/payment-plans/useChildPaymentProgress";
 import type { HouseholdPaymentProgressState } from "../features/payment-plans/useHouseholdPaymentProgress";
 
@@ -72,6 +74,20 @@ let progress: HouseholdPaymentProgressState;
 let zone: HouseholdTimezoneState;
 let push: MemberPushStatusState;
 
+
+type BreakdownState = {
+  balances: readonly BalanceInfo[] | null;
+  breakdown: MemberBreakdown | null;
+};
+let breakdownState: BreakdownState;
+vi.mock("../features/ledger/useAllTrackedBalances", () => ({
+  useBalanceBreakdown: () => breakdownState,
+}));
+
+const EVERYDAY: BalanceInfo = { id: "everyday", name: "Everyday", isEveryday: true, active: true };
+const CAR: BalanceInfo = { id: "b-car", name: "Car", isEveryday: false, active: true };
+const COLLEGE: BalanceInfo = { id: "b-college", name: "College", isEveryday: false, active: true };
+
 vi.mock("../features/ledger/useHouseholdBalances", () => ({ useHouseholdBalances: () => balances }));
 vi.mock("../features/payment-plans/useHouseholdPaymentProgress", () => ({
   useHouseholdPaymentProgress: () => progress,
@@ -118,6 +134,7 @@ function callsFor(action: string) {
 }
 
 const plan = (over: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress => ({
+  balanceId: "everyday",
   periodStatus: "overdue",
   minimumCents: 4000,
   paidCents: 2500,
@@ -125,6 +142,10 @@ const plan = (over: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress =>
   dueDate: "2026-09-15",
   ...over,
 });
+
+/** One plan per child (a null entry is a child with no plan). */
+const plansMap = (entries: [string, ChildPaymentProgress | null][]) =>
+  new Map(entries.map(([id, progress]) => [id, progress ? [progress] : []] as const));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -149,12 +170,13 @@ beforeEach(() => {
   };
   progress = {
     status: "loaded",
-    progressByMemberId: new Map<string, ChildPaymentProgress | null>([
+    plansByMemberId: plansMap([
       ["m2", plan()],
       ["m4", null],
     ]),
   };
   zone = { status: "loaded", timezone: "America/New_York" };
+  breakdownState = { balances: [EVERYDAY], breakdown: new Map() };
   push = {
     status: "loaded",
     remindersOn: new Map([
@@ -199,6 +221,28 @@ describe("FamilyPage list", () => {
     expect(within(samRow).getByText("Child")).toBeInTheDocument();
     expect(within(samRow).queryByText("You")).not.toBeInTheDocument();
     expect(within(samRow).getByRole("link")).toHaveAttribute("href", "/family/m2");
+  });
+
+  it("lists a child's balances with each plan's chip in place of the single chip", async () => {
+    breakdownState = {
+      balances: [EVERYDAY, CAR, COLLEGE],
+      breakdown: new Map([["m2", new Map([["everyday", 3000], ["b-car", 15732], ["b-college", 0]])]]),
+    };
+    progress = {
+      status: "loaded",
+      plansByMemberId: plansMap([["m2", plan({ balanceId: "b-car" })], ["m4", null]]),
+    };
+    renderPage();
+
+    await screen.findByText("Alex");
+    const list = within(rowOf("Sam")).getByRole("list", { name: "Sam's balances" });
+    expect(within(list).getByText("Everyday")).toBeInTheDocument();
+    const balancesListed = within(list).getAllByRole("listitem");
+    expect(balancesListed.map((item) => item.getAttribute("data-balance"))).toEqual(["Everyday", "Car"]);
+    expect(within(balancesListed[1]!).getByText("$15.00 overdue")).toBeInTheDocument();
+    // Riley owes only Everyday: the row looks as it always did.
+    expect(within(rowOf("Riley")).queryByRole("list")).not.toBeInTheDocument();
+    expect(within(rowOf("Riley")).getByText("No plan")).toBeInTheDocument();
   });
 
   it("shows each member's login email under their name", async () => {

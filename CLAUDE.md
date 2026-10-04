@@ -139,11 +139,24 @@ then any `workerd` children, and confirm with a process listing.
 
 ### What to actually test
 
-Database/security tests are the critical ones: run them as both Parent and
-Child identities, and include negative tests (Child attempts a payment, a
-negative amount, an amount edit downward, a void, another household's data,
-a role escalation). Do not treat a phase as complete while any Child
-privilege-escalation test fails.
+**Keep the suite lean: every permanent test must earn its place.** A test
+belongs in the suite only if it guards a rule whose breakage would hurt:
+money arithmetic, "a Child can never reduce a balance", cross-household and
+cross-child visibility, audit rows, and data migrations. Test each such rule
+once, at the layer that enforces it. Do not write a separate assertion for
+every grant, column, constraint, or error variant; one check per distinct
+rule, not one per line of code. Cover the Child-can't-do-it case and the
+Parent-can case, plus negative cases (a payment, a negative amount, a
+downward edit, a void, another household's data, a role escalation) where
+they are genuinely different rules. Do not treat a phase as complete while
+any Child privilege-escalation test fails.
+
+**Throwaway checks stay out of the repo.** Anything run only to confirm a
+feature works once (exploratory queries, scratch scripts, one-off
+assertions, mutation experiments) is run, reported, and then discarded or
+left in the scratchpad, never committed as a permanent test. Before
+finishing, an implementer prunes tests that duplicate another or only
+re-state the code.
 
 **Database tests run through pgTAP**, not Vitest: `npm run test:db` wraps
 `npx supabase test db --local` over `supabase/tests/*.sql`. It needs Docker
@@ -155,12 +168,20 @@ migration: the production schema must not carry a test framework. The
 Supabase CLI also pre-creates pgTAP before invoking pg_prove, but the files
 do not rely on that.
 
-**Every database invariant test must be mutation-proofed** — drop the thing
-it protects, confirm the suite actually goes red, restore. A regression test
-that passes against a broken schema is worse than none, and this is not
-hypothetical here: T7's first draft used `::regclass`, which aborted the
-transaction on a dropped index so the behavioural assertions never reported.
-`to_regclass()` fails cleanly instead. Only the mutation run exposed it.
+**Mutation-proof the key security rules, once.** For each *distinct*
+security or money rule a task adds (not every assertion), break the thing it
+protects once, confirm the suite goes red, and restore. A test that passes
+against a broken schema is worse than none (T7's first draft used
+`::regclass`, which aborted the transaction on a dropped index so the
+behavioural assertions never reported; `to_regclass()` fails cleanly
+instead). Aim for a handful of mutations per task, not dozens. The mutation
+pass is a one-off check, not a permanent artifact.
+
+**Who runs the full suite, and when.** The implementer runs only the test
+file(s) it wrote or changed while working. The full `npm run test:db` /
+`npm run test` / typecheck / lint run happens once per task, at the review
+pass (the verifier, or the orchestrator for non-verifier tasks), not
+repeatedly by every agent. Re-run it only if code changed after that.
 
 **The suite is superuser-only** (it needs `create extension`), so it cannot
 double as a role-scoped RLS harness. Phase 1's policy tests need `set local
