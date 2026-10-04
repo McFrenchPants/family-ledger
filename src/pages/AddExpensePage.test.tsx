@@ -460,3 +460,62 @@ describe("AddExpensePage dates, errors and retries", () => {
     expect(rpcMock.mock.calls.filter(([name]) => name === "record_expense")).toHaveLength(1);
   });
 });
+
+describe("AddExpensePage new category (Parents only)", () => {
+  function mockInsert(result: QueryResult<{ id: string; name: string }>) {
+    const insert = vi.fn(() => ({
+      select: vi.fn(() => ({ single: vi.fn(() => Promise.resolve(result)) })),
+    }));
+    const original = fromMock.getMockImplementation()!;
+    fromMock.mockImplementation((table: string) =>
+      table === "categories"
+        ? { select: vi.fn(() => makeSelectBuilder(categoriesResult)), insert }
+        : original(table),
+    );
+    return insert;
+  }
+
+  it("lets a Parent create a category and selects it", async () => {
+    const insert = mockInsert({ data: { id: "cat9", name: "Pets" }, error: null });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "New category" }));
+    await user.type(screen.getByLabelText("New category name"), "  Pets ");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+
+    await waitFor(() => expect(selectedIn("Category (optional)")).toHaveTextContent("Pets"));
+    expect(insert).toHaveBeenCalledWith({ household_id: "h1", name: "Pets" });
+    expect(rpcMock).not.toHaveBeenCalledWith("record_expense", expect.anything());
+  });
+
+  it("shows the database's refusal and keeps the form", async () => {
+    mockInsert({ data: null, error: { message: "denied" } });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "New category" }));
+    await user.type(screen.getByLabelText("New category name"), "Pets");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+
+    expect(await screen.findByText("denied")).toBeInTheDocument();
+  });
+
+  it("never offers a Child the option", async () => {
+    render(
+      <MemoryRouter initialEntries={["/new/expense"]}>
+        <MembershipContext.Provider
+          value={{
+            status: "loaded",
+            membership: { memberId: "m2", householdId: "h1", role: "child", name: "Sam", status: "active" },
+          }}
+        >
+          <AddExpensePage />
+        </MembershipContext.Provider>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("radiogroup", { name: "Category (optional)" });
+    expect(screen.queryByRole("button", { name: "New category" })).not.toBeInTheDocument();
+  });
+});

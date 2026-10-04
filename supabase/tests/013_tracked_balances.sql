@@ -25,7 +25,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path to extensions, public, pg_catalog;
 
-select plan(84);
+select plan(85);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures
@@ -681,6 +681,13 @@ select throws_ok(
       where id = 'cb300000-0000-0000-0000-000000000003' $$,
   '42501', null,
   'C7: a Child cannot UPDATE categories.tracked_balance_id directly'
+);
+
+select throws_ok(
+  $$ insert into public.categories (household_id, name)
+     values ('cb000000-0000-0000-0000-00000000000a', 'Child made') $$,
+  '42501', null,
+  'C7b: a Child cannot INSERT a category (the Add expense form offers new categories to Parents only)'
 );
 
 select is(
