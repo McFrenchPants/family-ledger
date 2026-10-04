@@ -9,6 +9,8 @@
   "approved_by": "mcfrench@gmail.com",
   "instruction": "standing authorization: CLAUDE.md release policy (owner, 2026-10-03)",
   "single_use": true,
-  "consumed": false,
-  "notes": "Promotes category-balances CB1-CB9 (separate balances per category, split payments, move money, child suggestions) plus policy docs. Hosted migrations 20261003130000..170000 were applied to the hosted Supabase project by the orchestrator BEFORE promotion (database first). No supabase/functions changes. Pinned to main 447d38e; this record's own commit lands on top of it and is included in the merge."
+  "consumed": true,
+  "consumed_at": "2026-10-03T18:05:00Z",
+  "consumed_by": "supervisor (release operator)",
+  "notes": "Promotes category-balances CB1-CB9 (separate balances per category, split payments, move money, child suggestions) plus policy docs. Hosted migrations 20261003130000..170000 were applied to the hosted Supabase project by the orchestrator BEFORE promotion (database first). No supabase/functions changes. Pinned to main 447d38e; this record's own commit lands on top of it and is included in the merge. | CONSUMED: typecheck+build green on main; git checkout production; pull --ff-only (572a80a); merge --no-ff main -> b597d3a7c112a223acf00dae3e2f3dee3cefdd7e; wrangler.jsonc preview_urls still false; git push origin production (572a80a..b597d3a). Live bundle before push: index-DhpDXQGU.js."
 }
