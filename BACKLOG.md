@@ -279,7 +279,7 @@ sequential except where noted.
     test: calling `payment_period_status` for another household's period
     returns zero rows (currently covered by reasoning, not by a test).
 
-16. **Separate balances by category, with payment splitting** — status: `in progress` (design signed off 2026-10-03) — analysis: analysis/16-category-balances.md
+16. **Separate balances by category, with payment splitting** — status: `done` (live, production b597d3a) — analysis: analysis/16-category-balances.md
     Requested by the owner 2026-10-03: keep a child's debts separate (e.g. a
     car with a $300/month minimum and $1,000 of college) and choose how each
     payment is divided between them. Owner decisions: allocate to category
@@ -290,7 +290,7 @@ sequential except where noted.
     spec first. Branch `feature/category-balances`; spec at
     `docs/proposals/category-balances/DESIGN_SPEC.md`.
 
-17. **Tap a Recent activity item on Home to open it on the Activity page** — status: `ready` — analysis: none (small; owner-requested 2026-10-03)
+17. **Tap a Recent activity item on Home to open it on the Activity page** — status: `done` (live 2026-10-03) — analysis: none (small; owner-requested 2026-10-03)
     Requested by the owner 2026-10-03: the Recent activity list on Home (the
     Parent and Child versions) is read-only. Each item should be tappable and
     take the person straight to the Activity page (`src/pages/ActivityPage.tsx`)
@@ -298,7 +298,7 @@ sequential except where noted.
     expected; check that the Activity page can find an item that is older than
     what it first loads, and that a Child only ever reaches their own items.
 
-18. **Add a new category while adding an expense (Parents only)** — status: `ready` — analysis: none (small; owner-requested 2026-10-03)
+18. **Add a new category while adding an expense (Parents only)** — status: `done` (live, production 46dfa6b) — analysis: none (small; owner-requested 2026-10-03)
     Requested by the owner 2026-10-03: on the Add/Edit Expense form the category
     picker only lists existing categories; new ones can only be made on the
     Categories settings page. Add an "Add new category" option to the picker

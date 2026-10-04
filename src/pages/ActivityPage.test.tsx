@@ -498,6 +498,46 @@ describe("ActivityPage pagination and filters", () => {
     expect(screen.getByTestId("activity-count")).toHaveTextContent(/^Showing 120$/);
   });
 
+  it("expands the row named by ?open= and keeps ?child= working", async () => {
+    dataset = [row(1), row(2, { note: "Fill-up" })];
+    renderAt("/activity?open=tx-2", member("parent"));
+
+    const opened = await screen.findByRole("button", { name: /^Item 2\b/ });
+    expect(opened).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Note: Fill-up")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Item 1\b/ })).toHaveAttribute("aria-expanded", "false");
+
+    await userEvent.click(screen.getByRole("radio", { name: "Alex" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/activity\?child=c1$/);
+  });
+
+  it("pages in older rows until the ?open= row turns up, then stops", async () => {
+    dataset = many(120);
+    renderAt("/activity?open=tx-75", member("parent"));
+
+    const opened = await screen.findByRole("button", { name: /^Item 75\b/ });
+    expect(opened).toHaveAttribute("aria-expanded", "true");
+    // Two pages were enough; it does not run on to the end.
+    expect(screen.getAllByRole("button", { name: /^Item / })).toHaveLength(100);
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
+  });
+
+  it("gives up quietly when the ?open= row never turns up", async () => {
+    dataset = many(120);
+    renderAt("/activity?open=missing", member("parent"));
+
+    // The count line is a cheap thing to wait on: 120 rows of role queries are not.
+    await waitFor(
+      () => expect(screen.getByTestId("activity-count")).toHaveTextContent(/^Showing 120$/),
+      { timeout: 5000 },
+    );
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // One query per page: 0-49, 50-99, 100-149, and no more.
+    expect(queries.filter((calls) => hasCall(calls, "range", 100, 149))).toHaveLength(1);
+    expect(queries).toHaveLength(3);
+  });
+
   it("has no Load more when the first page is short", async () => {
     dataset = many(3);
     renderAt("/activity", member("parent"));

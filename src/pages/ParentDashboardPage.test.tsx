@@ -399,6 +399,20 @@ describe("ParentDashboardPage", () => {
     expect(within(recent).getByRole("link", { name: "See all" })).toHaveAttribute("href", "/activity");
   });
 
+  it("recent activity: each row opens that entry on the Activity page, for Everyone", () => {
+    renderHome();
+    const recent = screen.getByRole("region", { name: "Recent activity" });
+    const links = within(recent)
+      .getAllByRole("listitem")
+      .map((row) => within(row).getByRole("link").getAttribute("href"));
+    expect(links).toEqual([
+      "/activity?open=e1",
+      "/activity?open=p1",
+      "/activity?open=p2",
+      "/activity?open=e2",
+    ]);
+  });
+
   it("loading: each section says so on its own", () => {
     balances = { status: "loading" };
     activity = { status: "loading" };

@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -43,6 +43,9 @@ import { supabase } from "../lib/supabase";
 /**
  * `/activity`: the ledger, newest first, 50 rows at a time.
  *
+ * `?open=<transactionId>` (from a Home row) starts that row expanded and
+ * scrolled into view, paging in older rows until it turns up.
+ *
  * A Parent sees the whole household ("Everyone") or one child, picked with
  * chips that mirror `?child=<memberId>` in the address. A Child always sees
  * their own rows: any `?child=` is ignored, so a Child cannot even ask the
@@ -54,13 +57,21 @@ import { supabase } from "../lib/supabase";
  * is decoration.
  */
 export function ActivityPage() {
+  const [searchParams] = useSearchParams();
+  const openId = searchParams.get("open") || undefined;
+
   return (
     <MembershipGate>
       {(membership) =>
         membership.role === "parent" ? (
-          <ParentActivity membership={membership} />
+          <ParentActivity membership={membership} openId={openId} />
         ) : (
-          <Activity key={membership.memberId} membership={membership} memberId={membership.memberId} />
+          <Activity
+            key={membership.memberId}
+            membership={membership}
+            memberId={membership.memberId}
+            openId={openId}
+          />
         )
       }
     </MembershipGate>
@@ -69,7 +80,7 @@ export function ActivityPage() {
 
 const EVERYONE = "everyone";
 
-function ParentActivity({ membership }: { membership: Membership }) {
+function ParentActivity({ membership, openId }: { membership: Membership; openId?: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const child = searchParams.get("child") || null;
   const balances = useHouseholdBalances(membership.householdId);
@@ -93,6 +104,7 @@ function ParentActivity({ membership }: { membership: Membership }) {
     <Activity
       membership={membership}
       memberId={child ?? undefined}
+      openId={openId}
       names={names}
       childChips={<ChildChips balances={balances} value={child ?? EVERYONE} onChange={chooseChild} />}
       onShowEveryone={child ? () => chooseChild(EVERYONE) : undefined}
@@ -147,6 +159,7 @@ type SegmentKind = (typeof KIND_OPTIONS)[number]["value"];
 function Activity({
   membership,
   memberId,
+  openId,
   names = null,
   childChips,
   onShowEveryone,
@@ -154,6 +167,8 @@ function Activity({
   membership: Membership;
   /** One member's rows, or undefined for the whole household (Parent "Everyone"). */
   memberId: string | undefined;
+  /** A row to show expanded and scrolled into view (`?open=`). */
+  openId?: string;
   /** Member id to name (archived members included), for naming rows in the Everyone view. */
   names?: ReadonlyMap<string, string> | null;
   childChips?: ReactNode;
@@ -208,6 +223,26 @@ function Activity({
 
   const sheetFilterCount = [categoryId, from, to].filter(Boolean).length + (kind === "adjustment" ? 1 : 0);
   const anyFilter = kind !== "all" || sheetFilterCount > 0;
+
+  // Seeking an `?open=` row older than the pages loaded so far: keep paging
+  // until it appears or the ledger runs out. Only while unfiltered, and never
+  // again once found, so choosing a filter afterwards cannot start a crawl.
+  const seeking = useRef(openId !== undefined);
+  if (activity.status === "loaded" && activity.transactions.some((row) => row.id === openId)) {
+    seeking.current = false;
+  }
+  const canLoadMore =
+    activity.status === "loaded" &&
+    activity.hasMore &&
+    !activity.loadingMore &&
+    !activity.loadMoreError;
+  const loadMore = activity.status === "loaded" ? activity.loadMore : undefined;
+  // The row count is a dependency so a page that lands before the "loading
+  // more" state was ever rendered still prompts the next request.
+  const loadedCount = activity.status === "loaded" ? activity.transactions.length : 0;
+  useEffect(() => {
+    if (seeking.current && !anyFilter && canLoadMore) loadMore?.();
+  }, [anyFilter, canLoadMore, loadMore, loadedCount]);
 
   function clearFilters() {
     setKind("all");
@@ -355,6 +390,7 @@ function Activity({
                           }
                           split={splitText(allocations.get(item.transaction.id), balanceInfos)}
                           isParent={isParent}
+                          startOpen={item.transaction.id === openId}
                           zone={zone}
                           onVoided={activity.refetch}
                         />
@@ -570,6 +606,7 @@ function ActivityItem({
   childName,
   split,
   isParent,
+  startOpen,
   zone,
   onVoided,
 }: {
@@ -578,10 +615,18 @@ function ActivityItem({
   /** How a payment or adjustment was split across balances; null when there is nothing to say. */
   split: string | null;
   isParent: boolean;
+  /** Arrived via `?open=`: begin expanded and scroll into view once. */
+  startOpen: boolean;
   zone: string | null;
   onVoided: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
+  const rowRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (startOpen) rowRef.current?.scrollIntoView?.({ block: "center" });
+    // Once, when the row first appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const panelId = useId();
   const look = transactionLook(transaction.type);
   const detail =
@@ -596,7 +641,11 @@ function ActivityItem({
   const voided = transaction.isVoided;
 
   return (
-    <li data-voided={voided ? "true" : undefined} className="border-t border-border first:border-t-0">
+    <li
+      ref={rowRef}
+      data-voided={voided ? "true" : undefined}
+      className="border-t border-border first:border-t-0"
+    >
       <button
         type="button"
         aria-expanded={open}
