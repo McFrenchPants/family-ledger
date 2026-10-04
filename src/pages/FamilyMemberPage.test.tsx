@@ -17,7 +17,10 @@ import type {
   ChildPaymentProgress,
   ChildPaymentProgressState,
 } from "../features/payment-plans/useChildPaymentProgress";
-import type { PaymentPlanState } from "../features/payment-plans/usePaymentPlan";
+import type { BalanceInfo } from "../features/ledger/balance-breakdown";
+import type { AllTrackedBalancesState } from "../features/ledger/useAllTrackedBalances";
+import type { MemberBreakdown } from "../features/ledger/useBalanceSplitData";
+import type { PaymentPlansState } from "../features/payment-plans/usePaymentPlan";
 
 type QueryResult<T> = {
   data: T | null;
@@ -75,14 +78,26 @@ vi.mock("../lib/supabase", () => ({
 }));
 
 let balances: HouseholdBalancesState;
-let planState: PaymentPlanState;
+let planState: PaymentPlansState;
+let balanceState: AllTrackedBalancesState;
+let breakdownState: MemberBreakdown | null;
+
+const EVERYDAY: BalanceInfo = { id: "everyday", name: "Everyday", isEveryday: true, active: true };
+const CAR: BalanceInfo = { id: "b-car", name: "Car", isEveryday: false, active: true };
+const COLLEGE: BalanceInfo = { id: "b-college", name: "College", isEveryday: false, active: true };
 let progressState: ChildPaymentProgressState;
 let activity: RecentActivityState;
 let zone: HouseholdTimezoneState;
 let push: MemberPushStatusState;
 
 vi.mock("../features/ledger/useHouseholdBalances", () => ({ useHouseholdBalances: () => balances }));
-vi.mock("../features/payment-plans/usePaymentPlan", () => ({ usePaymentPlan: () => planState }));
+vi.mock("../features/payment-plans/usePaymentPlan", () => ({ usePaymentPlans: () => planState }));
+vi.mock("../features/ledger/useAllTrackedBalances", () => ({
+  useAllTrackedBalances: () => balanceState,
+}));
+vi.mock("../features/ledger/useBalanceSplitData", () => ({
+  useMemberBreakdown: () => ({ breakdown: breakdownState, refetch: () => {} }),
+}));
 vi.mock("../features/payment-plans/useChildPaymentProgress", () => ({
   useChildPaymentProgress: () => progressState,
 }));
@@ -130,6 +145,7 @@ function callsFor(action: string) {
 
 const ACTIVE_PLAN: PaymentPlanRow = {
   id: "plan-1",
+  balanceId: "everyday",
   minimumCents: 4000,
   dueDay: 15,
   startsOn: "2026-06-15",
@@ -138,6 +154,7 @@ const ACTIVE_PLAN: PaymentPlanRow = {
 };
 
 const progress = (over: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress => ({
+  balanceId: "everyday",
   periodStatus: "overdue",
   minimumCents: 4000,
   paidCents: 2500,
@@ -181,8 +198,10 @@ beforeEach(() => {
     status: "loaded",
     children: [{ memberId: "m2", name: "Sam", balanceCents: 18732 }],
   };
-  planState = { status: "loaded", plan: ACTIVE_PLAN, refetch: planRefetch };
-  progressState = { status: "loaded", progress: progress() };
+  planState = { status: "loaded", plans: [ACTIVE_PLAN], refetch: planRefetch };
+  balanceState = { status: "loaded", balances: [EVERYDAY] };
+  breakdownState = null;
+  progressState = { status: "loaded", plans: [progress()] };
   activity = {
     status: "loaded",
     transactions: [
@@ -335,8 +354,8 @@ describe("FamilyMemberPage: an active child", () => {
 
 describe("FamilyMemberPage: payment plan editing", () => {
   it("treats no active plan as its own state and creates one directly", async () => {
-    planState = { status: "loaded", plan: null, refetch: planRefetch };
-    progressState = { status: "loaded", progress: null };
+    planState = { status: "loaded", plans: [], refetch: planRefetch };
+    progressState = { status: "loaded", plans: [] };
     const user = userEvent.setup();
     renderPage();
 
@@ -357,13 +376,14 @@ describe("FamilyMemberPage: payment plan editing", () => {
         p_due_day: 10,
         p_starts_on: "2026-10-01",
         p_ends_on: null,
+        p_tracked_balance_id: "everyday",
       }),
     );
     expect(planRefetch).toHaveBeenCalled();
   });
 
   it("shows field errors and makes no call for an invalid plan", async () => {
-    planState = { status: "loaded", plan: null, refetch: planRefetch };
+    planState = { status: "loaded", plans: [], refetch: planRefetch };
     const user = userEvent.setup();
     renderPage();
 
@@ -376,7 +396,7 @@ describe("FamilyMemberPage: payment plan editing", () => {
   });
 
   it("shows the function's error when creating fails, and keeps the form", async () => {
-    planState = { status: "loaded", plan: null, refetch: planRefetch };
+    planState = { status: "loaded", plans: [], refetch: planRefetch };
     rpcMock.mockResolvedValue({ data: null, error: { message: "only a Parent may do that" } });
     const user = userEvent.setup();
     renderPage();
@@ -421,9 +441,57 @@ describe("FamilyMemberPage: payment plan editing", () => {
         p_due_day: 15,
         p_starts_on: "2026-06-15",
         p_ends_on: null,
+        p_tracked_balance_id: "everyday",
       }),
     );
     expect(planRefetch).toHaveBeenCalled();
+  });
+
+  it("with several balances: plans per balance, each edited, ended or added on its own balance", async () => {
+    const CAR_PLAN: PaymentPlanRow = { ...ACTIVE_PLAN, id: "plan-2", balanceId: "b-car", minimumCents: 5000 };
+    balanceState = { status: "loaded", balances: [EVERYDAY, CAR, COLLEGE] };
+    breakdownState = new Map([["m2", new Map([["everyday", 3000], ["b-car", 15732], ["b-college", 0]])]]);
+    planState = { status: "loaded", plans: [CAR_PLAN, ACTIVE_PLAN], refetch: planRefetch };
+    progressState = {
+      status: "loaded",
+      plans: [progress(), progress({ balanceId: "b-car", periodStatus: "due", paidCents: 0, remainingCents: 5000, minimumCents: 5000 })],
+    };
+    const user = userEvent.setup();
+    renderPage();
+
+    await heading();
+    const card = screen.getByRole("region", { name: "Payment plans" });
+    // Everyday first, then Car; College has no plan yet.
+    const blocks = card.querySelectorAll("[data-balance]");
+    expect([...blocks].map((block) => block.getAttribute("data-balance"))).toEqual(["Everyday", "Car"]);
+
+    // Editing the Car plan replaces only the Car plan.
+    await user.click(within(blocks[1] as HTMLElement).getByRole("button", { name: "Edit plan on Car" }));
+    await user.click(screen.getByRole("button", { name: "Review changes" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("This will replace the current Car plan of $50.00/month");
+    await user.click(screen.getByRole("button", { name: "Confirm replace" }));
+    await waitFor(() =>
+      expect(rpcMock).toHaveBeenCalledWith("create_payment_plan", expect.objectContaining({ p_tracked_balance_id: "b-car" })),
+    );
+
+    // Ending the Everyday plan ends only that plan.
+    rpcMock.mockClear();
+    await user.click(within(card).getByRole("button", { name: "Deactivate plan on Everyday" }));
+    await user.click(screen.getByRole("button", { name: "Confirm deactivate" }));
+    await waitFor(() =>
+      expect(rpcMock).toHaveBeenCalledWith("deactivate_payment_plan", { p_plan_id: "plan-1" }),
+    );
+
+    // A new plan goes on a balance that has none.
+    rpcMock.mockClear();
+    await user.click(within(card).getByRole("button", { name: "Add a plan for another balance" }));
+    await user.type(within(card).getByLabelText("Minimum amount"), "20");
+    await user.type(within(card).getByLabelText("Due day (1-28)"), "5");
+    fireEvent.change(within(card).getByLabelText("Start date"), { target: { value: "2026-10-01" } });
+    await user.click(within(card).getByRole("button", { name: "Create plan" }));
+    await waitFor(() =>
+      expect(rpcMock).toHaveBeenCalledWith("create_payment_plan", expect.objectContaining({ p_tracked_balance_id: "b-college" })),
+    );
   });
 
   it("cancelling the replacement makes no call", async () => {

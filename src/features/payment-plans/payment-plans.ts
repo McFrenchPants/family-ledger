@@ -9,14 +9,14 @@ import type { CalendarDate } from "../../lib/dates";
  * validation -- no React, no network -- mirroring `record-transaction.ts`'s
  * split from its page/hook.
  *
- * A member has at most one *active* plan at a time (enforced server-side);
- * this screen only ever cares about that current active plan, never a full
- * history of plans, so there is no "list all plans" type here.
+ * A member has at most one *active* plan per tracked balance (enforced
+ * server-side); this screen only ever cares about the current active plans,
+ * never a full history of plans, so there is no "list all plans" type here.
  */
 
 /**
  * The subset of `payment_plans` columns this screen actually reads
- * (`usePaymentPlan`'s `.select(...)`), camelCased. There is no UI need for
+ * (`usePaymentPlans`'s `.select(...)`), camelCased. There is no UI need for
  * `household_id`/`member_id`/`frequency`/`created_by`/`created_at`/
  * `updated_at` here -- the caller already knows the household and member it
  * asked about, `frequency` is presently always monthly (not surfaced), and
@@ -24,6 +24,8 @@ import type { CalendarDate } from "../../lib/dates";
  */
 export type PaymentPlanRow = {
   readonly id: string;
+  /** The tracked balance this plan is on. */
+  readonly balanceId: string;
   readonly minimumCents: Cents;
   readonly dueDay: number;
   readonly startsOn: CalendarDate;
@@ -31,9 +33,10 @@ export type PaymentPlanRow = {
   readonly active: boolean;
 };
 
-/** Raw row shape from `payment_plans.select("id, minimum_cents, due_day, starts_on, ends_on, active")`. */
+/** Raw row shape from `payment_plans.select("id, minimum_cents, due_day, starts_on, ends_on, active, tracked_balance_id")`. */
 export type PaymentPlanDbRow = {
   id: string;
+  tracked_balance_id: string;
   minimum_cents: number;
   due_day: number;
   starts_on: string;
@@ -45,6 +48,7 @@ export type PaymentPlanDbRow = {
 export function toPaymentPlanRow(row: PaymentPlanDbRow): PaymentPlanRow {
   return {
     id: row.id,
+    balanceId: row.tracked_balance_id,
     minimumCents: row.minimum_cents,
     dueDay: row.due_day,
     startsOn: row.starts_on,

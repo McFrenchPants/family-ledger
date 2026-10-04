@@ -153,53 +153,70 @@ export function recordButtonLabel(
 export type PaymentShortcut = {
   readonly kind: "catch-up" | "minimum" | "full";
   readonly cents: Cents;
-  /** "Catch up $15.00" / "Minimum $40.00" / "Pay in full $187.32". */
+  /** "Catch up $15.00" / "Minimum $40.00" / "Pay in full $187.32"; a named balance adds " (Car)". */
   readonly label: string;
 };
 
 /**
  * Amount shortcuts for a payment, from what the page already knows:
  *
- * - period overdue with something left -> "Catch up" (what is left);
- * - otherwise due / partially paid / upcoming with something left ->
- *   "Minimum" (what is left of this period's minimum);
+ * - each plan whose period is overdue with something left -> "Catch up"
+ *   (what is left);
+ * - each other plan that is due / partially paid / upcoming with something
+ *   left -> "Minimum" (what is left of this period's minimum);
  * - anything owed -> "Pay in full" (the whole balance).
  *
- * A period shortcut never exceeds the balance; two shortcuts for the same
- * amount collapse to the first. `progress` is `null` for "no plan" and
+ * A child can have a plan per balance, so there can be one period shortcut
+ * per plan; a plan's shortcut is named after its balance when
+ * `ctx.balanceLabel` gives one, and capped at what that balance owes
+ * (`ctx.owedByBalance`) when known, else at the child's total. A period
+ * shortcut never exceeds the cap; "Pay in full" is dropped when a period
+ * shortcut already has the same amount. `plans` is empty for "no plan" and
  * `undefined` when plan status is unknown (loading or failed): both give
  * only "Pay in full". An unknown balance, or nothing owed, gives none.
  */
 export function paymentShortcuts(
   balanceCents: Cents | null,
-  progress: ChildPaymentProgress | null | undefined,
+  plans: readonly ChildPaymentProgress[] | undefined,
   locale?: string,
+  ctx: {
+    balanceLabel?: (balanceId: string) => string | null;
+    owedByBalance?: ReadonlyMap<string, Cents> | null;
+  } = {},
 ): PaymentShortcut[] {
   if (balanceCents === null || balanceCents <= 0) return [];
   const money = (cents: Cents) => formatCents(cents, { locale });
-  const candidates: PaymentShortcut[] = [];
+  const shortcuts: PaymentShortcut[] = [];
 
-  if (progress && progress.remainingCents > 0) {
-    const cents = Math.min(progress.remainingCents, balanceCents);
-    if (progress.periodStatus === "overdue") {
-      candidates.push({ kind: "catch-up", cents, label: `Catch up ${money(cents)}` });
-    } else if (
-      progress.periodStatus === "due" ||
-      progress.periodStatus === "partially_paid" ||
-      progress.periodStatus === "upcoming"
-    ) {
-      candidates.push({ kind: "minimum", cents, label: `Minimum ${money(cents)}` });
-    }
+  for (const progress of plans ?? []) {
+    if (progress.remainingCents <= 0) continue;
+    const kind =
+      progress.periodStatus === "overdue"
+        ? "catch-up"
+        : progress.periodStatus === "due" ||
+            progress.periodStatus === "partially_paid" ||
+            progress.periodStatus === "upcoming"
+          ? "minimum"
+          : null;
+    if (kind === null) continue;
+
+    const owed = ctx.owedByBalance?.get(progress.balanceId);
+    const cap = owed === undefined ? balanceCents : Math.min(balanceCents, owed);
+    const cents = Math.min(progress.remainingCents, cap);
+    if (cents <= 0) continue;
+    const name = ctx.balanceLabel?.(progress.balanceId) ?? null;
+    const word = kind === "catch-up" ? "Catch up" : "Minimum";
+    shortcuts.push({ kind, cents, label: `${word} ${money(cents)}${name ? ` (${name})` : ""}` });
   }
 
-  candidates.push({ kind: "full", cents: balanceCents, label: `Pay in full ${money(balanceCents)}` });
-
-  const seen = new Set<Cents>();
-  return candidates.filter((shortcut) => {
-    if (seen.has(shortcut.cents)) return false;
-    seen.add(shortcut.cents);
-    return true;
-  });
+  if (!shortcuts.some((shortcut) => shortcut.cents === balanceCents)) {
+    shortcuts.push({
+      kind: "full",
+      cents: balanceCents,
+      label: `Pay in full ${money(balanceCents)}`,
+    });
+  }
+  return shortcuts;
 }
 
 /* ------------------------------------------------------------------ */

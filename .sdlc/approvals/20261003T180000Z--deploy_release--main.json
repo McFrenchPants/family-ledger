@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "447d38e78d0015f27f8029a819895310e5c92ed6",
+  "approved_at": "2026-10-03T18:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "standing authorization: CLAUDE.md release policy (owner, 2026-10-03)",
+  "single_use": true,
+  "consumed": false,
+  "notes": "Promotes category-balances CB1-CB9 (separate balances per category, split payments, move money, child suggestions) plus policy docs. Hosted migrations 20261003130000..170000 were applied to the hosted Supabase project by the orchestrator BEFORE promotion (database first). No supabase/functions changes. Pinned to main 447d38e; this record's own commit lands on top of it and is included in the merge."
+}

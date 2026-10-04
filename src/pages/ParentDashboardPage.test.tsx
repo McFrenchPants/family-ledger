@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ParentDashboardPage } from "./ParentDashboardPage";
 import { MembershipContext } from "../features/auth/membership-context";
 import type { MembershipState } from "../features/auth/membership-context";
+import type { BalanceInfo } from "../features/ledger/balance-breakdown";
+import type { MemberBreakdown } from "../features/ledger/useBalanceSplitData";
 import type { HouseholdRecentTransaction } from "../features/ledger/recent-activity";
 import type { HouseholdBalancesState } from "../features/ledger/useHouseholdBalances";
 import type { HouseholdRecentActivityState } from "../features/ledger/useHouseholdRecentActivity";
@@ -16,10 +18,29 @@ import type { HouseholdPaymentProgressState } from "../features/payment-plans/us
 
 vi.mock("../lib/supabase", () => ({ supabase: {} }));
 
+// Payment suggestions have their own tests (SuggestionCards.test.tsx); here none are waiting.
+vi.mock("../features/ledger/usePaymentSuggestions", () => ({
+  usePendingPaymentSuggestions: () => ({ status: "loaded", suggestions: [], refetch: () => undefined }),
+}));
+
 let balances: HouseholdBalancesState;
 let progress: HouseholdPaymentProgressState;
 let activity: HouseholdRecentActivityState;
 let zone: HouseholdTimezoneState;
+
+
+type BreakdownState = {
+  balances: readonly BalanceInfo[] | null;
+  breakdown: MemberBreakdown | null;
+};
+let breakdownState: BreakdownState;
+vi.mock("../features/ledger/useAllTrackedBalances", () => ({
+  useBalanceBreakdown: () => breakdownState,
+}));
+
+const EVERYDAY: BalanceInfo = { id: "everyday", name: "Everyday", isEveryday: true, active: true };
+const CAR: BalanceInfo = { id: "b-car", name: "Car", isEveryday: false, active: true };
+const COLLEGE: BalanceInfo = { id: "b-college", name: "College", isEveryday: false, active: true };
 
 vi.mock("../features/ledger/useHouseholdBalances", () => ({ useHouseholdBalances: () => balances }));
 vi.mock("../features/payment-plans/useHouseholdPaymentProgress", () => ({
@@ -43,6 +64,7 @@ const membership: MembershipState = {
 };
 
 const plan = (over: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress => ({
+  balanceId: "everyday",
   periodStatus: "due",
   minimumCents: 4000,
   paidCents: 0,
@@ -50,6 +72,10 @@ const plan = (over: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress =>
   dueDate: "2026-10-15",
   ...over,
 });
+
+/** One plan per child (a null entry is a child with no plan). */
+const plansMap = (entries: [string, ChildPaymentProgress | null][]) =>
+  new Map(entries.map(([id, progress]) => [id, progress ? [progress] : []] as const));
 
 const ROSTER: HouseholdBalancesState = {
   status: "loaded",
@@ -64,7 +90,7 @@ const ROSTER: HouseholdBalancesState = {
 
 const PROBLEMS: HouseholdPaymentProgressState = {
   status: "loaded",
-  progressByMemberId: new Map<string, ChildPaymentProgress | null>([
+  plansByMemberId: plansMap([
     ["ryan", null],
     ["katie", plan({ periodStatus: "satisfied", minimumCents: 2000, paidCents: 2000, remainingCents: 0 })],
     ["sam", plan({ minimumCents: 3000, remainingCents: 3000, dueDate: "2026-10-05" })],
@@ -75,7 +101,7 @@ const PROBLEMS: HouseholdPaymentProgressState = {
 
 const CALM: HouseholdPaymentProgressState = {
   status: "loaded",
-  progressByMemberId: new Map<string, ChildPaymentProgress | null>([
+  plansByMemberId: plansMap([
     ["ryan", null],
     ["katie", plan({ periodStatus: "satisfied", minimumCents: 2000, paidCents: 2000, remainingCents: 0 })],
     ["sam", plan({ periodStatus: "upcoming", dueDate: "2026-10-20" })],
@@ -122,6 +148,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-02T16:00:00Z"));
   retry.mockReset();
   balances = ROSTER;
+  breakdownState = { balances: [EVERYDAY], breakdown: new Map() };
   progress = PROBLEMS;
   activity = SOME_ACTIVITY;
   zone = { status: "loaded", timezone: "America/New_York" };
@@ -182,7 +209,7 @@ describe("ParentDashboardPage", () => {
   it("due today reads as Due today", () => {
     progress = {
       status: "loaded",
-      progressByMemberId: new Map([
+      plansByMemberId: plansMap([
         ["ryan", null],
         ["katie", null],
         ["sam", plan({ dueDate: "2026-10-02", remainingCents: 3000 })],
@@ -216,7 +243,7 @@ describe("ParentDashboardPage", () => {
     };
     progress = {
       status: "loaded",
-      progressByMemberId: new Map([
+      plansByMemberId: plansMap([
         // 8 days out in LA (not due soon); 7 by the UTC date.
         ["a", plan({ dueDate: "2026-10-10" })],
         // 2 days overdue in LA; 3 by the UTC date.
@@ -234,6 +261,48 @@ describe("ParentDashboardPage", () => {
       "data-status",
       "upcoming",
     );
+  });
+
+  it("splits a total by balance with each plan's status, hides empty balances, and names the balance in attention", () => {
+    breakdownState = {
+      balances: [EVERYDAY, CAR, COLLEGE],
+      breakdown: new Map([
+        // Alex: Everyday $30, Car $157.32 with an overdue Car plan, College nothing owed and no plan.
+        ["alex", new Map([["everyday", 3000], ["b-car", 15732], ["b-college", 0]])],
+        // Sam: only Everyday owes anything, so the total says it all.
+        ["sam", new Map([["everyday", 11240], ["b-car", 0], ["b-college", 0]])],
+      ]),
+    };
+    progress = {
+      status: "loaded",
+      plansByMemberId: new Map([
+        ...plansMap([["ryan", null], ["katie", null], ["jo", null]]),
+        ["sam", [plan({ minimumCents: 3000, remainingCents: 3000, dueDate: "2026-10-05" })]],
+        [
+          "alex",
+          [
+            plan({ balanceId: "b-car", periodStatus: "overdue", paidCents: 2500, remainingCents: 1500, dueDate: "2026-09-15" }),
+          ],
+        ],
+      ]),
+    };
+    renderHome();
+
+    const alex = childCards().find((card) => card.getAttribute("aria-label") === "Alex")!;
+    const list = within(alex).getByRole("list", { name: "Alex's balances" });
+    const items = within(list).getAllByRole("listitem");
+    expect(items.map((item) => item.getAttribute("data-balance"))).toEqual(["Everyday", "Car"]);
+    expect(items[1]).toHaveTextContent(/\$157\.32.*owed/);
+    expect(within(items[1]!).getByText("$15.00 overdue")).toBeInTheDocument();
+    // The row's own total is unchanged, and the single chip gives way to the per-balance ones.
+    expect(within(alex).getByRole("img", { name: /187 dollars and 32 cents owed/ })).toBeInTheDocument();
+
+    const sam = childCards().find((card) => card.getAttribute("aria-label") === "Sam")!;
+    expect(within(sam).queryByRole("list", { name: "Sam's balances" })).not.toBeInTheDocument();
+    expect(within(sam).getByText("$30.00 due Oct 5")).toBeInTheDocument();
+
+    expect(attentionSection()).toHaveTextContent("Alex is $15.00 behind on Car");
+    expect(attentionSection()).toHaveTextContent("September Car minimum, due Sep 15");
   });
 
   it("household total with the still-due line", () => {
@@ -350,7 +419,7 @@ describe("ParentDashboardPage", () => {
   });
 
   it("does not flash 'No plan' while plan status still covers the empty pre-roster list", () => {
-    progress = { status: "loaded", progressByMemberId: new Map() };
+    progress = { status: "loaded", plansByMemberId: new Map() };
     renderHome();
     expect(screen.queryByText("No plan")).not.toBeInTheDocument();
     expect(screen.queryByText("Everyone is up to date")).not.toBeInTheDocument();
@@ -390,7 +459,7 @@ describe("ParentDashboardPage", () => {
 
   it("no children yet: a pointer to Family, no total, no attention line", () => {
     balances = { status: "loaded", children: [] };
-    progress = { status: "loaded", progressByMemberId: new Map() };
+    progress = { status: "loaded", plansByMemberId: new Map() };
     activity = { status: "loaded", transactions: [] };
     renderHome();
     expect(screen.getByText("No children yet")).toBeInTheDocument();

@@ -19,16 +19,19 @@ Live address: **https://family-ledger.mcfrench.workers.dev**
 
 1. Work is done on a branch and merged into `main` (the staging branch). Nothing
    goes live from `main`.
-2. When you say "deploy", `main` is merged into `production` and pushed.
+2. Once a change is reviewed and tested, the agent merges `main` into
+   `production` and pushes it by itself (standing instruction, 2026-10-03:
+   you no longer need to say "deploy").
 3. Cloudflare notices and rebuilds the app (about a minute). That is the whole
    deploy for screen/behavior changes.
-4. **Database changes are separate.** If a change adds a migration (a file in
-   `supabase/migrations/`), it must also be applied to the live database:
+4. **Database changes are separate, and the agent applies them too** (before
+   it promotes the screens). If a change adds a migration (a file in
+   `supabase/migrations/`), it is applied to the live database with:
    ```bash
    npx supabase db push --linked
    ```
    Do this *before or together with* publishing the screens that need it.
-5. **Server-function changes are separate too** (files in `supabase/functions/`):
+5. **Server-function changes are separate too** (files in `supabase/functions/`); the agent deploys them as well:
    ```bash
    npx supabase functions deploy
    ```
@@ -126,7 +129,7 @@ changes, archive-blocks-login) needs these in addition to the normal deploy.
 Do them in this order, **before** promoting to `production` (otherwise the new
 screens will call things that do not exist yet):
 
-1. Apply the new database migration (`20260908090000_...`):
+1. Apply the new database migration (`20260908090000_...`) — the agent now does this itself in every release (historical note for this one-time release):
    ```bash
    npx supabase db push --linked
    ```

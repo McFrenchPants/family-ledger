@@ -22,6 +22,13 @@ Branch `feature/period-fixes`. See `IMPLEMENTATION_PLAN.md`.
 
 _Newest entries on top._
 
+### 2026-10-03 — Released
+
+Owner approved; production `572a80a` (Cloudflare build success, new bundle
+served, /parent 200). Migration `20261003120000` NOT yet on the hosted
+database -- owner runs `npx supabase db push --linked`. Front end does not
+depend on it.
+
 ### 2026-10-03 — PF1 and PF2 done
 
 Both tasks built in parallel. PF2 spot-checked (diff, typecheck/lint/816

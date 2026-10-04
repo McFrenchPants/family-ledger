@@ -8,6 +8,8 @@ import { ActivityPage } from "./ActivityPage";
 import { HomePage } from "./HomePage";
 import { MembershipContext } from "../features/auth/membership-context";
 import type { MembershipState } from "../features/auth/membership-context";
+import type { BalanceTransferRow } from "../features/ledger/activity-feed";
+import type { BalanceInfo } from "../features/ledger/balance-breakdown";
 import type { ActivityTransactionRow } from "../features/ledger/history";
 import type { HouseholdBalancesState } from "../features/ledger/useHouseholdBalances";
 import type { HouseholdCategoriesState } from "../features/ledger/useHouseholdCategories";
@@ -21,6 +23,14 @@ vi.mock("./ChildDashboardPage", () => ({ ChildDashboardPage: () => <p>child dash
 let balances: HouseholdBalancesState = { status: "loading" };
 vi.mock("../features/ledger/useHouseholdBalances", () => ({
   useHouseholdBalances: () => balances,
+}));
+const BALANCES: BalanceInfo[] = [
+  { id: "b-every", name: "Everyday", isEveryday: true, active: true },
+  { id: "b-car", name: "Car", isEveryday: false, active: true },
+  { id: "b-college", name: "College", isEveryday: false, active: true },
+];
+vi.mock("../features/ledger/useAllTrackedBalances", () => ({
+  useAllTrackedBalances: () => ({ status: "loaded", balances: BALANCES }),
 }));
 let householdMembers: HouseholdMembersState = { status: "loading" };
 vi.mock("../features/members/useHouseholdMembers", () => ({
@@ -73,6 +83,25 @@ function builder() {
         return { data: dataset.slice(first, last + 1), error: null };
       })
       .then(resolve, reject);
+  return chain;
+}
+
+/** The other tables the page reads (balance moves, payment parts): rows by table, and each query made. */
+let sideData: Record<string, unknown[]> = {};
+let sideQueries: { table: string; calls: Call[] }[] = [];
+
+function sideBuilder(table: string) {
+  const calls: Call[] = [];
+  sideQueries.push({ table, calls });
+  const chain: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "in", "gte", "lte", "order", "limit", "returns"]) {
+    chain[method] = (...args: unknown[]) => {
+      calls.push({ method, args });
+      return chain;
+    };
+  }
+  chain.then = (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+    Promise.resolve({ data: sideData[table] ?? [], error: null }).then(resolve, reject);
   return chain;
 }
 
@@ -143,7 +172,11 @@ const roster: HouseholdBalancesState = {
 
 beforeEach(() => {
   fromMock.mockReset();
-  fromMock.mockImplementation(() => builder());
+  fromMock.mockImplementation((table: string) =>
+    table === "ledger_transactions" ? builder() : sideBuilder(table),
+  );
+  sideData = {};
+  sideQueries = [];
   rpcMock.mockReset();
   queries = [];
   dataset = [];
@@ -367,6 +400,75 @@ describe("ActivityPage as a Parent", () => {
       "Could not void this transaction: already voided",
     );
     expect(screen.getByRole("button", { name: "Confirm void" })).toBeEnabled();
+  });
+});
+
+const transferRow = (overrides: Partial<BalanceTransferRow> = {}): BalanceTransferRow => ({
+  id: "mv-1",
+  member_id: "c1",
+  from_tracked_balance_id: "b-every",
+  to_tracked_balance_id: "b-car",
+  amount_cents: 15000,
+  occurred_on: "2026-09-21",
+  note: "Saving for the car",
+  created_at: "2026-09-21T10:00:00Z",
+  voided_at: null,
+  void_reason: null,
+  ...overrides,
+});
+
+describe("ActivityPage balance splits and moves", () => {
+  it("shows how a multi-part payment was split, and nothing extra for a plain Everyday payment", async () => {
+    dataset = [
+      row(1, { id: "pay-split", description: "Big payment", type: "payment", amount_cents: -50000, category: null }),
+      row(2, { id: "pay-plain", description: "Small payment", type: "payment", amount_cents: -2000, category: null }),
+    ];
+    sideData = {
+      payment_allocations: [
+        { transaction_id: "pay-split", tracked_balance_id: "b-car", amount_cents: 30000 },
+        { transaction_id: "pay-split", tracked_balance_id: "b-college", amount_cents: 20000 },
+        { transaction_id: "pay-plain", tracked_balance_id: "b-every", amount_cents: 2000 },
+      ],
+    };
+    renderAt("/activity", member("parent"));
+
+    expect(await screen.findByText("$300.00 Car · $200.00 College")).toBeInTheDocument();
+    const plain = screen.getByRole("button", { name: /Small payment/ });
+    expect(within(plain).queryByText(/Everyday|Applied to/)).not.toBeInTheDocument();
+  });
+
+  it("lists balance moves with the child, note and voided state; only under All", async () => {
+    dataset = [row(1, { description: "Gas", occurred_on: "2026-09-20" })];
+    sideData = {
+      balance_transfers: [
+        transferRow(),
+        transferRow({ id: "mv-2", member_id: "c2", amount_cents: 500, occurred_on: "2026-09-19", note: null, voided_at: "2026-09-20T00:00:00Z", void_reason: "Typo" }),
+      ],
+    };
+    renderAt("/activity", member("parent"));
+
+    const rows = await screen.findAllByTestId("transfer-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("Moved $150.00 from Everyday to Car");
+    expect(rows[0]).toHaveTextContent("Alex");
+    expect(rows[0]).toHaveTextContent("Saving for the car");
+    expect(rows[1]).toHaveAttribute("data-voided", "true");
+    expect(rows[1]).toHaveTextContent("Voided");
+    // Newest first: the move of the 21st sits above the 20th's expense.
+    const all = screen.getAllByRole("listitem");
+    expect(all.indexOf(rows[0]!)).toBeLessThan(all.findIndex((item) => item.textContent?.includes("Gas")));
+    expect(screen.getByTestId("activity-count")).toHaveTextContent("Showing 3");
+
+    await userEvent.click(screen.getByRole("radio", { name: "Payments" }));
+    await waitFor(() => expect(screen.queryByTestId("transfer-row")).not.toBeInTheDocument());
+  });
+
+  it("asks only for a child's own moves, and for the chosen child under a Parent filter", async () => {
+    renderAt("/activity", member("child"));
+    await screen.findByText("No activity yet");
+    const own = sideQueries.filter((query) => query.table === "balance_transfers");
+    expect(own.length).toBeGreaterThan(0);
+    expect(own.every((query) => hasCall(query.calls, "eq", "member_id", "me"))).toBe(true);
   });
 });
 

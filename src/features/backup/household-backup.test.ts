@@ -49,6 +49,7 @@ const EXAMPLE_INPUT = {
       created_by: "member-1",
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
+      tracked_balance_id: null,
     },
   ],
   paymentPeriods: [
@@ -65,7 +66,73 @@ const EXAMPLE_INPUT = {
       created_at: "2026-09-01T00:00:00Z",
     },
   ],
-  categories: [{ id: "cat-1", name: "Transportation", sort_order: 1, active: true }],
+  categories: [
+    { id: "cat-1", name: "Transportation", sort_order: 1, active: true, tracked_balance_id: "bal-car" },
+  ],
+  trackedBalances: [
+    {
+      id: "bal-car",
+      name: "Car",
+      sort_order: 1,
+      active: true,
+      is_everyday: false,
+      created_at: "2026-10-01T00:00:00Z",
+    },
+  ],
+  paymentAllocations: [
+    {
+      id: "alloc-1",
+      member_id: "member-2",
+      transaction_id: "tx-2",
+      transaction_type: "payment",
+      tracked_balance_id: "bal-car",
+      amount_cents: 1250,
+      created_at: "2026-10-02T00:00:00Z",
+    },
+  ],
+  balanceTransfers: [
+    {
+      id: "xfer-1",
+      member_id: "member-2",
+      from_tracked_balance_id: "bal-everyday",
+      to_tracked_balance_id: "bal-car",
+      amount_cents: 500,
+      occurred_on: "2026-10-02",
+      note: null,
+      created_by: "member-1",
+      created_at: "2026-10-02T00:00:00Z",
+      voided_at: null,
+      voided_by: null,
+      void_reason: null,
+    },
+  ],
+  paymentSuggestions: [
+    {
+      id: "sugg-1",
+      member_id: "member-2",
+      amount_cents: 3000,
+      suggested_on: "2026-10-03",
+      note: "from my job",
+      status: "pending",
+      created_by: "member-2",
+      created_at: "2026-10-03T00:00:00Z",
+      resolved_at: null,
+      resolved_by: null,
+      resolution_note: null,
+      converted_transaction_id: null,
+      converted_transaction_type: null,
+    },
+  ],
+  paymentSuggestionParts: [
+    {
+      id: "part-1",
+      member_id: "member-2",
+      suggestion_id: "sugg-1",
+      tracked_balance_id: "bal-car",
+      amount_cents: 3000,
+      created_at: "2026-10-03T00:00:00Z",
+    },
+  ],
   auditLog: [
     {
       id: "audit-1",
@@ -93,8 +160,25 @@ describe("toHouseholdBackupSnapshot", () => {
       paymentPlans: EXAMPLE_INPUT.paymentPlans,
       paymentPeriods: EXAMPLE_INPUT.paymentPeriods,
       categories: EXAMPLE_INPUT.categories,
+      trackedBalances: EXAMPLE_INPUT.trackedBalances,
+      paymentAllocations: EXAMPLE_INPUT.paymentAllocations,
+      balanceTransfers: EXAMPLE_INPUT.balanceTransfers,
+      paymentSuggestions: EXAMPLE_INPUT.paymentSuggestions,
+      paymentSuggestionParts: EXAMPLE_INPUT.paymentSuggestionParts,
       auditLog: EXAMPLE_INPUT.auditLog,
     });
+  });
+
+  it("is schema version 2: carries the category-balance tables, with plan and category balance links", () => {
+    const snapshot = toHouseholdBackupSnapshot(EXAMPLE_INPUT, "2026-09-06T18:30:00.000Z");
+
+    expect(HOUSEHOLD_BACKUP_SCHEMA_VERSION).toBe(2);
+    expect(snapshot.schemaVersion).toBe(2);
+    expect(snapshot.categories[0]?.tracked_balance_id).toBe("bal-car");
+    expect(snapshot.paymentPlans[0]?.tracked_balance_id).toBeNull();
+    expect(snapshot.paymentAllocations[0]?.amount_cents).toBe(1250);
+    expect(snapshot.balanceTransfers[0]?.amount_cents).toBe(500);
+    expect(snapshot.paymentSuggestionParts[0]?.amount_cents).toBe(3000);
   });
 
   it("keeps monetary amounts as raw integer cents, never a formatted currency string", () => {
@@ -115,6 +199,11 @@ describe("toHouseholdBackupSnapshot", () => {
         paymentPlans: [],
         paymentPeriods: [],
         categories: [],
+        trackedBalances: [],
+        paymentAllocations: [],
+        balanceTransfers: [],
+        paymentSuggestions: [],
+        paymentSuggestionParts: [],
         auditLog: [],
       },
       "2026-09-06T18:30:00.000Z",

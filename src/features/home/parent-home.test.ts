@@ -24,6 +24,7 @@ const child = (memberId: string, name: string, balanceCents = 10000): ChildBalan
 });
 
 const plan = (over: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress => ({
+  balanceId: "everyday",
   periodStatus: "due",
   minimumCents: 4000,
   paidCents: 0,
@@ -32,7 +33,9 @@ const plan = (over: Partial<ChildPaymentProgress> = {}): ChildPaymentProgress =>
   ...over,
 });
 
-const progressMap = (entries: [string, ChildPaymentProgress | null][]) => new Map(entries);
+// One plan per child here (a null entry is a child with no plan).
+const progressMap = (entries: [string, ChildPaymentProgress | null][]) =>
+  new Map(entries.map(([id, progress]) => [id, progress ? [progress] : []] as const));
 
 describe("needsAttention", () => {
   it("lists overdue and due-within-a-week children, worst first", () => {
@@ -304,5 +307,27 @@ describe("greeting", () => {
   it("takes the first word of the name", () => {
     expect(firstName("  Dana  Smith ")).toBe("Dana");
     expect(firstName("Dana")).toBe("Dana");
+  });
+});
+
+describe("one child with a plan on each of two balances", () => {
+  const car = plan({ balanceId: "car", periodStatus: "overdue", dueDate: "2026-09-15", remainingCents: 1500, paidCents: 2500 });
+  const everyday = plan({ balanceId: "e", dueDate: "2026-10-05", remainingCents: 3000 });
+  const plans = new Map([["alex", [everyday, car]]]);
+  const alex = [child("alex", "Alex")];
+
+  it("needs attention once per plan, naming the balance, and sums what is due across both", () => {
+    const items = needsAttention(alex, plans, TODAY, LOCALE, (id) => (id === "car" ? "Car" : "Everyday"));
+    expect(items.map((item) => [item.balanceId, item.headline])).toEqual([
+      ["car", "Alex is $15.00 behind on Car"],
+      ["e", "Alex owes $30.00 on Everyday by Oct 5"],
+    ]);
+    expect(householdTotal(alex, plans, LOCALE).summary).toContain("$45.00 due by Oct 5");
+  });
+
+  it("is ordered and chipped by its most pressing plan", () => {
+    const calm = [child("sam", "Sam"), child("alex", "Alex")];
+    const mixed = new Map([["sam", [plan({ dueDate: "2026-10-03" })]], ["alex", [everyday, car]]]);
+    expect(orderChildren(calm, mixed).map((c) => c.memberId)).toEqual(["alex", "sam"]);
   });
 });

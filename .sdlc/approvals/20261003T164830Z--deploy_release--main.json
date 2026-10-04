@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "deploy_release",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "main",
+  "commit_sha": "7c4e69c795740a6f51638ddf8057b8714bb8059a",
+  "approved_at": "2026-10-03T16:48:30Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "\"publish it to production\"",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-10-03T16:49:45Z",
+  "consumed_by": "supervisor (release operator) via /continue-development",
+  "notes": "Promotes period-fixes (PF1 due date never before period start, PF2 Record payment confirmation names the payment's month). Includes migration 20261003120000 (new internal.payment_period_due_date helper, create or replace ensure_current_payment_period, one-time repair UPDATE of payment_periods rows with due_date < period_start), which the OWNER applies with npx supabase db push --linked -- agents never target the linked project. Front end does not depend on it. | CONSUMED: gate on main @7c4e69c green (typecheck, lint, test 48 files/816 tests, build -> local bundle index-BBnqu4_w.js). origin/main already at 7c4e69c (no main push needed). Ran: git checkout production; git pull --ff-only origin production (already up to date at a24651e); git merge --no-ff main -m \"Merge main into production: payment-period fixes (PF1 due date, PF2 payment confirmation month)\" -> 572a80a483b4dbf0ca02a290ba5d8bbef6861dbe; git push origin production (a24651e..572a80a); git checkout main. No wrangler deploy (Cloudflare Workers Builds deploys on push). Live bundle before push: index-DX20UK2U.js. Migration 20261003120000 NOT applied -- owner applies it."
+}

@@ -252,7 +252,7 @@ sequential except where noted.
     `20261003090000`, needs `npx supabase db push --linked` by the owner when
     promoted); Parent/Child Home tidy. Items 13-15 are follow-ups it found.
 
-13. **Record payment confirmation ignores a backdated payment's month** — status: `done (on main; not yet in production)` — analysis: analysis/13-payment-confirmation-backdated-month.md
+13. **Record payment confirmation ignores a backdated payment's month** — status: `done` (live, production 572a80a) — analysis: analysis/13-payment-confirmation-backdated-month.md
     Tracking: `docs/proposals/period-fixes/PROGRESS.md` (task PF2).
     After recording a payment, the confirmation always shows the effect on
     the *current* payment period, even when the payment's date falls in an
@@ -269,7 +269,7 @@ sequential except where noted.
     plan's first. Affects old-plan history only; Home uses the current plan.
     Verifier finding on H1, 2026-10-03.
 
-15. **Plans starting on the 29th-31st get a due date before the period starts** — status: `done (on main; not yet in production; owner db push needed)` — analysis: analysis/15-due-date-before-period-start.md
+15. **Plans starting on the 29th-31st get a due date before the period starts** — status: `live (production 572a80a); owner to run db push for migration 20261003120000` — analysis: analysis/15-due-date-before-period-start.md
     Tracking: `docs/proposals/period-fixes/PROGRESS.md` (task PF1). Wider than
     first noted: any plan whose start day is after its due day.
     `ensure_current_payment_period` puts the due date on `due_day` of the
@@ -278,3 +278,22 @@ sequential except where noted.
     immediately. Pre-existing; spotted during H1, 2026-10-03. Also worth a
     test: calling `payment_period_status` for another household's period
     returns zero rows (currently covered by reasoning, not by a test).
+
+16. **Separate balances by category, with payment splitting** — status: `in progress` (design signed off 2026-10-03) — analysis: analysis/16-category-balances.md
+    Requested by the owner 2026-10-03: keep a child's debts separate (e.g. a
+    car with a $300/month minimum and $1,000 of college) and choose how each
+    payment is divided between them. Owner decisions: allocate to category
+    balances (not individual expenses), per-balance monthly minimums,
+    suggested split the Parent can adjust, Child may suggest a split for a
+    Parent to confirm. Reverses `PROJECT_REQUIREMENTS.md` §3's "complex debt
+    allocation" non-goal in a limited form. Touches the money core: design
+    spec first. Branch `feature/category-balances`; spec at
+    `docs/proposals/category-balances/DESIGN_SPEC.md`.
+
+17. **Tap a Recent activity item on Home to open it on the Activity page** — status: `ready` — analysis: none (small; owner-requested 2026-10-03)
+    Requested by the owner 2026-10-03: the Recent activity list on Home (the
+    Parent and Child versions) is read-only. Each item should be tappable and
+    take the person straight to the Activity page (`src/pages/ActivityPage.tsx`)
+    with that item already expanded (and scrolled into view). Front-end only,
+    expected; check that the Activity page can find an item that is older than
+    what it first loads, and that a Child only ever reaches their own items.

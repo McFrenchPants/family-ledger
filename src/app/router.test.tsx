@@ -16,6 +16,9 @@ vi.mock("../pages/AddExpensePage", () => ({ AddExpensePage: () => <p>stub: add e
 vi.mock("../pages/RecordPaymentPage", () => ({
   RecordPaymentPage: () => <p>stub: record payment</p>,
 }));
+vi.mock("../pages/SuggestPaymentPage", () => ({
+  SuggestPaymentPage: () => <p>stub: suggest payment</p>,
+}));
 vi.mock("../pages/FamilyPage", () => ({ FamilyPage: () => <p>stub: family</p> }));
 vi.mock("../pages/FamilyMemberPage", () => ({
   FamilyMemberPage: () => <p>stub: family member</p>,
@@ -70,12 +73,18 @@ describe("route map: new addresses", () => {
     ["/home", "stub: home"],
     ["/activity", "stub: activity"],
     ["/new/expense", "stub: add expense"],
+    ["/new/suggestion", "stub: suggest payment"],
     ["/settings", "stub: settings"],
     ["/settings/account", "stub: account"],
   ])("a child reaches %s", (path, text) => {
     const router = renderAt(path, CHILD);
     expect(screen.getByText(text)).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(path);
+  });
+
+  it("a parent typing /new/suggestion is sent to /home (only children tell a parent about a payment)", () => {
+    const router = renderAt("/new/suggestion", PARENT);
+    expect(router.state.location.pathname).toBe("/home");
   });
 
   it.each([
