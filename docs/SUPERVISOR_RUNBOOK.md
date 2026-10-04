@@ -47,9 +47,11 @@ commands for a system it doesn't actually have verified access to.**
 
 Two-stage, per `.sdlc/project.yaml`'s `release` block: feature branches fork
 from and merge into `main` (routine, automatic); that
-branch only promotes to `production` on an explicit live
-instruction. Both stages still require this project's own tests fully green
-first.
+branch promotes to `production` automatically once everything is tested
+(**standing owner authorization, 2026-10-03 — see the "Release policy" in
+`CLAUDE.md`; no per-release instruction is needed**). Both stages still
+require this project's own tests fully green first, and hosted database
+changes go out **before** the promotion (Stage 1b).
 
 ### Stage 1 — feature branch → `main` (routine, no approval record needed)
 
@@ -68,7 +70,19 @@ Do this as the normal way a finished task/proposal wraps up — no need to
 wait for the user to separately ask for this merge, and no approval record
 to write for it.
 
-### Stage 2 — `main` → `production` (production; requires a live instruction + approval record)
+### Stage 1b — hosted database and functions (before Stage 2, when the branch changed them)
+
+```bash
+npx supabase migration list --linked          # what is pending
+npx supabase db push --linked --dry-run       # review exactly what will run
+npx supabase db push --linked                 # apply
+npx supabase functions deploy --project-ref fsszkclgeekdyyspgrhg   # only if supabase/functions changed
+```
+
+Standing-authorized. Stop and ask only for irreversible rewrites of real
+data (see "Still stop and ask" in `CLAUDE.md`).
+
+### Stage 2 — `main` → `production` (standing-authorized; audit record still written)
 
 ```bash
 git checkout production
@@ -84,9 +98,9 @@ git merge --no-ff main -m "Merge main into production: <summary>"
 git push origin production
 ```
 
-Never push a production promotion without the approval-record check in
-`docs/sdlc/APPROVAL_RECORDS.md` passing first — this is the step that
-reaches real users/guests/customers.
+Write the audit record described in `docs/sdlc/APPROVAL_RECORDS.md`
+(instruction: standing authorization) for each promotion. Then one
+read-only live check: the served bundle changed and the site loads.
 
 ## Live systems: read-only checks (preferred)
 
