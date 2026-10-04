@@ -241,6 +241,15 @@ describe("ChildDashboardPage", () => {
     expect(screen.getByTestId("nudge")).toHaveTextContent("nudge allowed");
   });
 
+  it("each recent row opens that entry on the Activity page", () => {
+    renderHome();
+    const recent = screen.getByRole("region", { name: "Recent activity" });
+    const links = within(recent)
+      .getAllByRole("listitem")
+      .map((row) => within(row).getByRole("link").getAttribute("href"));
+    expect(links).toEqual(["/activity?open=e1", "/activity?open=p1", "/activity?open=e2"]);
+  });
+
   it("asks for live rows only: voided entries stay off Home", () => {
     renderHome();
     expect(recentActivityArgs).toEqual([MEMBER, { excludeVoided: true }]);
@@ -404,6 +413,8 @@ describe("ChildDashboardPage", () => {
 
     const allowedHrefs = new Set(["/new/expense", "/new/suggestion", "/activity", "/settings"]);
     for (const link of screen.getAllByRole("link")) {
+      // Recent rows open that entry on the (read-only for a Child) Activity page.
+      if (link.getAttribute("href")?.startsWith("/activity?open=")) continue;
       expect(allowedHrefs).toContain(link.getAttribute("href"));
       // The one deliberate exception: telling a parent about a payment is a note, not a payment.
       if (link.getAttribute("href") === "/new/suggestion") {
